@@ -57,7 +57,7 @@
             app.UseMvc(routeBuilder =>
             {
                 var modelBuilder = routeBuilder.ServiceProvider.GetRequiredService<VersionedODataModelBuilder>();
-                routeBuilder.MapVersionedODataRoutes("odata", "api", modelBuilder.GetEdmModels());
+                routeBuilder.MapVersionedODataRoutes("odata", "api/v{version:apiVersion}", modelBuilder.GetEdmModels());
             });
         }
     }

@@ -51,7 +51,7 @@
                     var model = await _dataQueryService.GetAsync(query, new object[] { id }, cancellationToken).ConfigureAwait(false);
                     result = Ok(model);
                 }
-                catch (ArgumentException e) when (!IsNullOrEmpty(e.ParamName) && !IsNullOrWhiteSpace(e.ParamName))
+                catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
                 {
                     ModelState.AddModelError(e.ParamName, e.Message);
                     result = BadRequest(ModelState);
@@ -94,7 +94,7 @@
                     };
                     result = CreatedAtAction(nameof(GetAsset), routeValues, model);
                 }
-                catch (ArgumentException e) when (!IsNullOrEmpty(e.ParamName) && !IsNullOrWhiteSpace(e.ParamName))
+                catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
                 {
                     ModelState.AddModelError(e.ParamName, e.Message);
                     result = BadRequest(ModelState);
@@ -135,7 +135,7 @@
                     await _dataCommandService.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                     result = NoContent();
                 }
-                catch (ArgumentException e) when (!IsNullOrEmpty(e.ParamName) && !IsNullOrWhiteSpace(e.ParamName))
+                catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
                 {
                     ModelState.AddModelError(e.ParamName, e.Message);
                     result = BadRequest(ModelState);
@@ -168,7 +168,7 @@
                     await _dataCommandService.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                     result = NoContent();
                 }
-                catch (ArgumentException e) when (!IsNullOrEmpty(e.ParamName) && !IsNullOrWhiteSpace(e.ParamName))
+                catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
                 {
                     ModelState.AddModelError(e.ParamName, e.Message);
                     result = BadRequest(ModelState);

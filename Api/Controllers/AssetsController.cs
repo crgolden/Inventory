@@ -5,6 +5,7 @@
     using System.ComponentModel.DataAnnotations;
     using System.Linq;
     using System.Linq.Expressions;
+    using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
     using Common;
@@ -15,10 +16,14 @@
     using Microsoft.Extensions.Logging;
     using Microsoft.OData;
     using Swashbuckle.AspNetCore.Annotations;
+    using static System.DateTime;
+    using static System.Net.Mime.MediaTypeNames.Application;
     using static System.String;
+    using static Asset;
     using static Microsoft.AspNetCore.Http.StatusCodes;
 
     [ODataRoutePrefix("Assets")]
+    [Produces(Json)]
     public class AssetsController : ODataController
     {
         private readonly ILogger<AssetsController> _logger;
@@ -52,7 +57,7 @@
             {
                 result = BadRequest(e.Message);
             }
-            catch (ArgumentException e) when (!IsNullOrEmpty(e.ParamName) && !IsNullOrWhiteSpace(e.ParamName))
+            catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
             {
                 ModelState.AddModelError(e.ParamName, e.Message);
                 result = BadRequest(ModelState);
@@ -67,29 +72,38 @@
 
         [ODataRoute(RouteName = nameof(PostAssets))]
         [MapToApiVersion("1.0")]
-        [SwaggerResponse(Status200OK, "Create Assets", typeof(List<Asset>))]
-        public async Task<IActionResult> PostAssets([FromBody, Required] List<Asset> models, CancellationToken cancellationToken)
+        [SwaggerResponse(Status200OK, "Create Assets", typeof(ODataValue<List<Asset>>))]
+        public async Task<IActionResult> PostAssets([FromBody, Required] JsonElement element, CancellationToken cancellationToken)
         {
             IActionResult result;
-            if (models == default || models.Count == 0)
+            if (element.ValueKind != JsonValueKind.Array)
             {
-                ModelState.AddModelError(nameof(models), "Models are required");
+                ModelState.AddModelError(nameof(element), "Models must be an array");
                 result = BadRequest(ModelState);
             }
-            else if (models.Any(x => x.Id != default))
+            else if (element.GetArrayLength() == 0)
             {
-                ModelState.AddModelError(nameof(models), "Ids must be empty");
+                ModelState.AddModelError(nameof(element), "Models cannot be empty");
                 result = BadRequest(ModelState);
             }
             else
             {
                 try
                 {
-                    var response = await _dataCommandService.CreateRangeAsync(models, cancellationToken).ConfigureAwait(false);
-                    await _dataCommandService.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                    result = Ok(response.ToList());
+                    var models = element.EnumerateArray().Select(FromJsonElement).ToArray();
+                    if (models.Any(x => x.Id != default))
+                    {
+                        ModelState.AddModelError(nameof(element), "Ids must be empty");
+                        result = BadRequest(ModelState);
+                    }
+                    else
+                    {
+                        var response = await _dataCommandService.CreateRangeAsync(models, cancellationToken).ConfigureAwait(false);
+                        await _dataCommandService.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                        result = Ok(response.ToList());
+                    }
                 }
-                catch (ArgumentException e) when (!IsNullOrEmpty(e.ParamName) && !IsNullOrWhiteSpace(e.ParamName))
+                catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
                 {
                     ModelState.AddModelError(e.ParamName, e.Message);
                     result = BadRequest(ModelState);
@@ -106,24 +120,31 @@
         [ODataRoute(RouteName = nameof(PutAssets))]
         [MapToApiVersion("1.0")]
         [SwaggerResponse(Status204NoContent, "Update Assets")]
-        public async Task<IActionResult> PutAssets([FromBody] List<Asset> models, CancellationToken cancellationToken)
+        public async Task<IActionResult> PutAssets([FromBody] JsonElement element, CancellationToken cancellationToken)
         {
             IActionResult result;
-            if (models == default || models.Count == 0)
+            if (element.ValueKind != JsonValueKind.Array)
             {
-                ModelState.AddModelError(nameof(models), "Models are required");
+                ModelState.AddModelError(nameof(element), "Models must be an array");
+                result = BadRequest(ModelState);
+            }
+            else if (element.GetArrayLength() == 0)
+            {
+                ModelState.AddModelError(nameof(element), "Models cannot be empty");
                 result = BadRequest(ModelState);
             }
             else
             {
-                var keyValuePairs = models.ToDictionary<Asset, Expression<Func<Asset, bool>>, Asset>(x => y => y.Id == x.Id, x => x);
                 try
                 {
+                    var models = element.EnumerateArray().Select(FromJsonElement).ToList();
+                    models.ForEach(model => model.UpdatedDate = UtcNow);
+                    var keyValuePairs = models.ToDictionary<Asset, Expression<Func<Asset, bool>>, Asset>(x => y => y.Id == x.Id, x => x);
                     await _dataCommandService.UpdateRangeAsync(keyValuePairs, cancellationToken).ConfigureAwait(false);
                     await _dataCommandService.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                     result = NoContent();
                 }
-                catch (ArgumentException e) when (!IsNullOrEmpty(e.ParamName) && !IsNullOrWhiteSpace(e.ParamName))
+                catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
                 {
                     ModelState.AddModelError(e.ParamName, e.Message);
                     result = BadRequest(ModelState);
@@ -157,7 +178,7 @@
                     await _dataCommandService.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                     result = NoContent();
                 }
-                catch (ArgumentException e) when (!IsNullOrEmpty(e.ParamName) && !IsNullOrWhiteSpace(e.ParamName))
+                catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
                 {
                     ModelState.AddModelError(e.ParamName, e.Message);
                     result = BadRequest(ModelState);

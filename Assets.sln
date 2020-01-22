@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Assets.Api", "Api\Assets.Ap
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Assets.Models", "Models\Assets.Models.csproj", "{1939280E-3BA9-4EFC-9876-8A802922D718}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Assets.Api.IntegrationTests", "Api.IntegrationTests\Assets.Api.IntegrationTests.csproj", "{5B69DB68-8877-46B3-B368-2507E70C1B4C}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Abstractions", "..\Common\Abstractions\Common.Abstractions.csproj", "{B7DE807B-B786-46F0-AB1E-2BC7E0AD864B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Services.Data.Mongo", "..\Services\Data.Mongo\Services.Data.Mongo.csproj", "{901F5772-9D6E-4DF5-B4D8-7E2288390F65}"
@@ -59,6 +61,10 @@ Global
 		{01A63E6D-F2CB-485C-969E-89367C622071}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{01A63E6D-F2CB-485C-969E-89367C622071}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{01A63E6D-F2CB-485C-969E-89367C622071}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5B69DB68-8877-46B3-B368-2507E70C1B4C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5B69DB68-8877-46B3-B368-2507E70C1B4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5B69DB68-8877-46B3-B368-2507E70C1B4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5B69DB68-8877-46B3-B368-2507E70C1B4C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

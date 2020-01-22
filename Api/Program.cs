@@ -6,6 +6,7 @@
     using Microsoft.Extensions.Hosting;
     using Services.Extensions;
     using static ClassMaps;
+    using static IndexModels;
     using static Seeds;
 
     public static class Program
@@ -17,8 +18,9 @@
             var cancellationToken = cancellationTokenSource.Token;
             try
             {
-                await host.AddMongo(KeyValuePairs, cancellationToken: cancellationToken).ConfigureAwait(false);
-                await host.SeedDocumentsAsync(Assets, cancellationToken: cancellationToken).ConfigureAwait(false);
+                await host.Services.InitializeCollectionsAsync(KeyValuePairs, cancellationToken: cancellationToken).ConfigureAwait(false);
+                await host.Services.BuildIndexesAsync(AssetIndexes.Key, AssetIndexes.Value, cancellationToken: cancellationToken).ConfigureAwait(false);
+                await host.Services.SeedDocumentsAsync(Assets, cancellationToken: cancellationToken).ConfigureAwait(false);
                 await host.RunAsync(cancellationToken).ConfigureAwait(false);
             }
             catch
