@@ -1,7 +1,9 @@
 ﻿namespace Assets
 {
+    using System.Reflection;
     using Controllers;
     using Core.Extensions;
+    using MediatR;
     using Microsoft.AspNet.OData.Builder;
     using Microsoft.AspNet.OData.Extensions;
     using Microsoft.AspNetCore.Builder;
@@ -10,6 +12,7 @@
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Hosting;
     using Services.Extensions;
+    using static System.Reflection.Assembly;
     using static Microsoft.AspNet.OData.Query.AllowedQueryOptions;
     using static Microsoft.AspNetCore.Mvc.CompatibilityVersion;
 
@@ -32,6 +35,7 @@
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddMvc(options => options.EnableEndpointRouting = false).SetCompatibilityVersion(Latest);
+            services.AddMediatR(Load("Assets.Services"));
             services.AddMongo(_mongoSection);
             services.AddSwagger(_swaggerSection);
             services.AddODataApiExplorer(options =>
@@ -49,6 +53,7 @@
                 app.UseDeveloperExceptionPage();
             }
 
+            app.UseExceptionHandler(app1 => app1.Run(async context => await app1.HandleException(context).ConfigureAwait(false)));
             app.UseHttpsRedirection();
             app.UseSwagger();
             app.UseSwaggerUI();

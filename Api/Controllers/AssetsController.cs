@@ -9,17 +9,20 @@
     using System.Threading;
     using System.Threading.Tasks;
     using Common;
+    using MediatR;
     using Microsoft.AspNet.OData;
     using Microsoft.AspNet.OData.Query;
     using Microsoft.AspNet.OData.Routing;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Logging;
     using Microsoft.OData;
+    using Requests;
     using Swashbuckle.AspNetCore.Annotations;
     using static System.DateTime;
     using static System.Net.Mime.MediaTypeNames.Application;
     using static System.String;
     using static Asset;
+    using static Common.EventIds;
     using static Microsoft.AspNetCore.Http.StatusCodes;
 
     [ODataRoutePrefix("Assets")]
@@ -27,16 +30,16 @@
     public class AssetsController : ODataController
     {
         private readonly ILogger<AssetsController> _logger;
-        private readonly IDataQueryService _dataQueryService;
         private readonly IDataCommandService _dataCommandService;
+        private readonly IMediator _mediator;
 
         public AssetsController(
+            IMediator mediator,
             ILogger<AssetsController> logger,
-            IEnumerable<IDataQueryService> dataQueryServices,
             IEnumerable<IDataCommandService> dataCommandServices)
         {
+            _mediator = mediator;
             _logger = logger;
-            _dataQueryService = dataQueryServices.Single(x => x.Name == nameof(MongoDB));
             _dataCommandService = dataCommandServices.Single(x => x.Name == nameof(MongoDB));
         }
 
@@ -45,29 +48,34 @@
         [SwaggerResponse(Status200OK, "Get Assets", typeof(ODataValue<List<Asset>>))]
         public async Task<IActionResult> GetAssets(ODataQueryOptions<Asset> options, CancellationToken cancellationToken)
         {
-            IActionResult result;
-            try
-            {
-                var query = _dataQueryService.Query<Asset>();
-                query = options?.ApplyTo(query) as IQueryable<Asset> ?? query;
-                var models = await _dataQueryService.ToListAsync(query, cancellationToken).ConfigureAwait(false);
-                result = Ok(models);
-            }
-            catch (ODataException e)
-            {
-                result = BadRequest(e.Message);
-            }
-            catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
-            {
-                ModelState.AddModelError(e.ParamName, e.Message);
-                result = BadRequest(ModelState);
-            }
-            catch (ArgumentException e)
-            {
-                result = BadRequest(e.Message);
-            }
+            //IActionResult result;
+            //try
+            //{
+                var request = new GetAssetsRequest(nameof(MongoDB), options);
+                var response = await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
+                return Ok(response);
+            //}
+            //catch (ODataException e)
+            //{
+            //    result = BadRequest(e.Message);
+            //}
+            //catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
+            //{
+            //    ModelState.AddModelError(e.ParamName, e.Message);
+            //    result = BadRequest(ModelState);
+            //}
+            //catch (ArgumentException e)
+            //{
+            //    result = BadRequest(e.Message);
+            //}
+            //catch (Exception e)
+            //{
+            //    _logger.LogError(GetRange, e, e.Message);
+            //    throw;
+            //}
 
-            return result;
+            //_logger.LogInformation(GetRange, "", result);
+            //return result;
         }
 
         [ODataRoute(RouteName = nameof(PostAssets))]

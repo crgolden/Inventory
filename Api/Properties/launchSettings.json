@@ -17,7 +17,7 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "Reports": {
+    "Assets": {
       "commandName": "Project",
       "launchBrowser": true,
       "launchUrl": "swagger",

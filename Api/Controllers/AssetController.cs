@@ -8,6 +8,7 @@
     using System.Threading.Tasks;
     using Common;
     using Microsoft.AspNet.OData;
+    using Microsoft.AspNet.OData.Results;
     using Microsoft.AspNet.OData.Routing;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Logging;
@@ -70,6 +71,7 @@
         [SwaggerResponse(Status201Created, "Create an Asset", typeof(Asset))]
         public async Task<IActionResult> PostAsset([FromBody, Required] Asset model, CancellationToken cancellationToken)
         {
+            var valid = ModelState.IsValid;
             IActionResult result;
             if (model == default)
             {
@@ -92,7 +94,7 @@
                         odataPath = $"Asset/{model.Id}",
                         model.Id
                     };
-                    result = CreatedAtAction(nameof(GetAsset), routeValues, model);
+                    result = new CreatedODataResult<Asset>(model);
                 }
                 catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
                 {
@@ -133,7 +135,7 @@
                 {
                     await _dataCommandService.UpdateAsync(x => x.Id == id, model, cancellationToken).ConfigureAwait(false);
                     await _dataCommandService.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                    result = NoContent();
+                    result = new UpdatedODataResult<Asset>(model);
                 }
                 catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
                 {
