@@ -1,4 +1,4 @@
-﻿namespace Assets.Api.IntegrationTests
+﻿namespace Inventory.Api.IntegrationTests
 {
     using System;
     using System.Collections.Generic;
@@ -27,28 +27,28 @@
 
     public class AssetsControllerTests : IClassFixture<WebApplicationFactory<Startup>>
     {
+        private readonly List<Asset> _models = Enumerable.Range(0, 1000).Select(_ => new Asset
+        {
+            Name = NewGuid().ToString()
+        }).OrderBy(x => x.Name).ToList();
+
         private readonly ITestOutputHelper _output;
-        private readonly JsonSerializerOptions _jsonSerializerOptions;
         private WebApplicationFactory<Startup> _factory;
 
         public AssetsControllerTests(
             ITestOutputHelper output,
-            WebApplicationFactory<Startup> factory)
+            WebApplicationFactory<Startup> factory) => (_output, _factory) = (output, factory);
+
+        private static JsonSerializerOptions JsonSerializerOptions => new JsonSerializerOptions
         {
-            _output = output;
-            _jsonSerializerOptions = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = CamelCase,
-                PropertyNameCaseInsensitive = true
-            };
-            _factory = factory;
-        }
+            PropertyNamingPolicy = CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
 
         [Fact]
         public async Task PostGetPutGetDeleteGet()
         {
             // Arrange
-            const int count = 100;
             var total = Zero;
             var stopwatch = new Stopwatch();
             _factory = _factory.WithWebHostBuilder(webHost =>
@@ -59,84 +59,51 @@
                 });
             });
             await _factory.Services.InitializeCollectionsAsync(KeyValuePairs).ConfigureAwait(true);
-            await _factory.Services.BuildIndexesAsync(AssetIndexes.Key, AssetIndexes.Value).ConfigureAwait(false);
+            await _factory.Services.BuildIndexesAsync(AssetIndexes).ConfigureAwait(true);
             var client = _factory.CreateClient();
-            var models = Enumerable.Range(0, count).Select(x => new Asset
-            {
-                Name = NewGuid().ToString()
-            }).ToList();
+            ODataValue<List<Asset>> value;
+            var content = Serialize(_models, JsonSerializerOptions);
             var requestUri = new Uri("/api/v1/Assets", Relative);
-            var content = Serialize(models, _jsonSerializerOptions);
-            ODataValue<List<Asset>> result;
 
             // Act
-            _output.WriteLine("Starting POST.");
             stopwatch.Start();
             using (var httpContent = new StringContent(content, UTF8, Json))
             {
                 using var response = await client.PostAsync(requestUri, httpContent).ConfigureAwait(true);
                 response.EnsureSuccessStatusCode();
                 var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
-                result = await DeserializeAsync<ODataValue<List<Asset>>>(body, _jsonSerializerOptions).ConfigureAwait(true);
+                value = await DeserializeAsync<ODataValue<List<Asset>>>(body, JsonSerializerOptions).ConfigureAwait(true);
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Finished POST in   {0}.", stopwatch.Elapsed);
+            _output.WriteLine("Models created in   {0}", stopwatch.Elapsed);
 
             // Assert
-            for (var i = 0; i < count; i++)
+            for (var i = 0; i < value.Value.Count; i++)
             {
-                var model = result.Value[i];
+                var model = value.Value[i];
                 Assert.NotEqual(Empty, model.Id);
-                Assert.Equal(models[i].Name, model.Name);
-                Assert.Equal(models[i].CreatedDate, model.CreatedDate.ToUniversalTime());
+                Assert.Equal(_models[i].Name, model.Name);
+                Assert.Equal(_models[i].CreatedDate, model.CreatedDate.ToUniversalTime());
                 Assert.Null(model.UpdatedDate);
+                _models[i].Id = model.Id;
             }
-
-            // Arrange
-            models = result.Value;
-            models.Sort((x, y) => string.Compare(x.Name, y.Name, Ordinal));
-            var sb = new StringBuilder("/api/v1/Assets?$filter=");
-            foreach (var model in models)
-            {
-                sb.Append($"{nameof(Asset.Name)} eq '{model.Name}' or ");
-            }
-
-            requestUri = new Uri(sb.ToString().TrimEnd(' ', 'o', 'r'), Relative);
 
             // Act
-            _output.WriteLine("Starting GET.");
             stopwatch.Restart();
-            using (var response = await client.GetAsync(requestUri).ConfigureAwait(true))
-            {
-                response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStringAsync().ConfigureAwait(true);
-                result = Deserialize<ODataValue<List<Asset>>>(body, _jsonSerializerOptions);
-            }
-
+            var count = await AssertQuery(client).ConfigureAwait(true);
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Finished GET in    {0}.", stopwatch.Elapsed);
+            _output.WriteLine("Models retrieved in {0}", stopwatch.Elapsed);
 
             // Assert
-            for (var i = 0; i < count; i++)
-            {
-                var model = result.Value[i];
-                Assert.Equal(models[i].Id, model.Id);
-                Assert.Equal(models[i].Name, model.Name);
-                Assert.Equal(models[i].CreatedDate, model.CreatedDate, FromMilliseconds(1));
-                Assert.Null(model.UpdatedDate);
-            }
+            Assert.Equal(_models.Count, count);
 
             // Arrange
-            models.ForEach(model => model.Name = NewGuid().ToString());
-            models.Sort((x, y) => string.Compare(x.Name, y.Name, Ordinal));
-            content = Serialize(models, _jsonSerializerOptions);
-            requestUri = new Uri("/api/v1/Assets", Relative);
-
-            // Act
-            _output.WriteLine("Starting PUT.");
+            _models.ForEach(model => model.Name = NewGuid().ToString());
+            _models.Sort((x, y) => string.Compare(x.Name, y.Name, Ordinal));
+            content = Serialize(_models, JsonSerializerOptions);
             stopwatch.Restart();
             using (var httpContent = new StringContent(content, UTF8, Json))
             {
@@ -146,47 +113,21 @@
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Finished PUT in    {0}.", stopwatch.Elapsed);
-
-            // Arrange
-            sb = new StringBuilder("/api/v1/Assets?$filter=");
-            foreach (var model in models)
-            {
-                sb.Append($"{nameof(Asset.Name)} eq '{model.Name}' or ");
-            }
-
-            requestUri = new Uri(sb.ToString().TrimEnd(' ', 'o', 'r'), Relative);
+            _output.WriteLine("Models replaced in  {0}", stopwatch.Elapsed);
 
             // Act
-            _output.WriteLine("Starting GET.");
             stopwatch.Restart();
-            using (var response = await client.GetAsync(requestUri).ConfigureAwait(true))
-            {
-                response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStringAsync().ConfigureAwait(true);
-                result = Deserialize<ODataValue<List<Asset>>>(body, _jsonSerializerOptions);
-            }
-
+            count = await AssertQuery(client, true).ConfigureAwait(true);
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Finished GET in    {0}.", stopwatch.Elapsed);
+            _output.WriteLine("Models retrieved in {0}", stopwatch.Elapsed);
 
             // Assert
-            for (var i = 0; i < count; i++)
-            {
-                var model = result.Value[i];
-                Assert.Equal(models[i].Id, model.Id);
-                Assert.Equal(models[i].Name, model.Name);
-                Assert.Equal(models[i].CreatedDate, model.CreatedDate, FromMilliseconds(1));
-                Assert.NotNull(model.UpdatedDate);
-            }
+            Assert.Equal(_models.Count, count);
 
             // Arrange
-            var ids = string.Join('&', models.Select(x => x.Id).Select((x, i) => $"ids[{i}]={x}"));
+            var ids = string.Join('&', _models.Select(x => x.Id).Select((x, j) => $"ids[{j}]={x}"));
             requestUri = new Uri($"/api/v1/Assets?{ids}", Relative);
-
-            // Act
-            _output.WriteLine("Starting DELETE.");
             stopwatch.Restart();
             using (var response = await client.DeleteAsync(requestUri).ConfigureAwait(true))
             {
@@ -195,34 +136,79 @@
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Finished DELETE in {0}.", stopwatch.Elapsed);
-
-            // Arrange
-            sb = new StringBuilder("/api/v1/Assets?$filter=");
-            foreach (var model in models)
-            {
-                sb.Append($"{nameof(Asset.Name)} eq '{model.Name}' or ");
-            }
-
-            requestUri = new Uri(sb.ToString().TrimEnd(' ', 'o', 'r'), Relative);
+            _output.WriteLine("Models deleted in   {0}", stopwatch.Elapsed);
 
             // Act
-            _output.WriteLine("Starting GET.");
             stopwatch.Restart();
-            using (var response = await client.GetAsync(requestUri).ConfigureAwait(true))
-            {
-                response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStringAsync().ConfigureAwait(true);
-                result = Deserialize<ODataValue<List<Asset>>>(body, _jsonSerializerOptions);
-            }
-
+            count = await AssertQuery(client).ConfigureAwait(true);
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Finished GET in    {0}.", stopwatch.Elapsed);
+            _output.WriteLine("Models retrieved in {0}", stopwatch.Elapsed);
 
             // Assert
-            Assert.Empty(result.Value);
-            _output.WriteLine("Finished all in    {0}.", total);
+            Assert.Equal(0, count);
+            _output.WriteLine("Finished all in     {0}", total);
+        }
+
+        private async Task<int> AssertQuery(HttpClient client, bool updated = default)
+        {
+            // Arrange
+            const int maxPerQuery = 100;
+            var requestCount = _models.Count / maxPerQuery;
+            var values = _models.Count % maxPerQuery > 0
+                ? new ODataValue<List<Asset>>[requestCount + 1]
+                : new ODataValue<List<Asset>>[requestCount];
+            var index = 0;
+            for (var i = 0; i < values.Length; i++)
+            {
+                values[i] = new ODataValue<List<Asset>>
+                {
+                    Value = _models.Skip(index).Take(maxPerQuery).ToList()
+                };
+                index += maxPerQuery;
+            }
+
+            var tasks = values.Select(async (value, i) =>
+            {
+                var sb = new StringBuilder("/api/v1/Assets?$filter=");
+                foreach (var model in value.Value)
+                {
+                    sb.Append($"{nameof(Asset.Name)} eq '{model.Name}' or ");
+                }
+
+                var requestUri = new Uri(sb.ToString().TrimEnd(' ', 'o', 'r'), Relative);
+                using var response = await client.GetAsync(requestUri).ConfigureAwait(true);
+                response.EnsureSuccessStatusCode();
+                var body = await response.Content.ReadAsStringAsync().ConfigureAwait(true);
+                return Deserialize<ODataValue<List<Asset>>>(body, JsonSerializerOptions);
+            });
+
+            // Act
+            values = await Task.WhenAll(tasks).ConfigureAwait(true);
+
+            // Assert
+            index = 0;
+            foreach (var value in values)
+            {
+                foreach (var model in value.Value)
+                {
+                    Assert.Equal(_models[index].Id, model.Id);
+                    Assert.Equal(_models[index].Name, model.Name);
+                    Assert.Equal(_models[index].CreatedDate, model.CreatedDate.ToUniversalTime(), FromMilliseconds(1));
+                    if (updated)
+                    {
+                        Assert.NotNull(model.UpdatedDate);
+                    }
+                    else
+                    {
+                        Assert.Null(model.UpdatedDate);
+                    }
+
+                    index++;
+                }
+            }
+
+            return index;
         }
     }
 }

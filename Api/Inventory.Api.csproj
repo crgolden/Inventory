@@ -4,10 +4,11 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <RootNamespace>Assets</RootNamespace>
+    <RootNamespace>Inventory</RootNamespace>
     <IncludeOpenAPIAnalyzers>true</IncludeOpenAPIAnalyzers>
     <CodeAnalysisRuleSet>..\.ruleset</CodeAnalysisRuleSet>
     <SkipDefaultEditorConfigAsAdditionalFile>true</SkipDefaultEditorConfigAsAdditionalFile>
+    <UserSecretsId>75d66946-e5f6-47c8-a792-751864bb2e1d</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -36,10 +37,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Common\Attributes\Common.Attributes.csproj" />
     <ProjectReference Include="..\..\Common\EventIds\Common.EventIds.csproj" />
+    <ProjectReference Include="..\..\Core\AspNetCore\Core.AspNetCore.csproj" />
     <ProjectReference Include="..\..\Core\Swagger\Core.Swagger.csproj" />
     <ProjectReference Include="..\..\Services\Data.Mongo\Services.Data.Mongo.csproj" />
-    <ProjectReference Include="..\Services\Assets.Services.csproj" />
+    <ProjectReference Include="..\Services\Inventory.Services.csproj" />
   </ItemGroup>
 
 </Project>

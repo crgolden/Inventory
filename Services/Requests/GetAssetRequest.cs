@@ -4,12 +4,11 @@
     using System.Collections.Generic;
     using Common;
     using MediatR;
-    using Microsoft.AspNet.OData.Query;
     using static System.String;
 
-    public class GetAssetsRequest : IRequest<List<Asset>>, INameable
+    public class GetAssetRequest : IRequest<Asset>, INameable
     {
-        public GetAssetsRequest(string name, ODataQueryOptions<Asset> queryOptions)
+        public GetAssetRequest(string name, object[] keyValues)
         {
             if (IsNullOrWhiteSpace(name))
             {
@@ -17,11 +16,11 @@
             }
 
             Name = name;
-            ODataQueryOptions = queryOptions ?? throw new ArgumentNullException(nameof(queryOptions));
+            KeyValues = keyValues ?? throw new ArgumentNullException(nameof(keyValues));
         }
 
         public string Name { get; }
 
-        public ODataQueryOptions<Asset> ODataQueryOptions { get; }
+        public IReadOnlyCollection<object> KeyValues { get; }
     }
 }

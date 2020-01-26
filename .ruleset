@@ -215,7 +215,9 @@
     <Rule Id="CA1303" Action="None" />
   </Rules>
   <Rules AnalyzerId="StyleCop.Analyzers" RuleNamespace="StyleCop.Analyzers">
+    <Rule Id="SA1009" Action="None" />
     <Rule Id="SA1101" Action="None" />
+    <Rule Id="SA1111" Action="None" />
     <Rule Id="SA1135" Action="None" />
     <Rule Id="SA1305" Action="Warning" />
     <Rule Id="SA1309" Action="None" />

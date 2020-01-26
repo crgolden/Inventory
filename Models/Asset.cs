@@ -1,4 +1,4 @@
-﻿namespace Assets
+﻿namespace Inventory
 {
     using System;
     using System.ComponentModel.DataAnnotations;
@@ -24,6 +24,11 @@
         public static Asset FromJsonElement(JsonElement element)
         {
             var asset = new Asset();
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                throw new ArgumentException("Element must be an object", nameof(element));
+            }
+
             foreach (var property in element.EnumerateObject())
             {
                 var name = property.Name.ToUpperInvariant();

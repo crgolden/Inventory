@@ -1,4 +1,4 @@
-﻿namespace Assets.RequestHandlers
+﻿namespace Inventory.RequestHandlers
 {
     using System;
     using System.Collections.Generic;

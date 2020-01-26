@@ -1,4 +1,4 @@
-﻿namespace Assets
+﻿namespace Inventory
 {
     using System.Threading;
     using System.Threading.Tasks;
@@ -19,7 +19,7 @@
             try
             {
                 await host.Services.InitializeCollectionsAsync(KeyValuePairs, cancellationToken: cancellationToken).ConfigureAwait(false);
-                await host.Services.BuildIndexesAsync(AssetIndexes.Key, AssetIndexes.Value, cancellationToken: cancellationToken).ConfigureAwait(false);
+                await host.Services.BuildIndexesAsync(AssetIndexes, cancellationToken: cancellationToken).ConfigureAwait(false);
                 await host.Services.SeedDocumentsAsync(Assets, cancellationToken: cancellationToken).ConfigureAwait(false);
                 await host.RunAsync(cancellationToken).ConfigureAwait(false);
             }

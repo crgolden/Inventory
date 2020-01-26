@@ -1,187 +1,127 @@
-﻿namespace Assets.Controllers
+﻿namespace Inventory.Controllers
 {
     using System;
-    using System.Collections.Generic;
     using System.ComponentModel.DataAnnotations;
-    using System.Linq;
+    using System.Diagnostics.CodeAnalysis;
     using System.Threading;
     using System.Threading.Tasks;
     using Common;
+    using MediatR;
     using Microsoft.AspNet.OData;
-    using Microsoft.AspNet.OData.Results;
     using Microsoft.AspNet.OData.Routing;
     using Microsoft.AspNetCore.Mvc;
-    using Microsoft.Extensions.Logging;
+    using Requests;
     using Swashbuckle.AspNetCore.Annotations;
-    using static System.String;
     using static Microsoft.AspNetCore.Http.StatusCodes;
 
     [ODataRoutePrefix("Asset")]
+    [SwaggerTag("Create, Read, Update, and Delete Assets")]
     public class AssetController : ODataController
     {
-        private readonly ILogger<AssetController> _logger;
-        private readonly IDataQueryService _dataQueryService;
-        private readonly IDataCommandService _dataCommandService;
+        private readonly IMediator _mediator;
 
-        public AssetController(
-            ILogger<AssetController> logger,
-            IEnumerable<IDataQueryService> dataQueryServices,
-            IEnumerable<IDataCommandService> dataCommandServices)
-        {
-            _logger = logger;
-            _dataQueryService = dataQueryServices.Single(x => x.Name == nameof(MongoDB));
-            _dataCommandService = dataCommandServices.Single(x => x.Name == nameof(MongoDB));
-        }
+        public AssetController(IMediator mediator) => _mediator = mediator;
 
-        [ODataRoute("{id}", RouteName = nameof(GetAsset))]
+        [ODataRoute("({id})", RouteName = nameof(GetAsset))]
         [MapToApiVersion("1.0")]
-        [SwaggerResponse(Status200OK, "Get an Asset", typeof(Asset))]
-        public async Task<IActionResult> GetAsset([FromODataUri] Guid id, CancellationToken cancellationToken)
+        [SwaggerResponse(Status200OK, "Asset retrieved successfully", typeof(Asset))]
+        [SwaggerOperation(
+            Summary = "Get an Asset",
+            OperationId = nameof(GetAsset),
+            Tags = new[] { "Asset" }
+        )]
+        public async Task<IActionResult> GetAsset(
+            [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
+            CancellationToken cancellationToken)
         {
-            IActionResult result;
-            if (id == default)
-            {
-                ModelState.AddModelError(nameof(id), "Id is required");
-                result = BadRequest(ModelState);
-            }
-            else
-            {
-                try
-                {
-                    var query = _dataQueryService.Query<Asset>();
-                    var model = await _dataQueryService.GetAsync(query, new object[] { id }, cancellationToken).ConfigureAwait(false);
-                    result = Ok(model);
-                }
-                catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
-                {
-                    ModelState.AddModelError(e.ParamName, e.Message);
-                    result = BadRequest(ModelState);
-                }
-                catch (ArgumentException e)
-                {
-                    result = BadRequest(e.Message);
-                }
-            }
-
-            return result;
+            var request = new GetAssetRequest(nameof(MongoDB), new object[] { id });
+            var model = await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
+            return Ok(model);
         }
 
         [ODataRoute(RouteName = nameof(PostAsset))]
         [MapToApiVersion("1.0")]
-        [SwaggerResponse(Status201Created, "Create an Asset", typeof(Asset))]
-        public async Task<IActionResult> PostAsset([FromBody, Required] Asset model, CancellationToken cancellationToken)
-        {
-            var valid = ModelState.IsValid;
-            IActionResult result;
-            if (model == default)
-            {
-                ModelState.AddModelError(nameof(model), "Model is required");
-                result = BadRequest(ModelState);
-            }
-            else if (model.Id != default)
-            {
-                ModelState.AddModelError(nameof(model), "Id must be empty");
-                result = BadRequest(ModelState);
-            }
-            else
-            {
-                try
-                {
-                    model = await _dataCommandService.CreateAsync(model, cancellationToken).ConfigureAwait(false);
-                    await _dataCommandService.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                    var routeValues = new
-                    {
-                        odataPath = $"Asset/{model.Id}",
-                        model.Id
-                    };
-                    result = new CreatedODataResult<Asset>(model);
-                }
-                catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
-                {
-                    ModelState.AddModelError(e.ParamName, e.Message);
-                    result = BadRequest(ModelState);
-                }
-                catch (ArgumentException e)
-                {
-                    result = BadRequest(e.Message);
-                }
-            }
-
-            return result;
-        }
-
-        [ODataRoute("{id}", RouteName = nameof(PutAsset))]
-        [MapToApiVersion("1.0")]
-        [SwaggerResponse(Status204NoContent, "Update an Asset")]
-        public async Task<IActionResult> PutAsset(
-            [FromODataUri] Guid id,
-            [FromBody, Required] Asset model,
+        [SwaggerResponse(Status201Created, "Asset created successfully", typeof(Asset))]
+        [SwaggerOperation(
+            Summary = "Create an Asset",
+            OperationId = nameof(PostAsset),
+            Tags = new[] { "Asset" }
+        )]
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Checked by `Required` attribute")]
+        public async Task<IActionResult> PostAsset(
+            [SwaggerParameter("The Asset", Required = true), FromBody, Required] Asset model,
             CancellationToken cancellationToken)
         {
-            IActionResult result;
-            if (id == default)
+            if (model.Id != default)
             {
-                ModelState.AddModelError(nameof(id), "Id is required");
-                result = BadRequest(ModelState);
-            }
-            else if (id != model?.Id)
-            {
-                ModelState.AddModelError(nameof(id), "Ids must match");
-                result = BadRequest(ModelState);
-            }
-            else
-            {
-                try
-                {
-                    await _dataCommandService.UpdateAsync(x => x.Id == id, model, cancellationToken).ConfigureAwait(false);
-                    await _dataCommandService.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                    result = new UpdatedODataResult<Asset>(model);
-                }
-                catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
-                {
-                    ModelState.AddModelError(e.ParamName, e.Message);
-                    result = BadRequest(ModelState);
-                }
-                catch (ArgumentException e)
-                {
-                    result = BadRequest(e.Message);
-                }
+                ModelState.AddModelError(nameof(model), "Id must be empty");
+                return BadRequest(ModelState);
             }
 
-            return result;
+            var request = new CreateAssetRequest(nameof(MongoDB), model);
+            await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
+            return Created(model);
         }
 
-        [ODataRoute("{id}", RouteName = nameof(DeleteAsset))]
+        [ODataRoute("({id})", RouteName = nameof(PatchAsset))]
         [MapToApiVersion("1.0")]
-        [SwaggerResponse(Status204NoContent, "Delete an Asset")]
-        public async Task<IActionResult> DeleteAsset([FromODataUri] Guid id, CancellationToken cancellationToken)
+        [SwaggerResponse(Status204NoContent, "Asset updated successfully")]
+        [SwaggerOperation(
+            Summary = "Update an Asset",
+            OperationId = nameof(PatchAsset),
+            Tags = new[] { "Asset" }
+        )]
+        public async Task<IActionResult> PatchAsset(
+            [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
+            [SwaggerParameter("The Asset", Required = true), Required] Delta<Asset> delta,
+            CancellationToken cancellationToken)
         {
-            IActionResult result;
-            if (id == default)
+            var request = new UpdateAssetRequest(nameof(MongoDB), id, delta);
+            var model = await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
+            return Updated(model);
+        }
+
+        [ODataRoute("({id})", RouteName = nameof(PutAsset))]
+        [MapToApiVersion("1.0")]
+        [SwaggerResponse(Status204NoContent, "Asset replaced successfully")]
+        [SwaggerOperation(
+            Summary = "Replace an Asset",
+            OperationId = nameof(PutAsset),
+            Tags = new[] { "Asset" }
+        )]
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Checked by `Required` attribute")]
+        public async Task<IActionResult> PutAsset(
+            [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
+            [SwaggerParameter("The Asset", Required = true), Required] Delta<Asset> delta,
+            CancellationToken cancellationToken)
+        {
+            var model = delta.GetInstance();
+            if (model.Id != id)
             {
-                ModelState.AddModelError(nameof(id), "Id is required");
-                result = BadRequest(ModelState);
-            }
-            else
-            {
-                try
-                {
-                    await _dataCommandService.DeleteAsync<Asset>(x => x.Id == id, cancellationToken).ConfigureAwait(false);
-                    await _dataCommandService.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                    result = NoContent();
-                }
-                catch (ArgumentException e) when (!IsNullOrWhiteSpace(e.ParamName))
-                {
-                    ModelState.AddModelError(e.ParamName, e.Message);
-                    result = BadRequest(ModelState);
-                }
-                catch (ArgumentException e)
-                {
-                    result = BadRequest(e.Message);
-                }
+                ModelState.AddModelError(nameof(id), "Ids must match");
+                return BadRequest(ModelState);
             }
 
-            return result;
+            var request = new ReplaceAssetRequest(nameof(MongoDB), id, model);
+            await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
+            return Updated(model);
+        }
+
+        [ODataRoute("({id})", RouteName = nameof(DeleteAsset))]
+        [MapToApiVersion("1.0")]
+        [SwaggerResponse(Status204NoContent, "Asset deleted successfully")]
+        [SwaggerOperation(
+            Summary = "Delete an Asset",
+            OperationId = nameof(DeleteAsset),
+            Tags = new[] { "Asset" }
+        )]
+        public async Task<IActionResult> DeleteAsset(
+            [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
+            CancellationToken cancellationToken)
+        {
+            var request = new DeleteAssetRequest(nameof(MongoDB), id);
+            await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
+            return NoContent();
         }
     }
 }

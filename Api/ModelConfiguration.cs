@@ -1,4 +1,4 @@
-﻿namespace Assets
+﻿namespace Inventory
 {
     using Microsoft.AspNet.OData.Builder;
     using Microsoft.AspNetCore.Mvc;

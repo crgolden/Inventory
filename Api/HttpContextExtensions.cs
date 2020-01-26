@@ -1,11 +1,9 @@
-﻿namespace Assets
+﻿namespace Inventory
 {
     using System;
     using System.Collections.Generic;
-    using System.Diagnostics.CodeAnalysis;
     using System.Threading.Tasks;
     using Common;
-    using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Diagnostics;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Mvc;
@@ -14,14 +12,12 @@
     using Microsoft.AspNetCore.Routing;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
-    using Microsoft.OData;
     using static System.StringComparer;
     using static System.Threading.Tasks.Task;
-    using static Microsoft.AspNetCore.Http.StatusCodes;
     using static Microsoft.AspNetCore.WebUtilities.ReasonPhrases;
     using static Microsoft.Net.Http.Headers.HeaderNames;
 
-    public static class ApplicationBuilderExtensions
+    public static class HttpContextExtensions
     {
         private static readonly HashSet<string> CorsHeaderNames = new HashSet<string>(OrdinalIgnoreCase)
         {
@@ -33,14 +29,8 @@
             AccessControlMaxAge
         };
 
-        [SuppressMessage("StyleCop.CSharp.NamingRules", "SA1305:Field names should not use Hungarian notation", Justification = "oData")]
-        public static Task HandleException(this IApplicationBuilder app, HttpContext context)
+        public static Task HandleException(this HttpContext context)
         {
-            if (app == default)
-            {
-                throw new ArgumentNullException(nameof(app));
-            }
-
             if (context == default)
             {
                 throw new ArgumentNullException(nameof(context));
@@ -61,7 +51,7 @@
             var exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();
             if (exceptionHandlerPathFeature?.Error != default)
             {
-                var logger = app.ApplicationServices.GetRequiredService<ILogger<HttpContext>>();
+                var logger = context.RequestServices.GetRequiredService<ILogger<HttpContext>>();
                 logger.LogError(EventIds.Exception, exceptionHandlerPathFeature.Error, default);
             }
 
@@ -77,7 +67,7 @@
             result.ContentTypes.Add("application/problem+json");
             result.ContentTypes.Add("application/problem+xml");
 
-            var executor = app.ApplicationServices.GetRequiredService<IActionResultExecutor<ObjectResult>>();
+            var executor = context.RequestServices.GetRequiredService<IActionResultExecutor<ObjectResult>>();
             return executor.ExecuteAsync(actionContext, result);
         }
 

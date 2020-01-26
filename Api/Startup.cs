@@ -1,9 +1,10 @@
-﻿namespace Assets
+﻿namespace Inventory
 {
-    using System.Reflection;
     using Controllers;
+    using Core;
     using Core.Extensions;
     using MediatR;
+    using Microsoft.AspNet.OData;
     using Microsoft.AspNet.OData.Builder;
     using Microsoft.AspNet.OData.Extensions;
     using Microsoft.AspNetCore.Builder;
@@ -15,6 +16,7 @@
     using static System.Reflection.Assembly;
     using static Microsoft.AspNet.OData.Query.AllowedQueryOptions;
     using static Microsoft.AspNetCore.Mvc.CompatibilityVersion;
+    using static Microsoft.OData.ODataUrlKeyDelimiter;
 
     public class Startup
     {
@@ -34,14 +36,22 @@
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddMvc(options => options.EnableEndpointRouting = false).SetCompatibilityVersion(Latest);
-            services.AddMediatR(Load("Assets.Services"));
+            var servicesAssembly = Load("Inventory.Services");
+            services.AddMvc(options =>
+            {
+                options.EnableEndpointRouting = false;
+                options.Filters.Add<ModelStateActionFilter>();
+            }).SetCompatibilityVersion(Latest);
+            services.AddMediatR(new[]
+            {
+                servicesAssembly
+            });
             services.AddMongo(_mongoSection);
             services.AddSwagger(_swaggerSection);
             services.AddODataApiExplorer(options =>
             {
-                var method = typeof(AssetsController).GetMethod(nameof(AssetsController.GetAssets));
-                options.QueryOptions.Controller<AssetsController>().Action(method!).Allow(All).AllowTop(default);
+                var getAssetsMethod = typeof(AssetsController).GetMethod(nameof(AssetsController.GetAssets));
+                options.QueryOptions.Controller<AssetsController>().Action(getAssetsMethod!).Allow(All).AllowTop(default);
             });
         }
 
@@ -53,7 +63,7 @@
                 app.UseDeveloperExceptionPage();
             }
 
-            app.UseExceptionHandler(app1 => app1.Run(async context => await app1.HandleException(context).ConfigureAwait(false)));
+            app.UseExceptionHandler(app1 => app1.Run(async context => await context.HandleException().ConfigureAwait(false)));
             app.UseHttpsRedirection();
             app.UseSwagger();
             app.UseSwaggerUI();
@@ -61,6 +71,8 @@
             app.UseAuthorization();
             app.UseMvc(routeBuilder =>
             {
+                var options = routeBuilder.ServiceProvider.GetRequiredService<ODataOptions>();
+                options.UrlKeyDelimiter = Parentheses;
                 var modelBuilder = routeBuilder.ServiceProvider.GetRequiredService<VersionedODataModelBuilder>();
                 routeBuilder.MapVersionedODataRoutes("odata", "api/v{version:apiVersion}", modelBuilder.GetEdmModels());
             });

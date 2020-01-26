@@ -17,7 +17,7 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "Assets": {
+    "Inventory": {
       "commandName": "Project",
       "launchBrowser": true,
       "launchUrl": "swagger",

@@ -1,4 +1,4 @@
-﻿namespace Assets
+﻿namespace Inventory
 {
     using System.Collections.Generic;
     using MongoDB.Bson.Serialization;

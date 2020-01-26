@@ -3,13 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29613.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Assets.Api", "Api\Assets.Api.csproj", "{06B8226C-EF4E-4D79-80B6-C906EDFF1484}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Inventory.Api", "Api\Inventory.Api.csproj", "{06B8226C-EF4E-4D79-80B6-C906EDFF1484}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Assets.Models", "Models\Assets.Models.csproj", "{1939280E-3BA9-4EFC-9876-8A802922D718}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Inventory.Models", "Models\Inventory.Models.csproj", "{1939280E-3BA9-4EFC-9876-8A802922D718}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Assets.Api.IntegrationTests", "Api.IntegrationTests\Assets.Api.IntegrationTests.csproj", "{5B69DB68-8877-46B3-B368-2507E70C1B4C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Inventory.Api.IntegrationTests", "Api.IntegrationTests\Inventory.Api.IntegrationTests.csproj", "{5B69DB68-8877-46B3-B368-2507E70C1B4C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Assets.Services", "Services\Assets.Services.csproj", "{7A93FEB3-3A3B-4D00-B2E1-964606EAC913}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Inventory.Services", "Services\Inventory.Services.csproj", "{7A93FEB3-3A3B-4D00-B2E1-964606EAC913}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Abstractions", "..\Common\Abstractions\Common.Abstractions.csproj", "{B7DE807B-B786-46F0-AB1E-2BC7E0AD864B}"
 EndProject
@@ -30,6 +30,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.EventIds", "..\Common\EventIds\Common.EventIds.csproj", "{0AB0583C-00F8-4FAE-92C0-62CECB7B2C0B}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Core.AspNetCore", "..\Core\AspNetCore\Core.AspNetCore.csproj", "{48AFCFEE-9AA2-4A14-888A-C28FB6EA594B}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Attributes", "..\Common\Attributes\Common.Attributes.csproj", "{C40DF444-1742-4478-8995-C13F0F300B01}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -77,6 +81,14 @@ Global
 		{0AB0583C-00F8-4FAE-92C0-62CECB7B2C0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0AB0583C-00F8-4FAE-92C0-62CECB7B2C0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0AB0583C-00F8-4FAE-92C0-62CECB7B2C0B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{48AFCFEE-9AA2-4A14-888A-C28FB6EA594B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{48AFCFEE-9AA2-4A14-888A-C28FB6EA594B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{48AFCFEE-9AA2-4A14-888A-C28FB6EA594B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{48AFCFEE-9AA2-4A14-888A-C28FB6EA594B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C40DF444-1742-4478-8995-C13F0F300B01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C40DF444-1742-4478-8995-C13F0F300B01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C40DF444-1742-4478-8995-C13F0F300B01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C40DF444-1742-4478-8995-C13F0F300B01}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
