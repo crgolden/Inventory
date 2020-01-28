@@ -2,14 +2,15 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using Common;
     using MediatR;
-    using Microsoft.AspNet.OData.Query;
+    using Microsoft.Extensions.Logging;
     using static System.String;
 
-    public class GetAssetsRequest : IRequest<List<Asset>>, INameable
+    public class GetAssetsRequest : IRequest<List<Asset>>, INameable, IEventable
     {
-        public GetAssetsRequest(string name, ODataQueryOptions<Asset> queryOptions)
+        public GetAssetsRequest(string name, IQueryable<Asset> query)
         {
             if (IsNullOrWhiteSpace(name))
             {
@@ -17,11 +18,14 @@
             }
 
             Name = name;
-            ODataQueryOptions = queryOptions ?? throw new ArgumentNullException(nameof(queryOptions));
+            Query = query ?? throw new ArgumentNullException(nameof(query));
         }
+
+        public EventId EventId => EventIds.Query;
 
         public string Name { get; }
 
-        public ODataQueryOptions<Asset> ODataQueryOptions { get; }
+        public IQueryable<Asset> Query { get; }
+
     }
 }

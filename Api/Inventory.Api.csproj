@@ -38,8 +38,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Common\Attributes\Common.Attributes.csproj" />
-    <ProjectReference Include="..\..\Common\EventIds\Common.EventIds.csproj" />
     <ProjectReference Include="..\..\Core\AspNetCore\Core.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\Core\Serilog\Core.Serilog.csproj" />
     <ProjectReference Include="..\..\Core\Swagger\Core.Swagger.csproj" />
     <ProjectReference Include="..\..\Services\Data.Mongo\Services.Data.Mongo.csproj" />
     <ProjectReference Include="..\Services\Inventory.Services.csproj" />

@@ -3,10 +3,12 @@
     using System;
     using System.Collections.Generic;
     using System.ComponentModel.DataAnnotations;
+    using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
+    using Common;
     using MediatR;
     using Microsoft.AspNet.OData;
     using Microsoft.AspNet.OData.Query;
@@ -14,6 +16,7 @@
     using Microsoft.AspNetCore.Mvc;
     using Requests;
     using Swashbuckle.AspNetCore.Annotations;
+    using static System.StringComparison;
     using static Asset;
     using static Microsoft.AspNetCore.Http.StatusCodes;
 
@@ -22,8 +25,13 @@
     public class AssetsController : ODataController
     {
         private readonly IMediator _mediator;
+        private readonly IDataQueryService _dataQueryService;
 
-        public AssetsController(IMediator mediator) => _mediator = mediator;
+        public AssetsController(IMediator mediator, IEnumerable<IDataQueryService> dataQueryServices)
+        {
+            _mediator = mediator;
+            _dataQueryService = dataQueryServices.Single(x => string.Equals(nameof(MongoDB), x.Name, OrdinalIgnoreCase));
+        }
 
         [ODataRoute(RouteName = nameof(GetAssets))]
         [MapToApiVersion("1.0")]
@@ -33,11 +41,14 @@
             OperationId = nameof(GetAssets),
             Tags = new[] { "Assets" }
         )]
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Checked by `Required` attribute")]
         public async Task<IActionResult> GetAssets(
             [SwaggerParameter("The query options", Required = true), Required] ODataQueryOptions<Asset> options,
             CancellationToken cancellationToken)
         {
-            var request = new GetAssetsRequest(nameof(MongoDB), options);
+            var query = _dataQueryService.Query<Asset>();
+            query = options.ApplyTo(query) as IQueryable<Asset> ?? query;
+            var request = new GetAssetsRequest(nameof(MongoDB), query);
             var response = await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return Ok(response);
         }
@@ -103,7 +114,7 @@
             }
 
             var models = element.EnumerateArray().Select(FromJsonElement).ToArray();
-            var request = new ReplaceAssetsRequest(nameof(MongoDB), models);
+            var request = new UpdateAssetsRequest(nameof(MongoDB), models);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return NoContent();
         }

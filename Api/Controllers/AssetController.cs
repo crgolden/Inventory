@@ -34,7 +34,7 @@
             [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
             CancellationToken cancellationToken)
         {
-            var request = new GetAssetRequest(nameof(MongoDB), new object[] { id });
+            var request = new GetAssetRequest(nameof(MongoDB), id);
             var model = await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return Ok(model);
         }
@@ -71,14 +71,18 @@
             OperationId = nameof(PatchAsset),
             Tags = new[] { "Asset" }
         )]
+        [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Checked by `Required` attribute")]
         public async Task<IActionResult> PatchAsset(
             [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
             [SwaggerParameter("The Asset", Required = true), Required] Delta<Asset> delta,
             CancellationToken cancellationToken)
         {
-            var request = new UpdateAssetRequest(nameof(MongoDB), id, delta);
-            var model = await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-            return Updated(model);
+            var getRequest = new GetAssetRequest(nameof(MongoDB), id);
+            var model = await _mediator.Send(getRequest, cancellationToken).ConfigureAwait(false);
+            delta.Patch(model);
+            var updateRequest = new UpdateAssetRequest(nameof(MongoDB), model);
+            await _mediator.Send(updateRequest, cancellationToken).ConfigureAwait(false);
+            return NoContent();
         }
 
         [ODataRoute("({id})", RouteName = nameof(PutAsset))]
@@ -102,9 +106,9 @@
                 return BadRequest(ModelState);
             }
 
-            var request = new ReplaceAssetRequest(nameof(MongoDB), id, model);
+            var request = new UpdateAssetRequest(nameof(MongoDB), model);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-            return Updated(model);
+            return NoContent();
         }
 
         [ODataRoute("({id})", RouteName = nameof(DeleteAsset))]

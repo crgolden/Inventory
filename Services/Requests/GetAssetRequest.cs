@@ -1,26 +1,30 @@
 ﻿namespace Inventory.Requests
 {
     using System;
-    using System.Collections.Generic;
     using Common;
     using MediatR;
     using static System.String;
 
     public class GetAssetRequest : IRequest<Asset>, INameable
     {
-        public GetAssetRequest(string name, object[] keyValues)
+        public GetAssetRequest(string name, Guid id)
         {
             if (IsNullOrWhiteSpace(name))
             {
                 throw new ArgumentNullException(nameof(name));
             }
 
+            if (id == default)
+            {
+                throw new ArgumentException("Invalid id", nameof(id));
+            }
+
             Name = name;
-            KeyValues = keyValues ?? throw new ArgumentNullException(nameof(keyValues));
+            Id = id;
         }
 
         public string Name { get; }
 
-        public IReadOnlyCollection<object> KeyValues { get; }
+        public Guid Id { get; }
     }
 }

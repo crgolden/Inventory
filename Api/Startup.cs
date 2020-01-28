@@ -1,5 +1,6 @@
 ﻿namespace Inventory
 {
+    using Behaviors;
     using Controllers;
     using Core;
     using Core.Extensions;
@@ -12,6 +13,7 @@
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Hosting;
+    using Serilog;
     using Services.Extensions;
     using static System.Reflection.Assembly;
     using static Microsoft.AspNet.OData.Query.AllowedQueryOptions;
@@ -46,6 +48,7 @@
             {
                 servicesAssembly
             });
+            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
             services.AddMongo(_mongoSection);
             services.AddSwagger(_swaggerSection);
             services.AddODataApiExplorer(options =>

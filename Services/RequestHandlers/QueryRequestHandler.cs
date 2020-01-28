@@ -32,9 +32,7 @@
                 throw new InvalidOperationException($"Data Query Service not found for '{request.Name}'");
             }
 
-            var query = dataQueryService.Query<Asset>();
-            query = request.ODataQueryOptions.ApplyTo(query) as IQueryable<Asset> ?? query;
-            return dataQueryService.ToListAsync(query, cancellationToken);
+            return dataQueryService.ToListAsync(request.Query, cancellationToken);
         }
     }
 }

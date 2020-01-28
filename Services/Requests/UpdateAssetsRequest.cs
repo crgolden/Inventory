@@ -6,9 +6,9 @@
     using MediatR;
     using static System.String;
 
-    public class ReplaceAssetsRequest : IRequest, INameable
+    public class UpdateAssetsRequest : IRequest, INameable
     {
-        public ReplaceAssetsRequest(string name, Asset[] assets)
+        public UpdateAssetsRequest(string name, Asset[] assets)
         {
             if (IsNullOrWhiteSpace(name))
             {
