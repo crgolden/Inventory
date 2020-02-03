@@ -11,9 +11,9 @@
     using Microsoft.AspNet.OData;
     using Microsoft.AspNetCore.Mvc.Testing;
     using Microsoft.Extensions.Configuration;
-    using Services.Extensions;
     using Xunit;
     using Xunit.Abstractions;
+    using static System.Console;
     using static System.Guid;
     using static System.Net.Mime.MediaTypeNames.Application;
     using static System.StringComparison;
@@ -58,8 +58,8 @@
                     configuration.AddEnvironmentVariables("ASPNETCORE");
                 });
             });
-            await _factory.Services.InitializeCollectionsAsync(KeyValuePairs).ConfigureAwait(true);
-            await _factory.Services.BuildIndexesAsync(AssetIndexes).ConfigureAwait(true);
+            await _factory.Services.InitializeCollectionsAsync(KeyValuePairs).ConfigureAwait(false);
+            await _factory.Services.BuildIndexesAsync(AssetIndexes).ConfigureAwait(false);
             var client = _factory.CreateClient();
             ODataValue<List<Asset>> value;
             var content = Serialize(_models, JsonSerializerOptions);
@@ -69,15 +69,17 @@
             stopwatch.Start();
             using (var httpContent = new StringContent(content, UTF8, Json))
             {
-                using var response = await client.PostAsync(requestUri, httpContent).ConfigureAwait(true);
+                using var response = await client.PostAsync(requestUri, httpContent).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
-                value = await DeserializeAsync<ODataValue<List<Asset>>>(body, JsonSerializerOptions).ConfigureAwait(true);
+                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                value = await DeserializeAsync<ODataValue<List<Asset>>>(body, JsonSerializerOptions).ConfigureAwait(false);
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Models created in   {0}", stopwatch.Elapsed);
+            var message = $"Models created in   {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Assert
             for (var i = 0; i < value.Value.Count; i++)
@@ -92,10 +94,12 @@
 
             // Act
             stopwatch.Restart();
-            var count = await AssertQuery(client).ConfigureAwait(true);
+            var count = await AssertQuery(client).ConfigureAwait(false);
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Models retrieved in {0}", stopwatch.Elapsed);
+            message = $"Models retrieved in {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Assert
             Assert.Equal(_models.Count, count);
@@ -107,20 +111,24 @@
             stopwatch.Restart();
             using (var httpContent = new StringContent(content, UTF8, Json))
             {
-                using var response = await client.PutAsync(requestUri, httpContent).ConfigureAwait(true);
+                using var response = await client.PutAsync(requestUri, httpContent).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Models replaced in  {0}", stopwatch.Elapsed);
+            message = $"Models replaced in  {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Act
             stopwatch.Restart();
-            count = await AssertQuery(client, true).ConfigureAwait(true);
+            count = await AssertQuery(client, true).ConfigureAwait(false);
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Models retrieved in {0}", stopwatch.Elapsed);
+            message = $"Models retrieved in {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Assert
             Assert.Equal(_models.Count, count);
@@ -129,25 +137,31 @@
             var ids = string.Join('&', _models.Select(x => x.Id).Select((x, j) => $"ids[{j}]={x}"));
             requestUri = new Uri($"/api/v1/Assets?{ids}", Relative);
             stopwatch.Restart();
-            using (var response = await client.DeleteAsync(requestUri).ConfigureAwait(true))
+            using (var response = await client.DeleteAsync(requestUri).ConfigureAwait(false))
             {
                 response.EnsureSuccessStatusCode();
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Models deleted in   {0}", stopwatch.Elapsed);
+            message = $"Models deleted in   {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Act
             stopwatch.Restart();
-            count = await AssertQuery(client).ConfigureAwait(true);
+            count = await AssertQuery(client).ConfigureAwait(false);
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Models retrieved in {0}", stopwatch.Elapsed);
+            message = $"Models retrieved in {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Assert
             Assert.Equal(0, count);
-            _output.WriteLine("Finished all in     {0}", total);
+            message = $"Finished all in     {total}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
         }
 
         private async Task<int> AssertQuery(HttpClient client, bool updated = default)
@@ -177,14 +191,14 @@
                 }
 
                 var requestUri = new Uri(sb.ToString().TrimEnd(' ', 'o', 'r'), Relative);
-                using var response = await client.GetAsync(requestUri).ConfigureAwait(true);
+                using var response = await client.GetAsync(requestUri).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStringAsync().ConfigureAwait(true);
+                var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 return Deserialize<ODataValue<List<Asset>>>(body, JsonSerializerOptions);
             });
 
             // Act
-            values = await Task.WhenAll(tasks).ConfigureAwait(true);
+            values = await Task.WhenAll(tasks).ConfigureAwait(false);
 
             // Assert
             index = 0;

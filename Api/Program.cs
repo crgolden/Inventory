@@ -1,12 +1,12 @@
 ﻿namespace Inventory
 {
+    using System;
     using System.Threading;
     using System.Threading.Tasks;
-    using Core.Extensions;
     using Microsoft.AspNetCore.Hosting;
+    using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Hosting;
     using Microsoft.Extensions.Logging;
-    using Services.Extensions;
     using static ClassMaps;
     using static IndexModels;
     using static Seeds;

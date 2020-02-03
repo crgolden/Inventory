@@ -1,10 +1,8 @@
 ﻿namespace Inventory
 {
-    using Behaviors;
     using Controllers;
     using Core;
-    using Core.Extensions;
-    using MediatR;
+    using Core.Filters;
     using Microsoft.AspNet.OData;
     using Microsoft.AspNet.OData.Builder;
     using Microsoft.AspNet.OData.Extensions;
@@ -13,24 +11,21 @@
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Hosting;
-    using Serilog;
-    using Services.Extensions;
-    using static System.Reflection.Assembly;
     using static Microsoft.AspNet.OData.Query.AllowedQueryOptions;
     using static Microsoft.AspNetCore.Mvc.CompatibilityVersion;
     using static Microsoft.OData.ODataUrlKeyDelimiter;
 
     public class Startup
     {
-        private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _environment;
+        private readonly IConfigurationSection _mediatRSection;
         private readonly IConfigurationSection _mongoSection;
         private readonly IConfigurationSection _swaggerSection;
 
         public Startup(IConfiguration configuration, IWebHostEnvironment environment)
         {
-            _configuration = configuration;
             _environment = environment;
+            _mediatRSection = configuration.GetMediatROptionsSection();
             _mongoSection = configuration.GetMongoDataOptionsSection();
             _swaggerSection = configuration.GetSwaggerOptionsSection();
         }
@@ -38,17 +33,12 @@
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            var servicesAssembly = Load("Inventory.Services");
             services.AddMvc(options =>
             {
                 options.EnableEndpointRouting = false;
                 options.Filters.Add<ModelStateActionFilter>();
             }).SetCompatibilityVersion(Latest);
-            services.AddMediatR(new[]
-            {
-                servicesAssembly
-            });
-            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+            services.AddMediatR(new[] { typeof(Asset) }, _mediatRSection, service => service.AsScoped());
             services.AddMongo(_mongoSection);
             services.AddSwagger(_swaggerSection);
             services.AddODataApiExplorer(options =>

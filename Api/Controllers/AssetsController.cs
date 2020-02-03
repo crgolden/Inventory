@@ -5,17 +5,21 @@
     using System.ComponentModel.DataAnnotations;
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
+    using System.Linq.Expressions;
     using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
     using Common;
+    using Core.Requests;
     using MediatR;
     using Microsoft.AspNet.OData;
     using Microsoft.AspNet.OData.Query;
     using Microsoft.AspNet.OData.Routing;
     using Microsoft.AspNetCore.Mvc;
-    using Requests;
+    using Microsoft.Extensions.Logging;
+    using Microsoft.OData;
     using Swashbuckle.AspNetCore.Annotations;
+    using static System.DateTime;
     using static System.StringComparison;
     using static Asset;
     using static Microsoft.AspNetCore.Http.StatusCodes;
@@ -26,11 +30,18 @@
     {
         private readonly IMediator _mediator;
         private readonly IDataQueryService _dataQueryService;
+        private readonly ILogger<AssetsController> _logger;
 
-        public AssetsController(IMediator mediator, IEnumerable<IDataQueryService> dataQueryServices)
+        public AssetsController(
+            IMediator mediator,
+            IEnumerable<IDataQueryService> dataQueryServices,
+            ILogger<AssetsController> logger)
         {
-            _mediator = mediator;
-            _dataQueryService = dataQueryServices.Single(x => string.Equals(nameof(MongoDB), x.Name, OrdinalIgnoreCase));
+            _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+            _dataQueryService = (
+                dataQueryServices ?? throw new ArgumentNullException(nameof(dataQueryServices))
+            ).Single(x => string.Equals(nameof(MongoDB), x.Name, OrdinalIgnoreCase));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         [ODataRoute(RouteName = nameof(GetAssets))]
@@ -47,8 +58,17 @@
             CancellationToken cancellationToken)
         {
             var query = _dataQueryService.Query<Asset>();
-            query = options.ApplyTo(query) as IQueryable<Asset> ?? query;
-            var request = new GetAssetsRequest(nameof(MongoDB), query);
+            try
+            {
+                query = (IQueryable<Asset>)options.ApplyTo(query);
+            }
+            catch (ODataException e)
+            {
+                ModelState.AddModelError(nameof(options), e.Message);
+                return BadRequest(ModelState);
+            }
+
+            var request = new GetRangeRequest<Asset>(nameof(MongoDB), query, _logger);
             var response = await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return Ok(response);
         }
@@ -77,14 +97,14 @@
                 return BadRequest(ModelState);
             }
 
-            var models = element.EnumerateArray().Select(FromJsonElement).ToArray();
+            var models = element.EnumerateArray().Select(FromJsonElement).ToList();
             if (models.Any(x => x.Id != default))
             {
                 ModelState.AddModelError(nameof(element), "Ids must be empty");
                 return BadRequest(ModelState);
             }
 
-            var request = new CreateAssetsRequest(nameof(MongoDB), models);
+            var request = new CreateRangeRequest<Asset>(nameof(MongoDB), models, _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return Ok(models);
         }
@@ -113,8 +133,10 @@
                 return BadRequest(ModelState);
             }
 
-            var models = element.EnumerateArray().Select(FromJsonElement).ToArray();
-            var request = new UpdateAssetsRequest(nameof(MongoDB), models);
+            var models = element.EnumerateArray().Select(FromJsonElement).ToList();
+            models.ForEach(model => model.UpdatedDate = UtcNow);
+            var keyValuePairs = models.ToDictionary(model => (Expression<Func<Asset, bool>>)(x => x.Id == model.Id), model => model);
+            var request = new UpdateRangeRequest<Asset>(nameof(MongoDB), keyValuePairs, _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return NoContent();
         }
@@ -137,7 +159,8 @@
                 return BadRequest(ModelState);
             }
 
-            var request = new DeleteAssetsRequest(nameof(MongoDB), ids);
+            var expressions = ids.Select(id => (Expression<Func<Asset, bool>>)(asset => asset.Id == id));
+            var request = new DeleteRangeRequest<Asset>(nameof(MongoDB), expressions.ToArray(), _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return NoContent();
         }

@@ -21,7 +21,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="8.0.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.FxCopAnalyzers" Version="2.9.8">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -39,10 +38,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Common\Attributes\Common.Attributes.csproj" />
     <ProjectReference Include="..\..\Core\AspNetCore\Core.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\Core\MediatR\Core.MediatR.csproj" />
     <ProjectReference Include="..\..\Core\Serilog\Core.Serilog.csproj" />
     <ProjectReference Include="..\..\Core\Swagger\Core.Swagger.csproj" />
     <ProjectReference Include="..\..\Services\Data.Mongo\Services.Data.Mongo.csproj" />
-    <ProjectReference Include="..\Services\Inventory.Services.csproj" />
+    <ProjectReference Include="..\Models\Inventory.Models.csproj" />
   </ItemGroup>
 
 </Project>

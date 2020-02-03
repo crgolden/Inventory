@@ -6,12 +6,14 @@
     using System.Threading;
     using System.Threading.Tasks;
     using Common;
+    using Core.Requests;
     using MediatR;
     using Microsoft.AspNet.OData;
     using Microsoft.AspNet.OData.Routing;
     using Microsoft.AspNetCore.Mvc;
-    using Requests;
+    using Microsoft.Extensions.Logging;
     using Swashbuckle.AspNetCore.Annotations;
+    using static System.DateTime;
     using static Microsoft.AspNetCore.Http.StatusCodes;
 
     [ODataRoutePrefix("Asset")]
@@ -19,8 +21,13 @@
     public class AssetController : ODataController
     {
         private readonly IMediator _mediator;
+        private readonly ILogger<AssetController> _logger;
 
-        public AssetController(IMediator mediator) => _mediator = mediator;
+        public AssetController(IMediator mediator, ILogger<AssetController> logger)
+        {
+            _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
 
         [ODataRoute("({id})", RouteName = nameof(GetAsset))]
         [MapToApiVersion("1.0")]
@@ -34,7 +41,7 @@
             [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
             CancellationToken cancellationToken)
         {
-            var request = new GetAssetRequest(nameof(MongoDB), id);
+            var request = new GetRequest<Asset>(nameof(MongoDB), new object[] { id }, _logger);
             var model = await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return Ok(model);
         }
@@ -58,7 +65,7 @@
                 return BadRequest(ModelState);
             }
 
-            var request = new CreateAssetRequest(nameof(MongoDB), model);
+            var request = new CreateRequest<Asset>(nameof(MongoDB), model, _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return Created(model);
         }
@@ -77,10 +84,11 @@
             [SwaggerParameter("The Asset", Required = true), Required] Delta<Asset> delta,
             CancellationToken cancellationToken)
         {
-            var getRequest = new GetAssetRequest(nameof(MongoDB), id);
+            var getRequest = new GetRequest<Asset>(nameof(MongoDB), new object[] { id }, _logger);
             var model = await _mediator.Send(getRequest, cancellationToken).ConfigureAwait(false);
             delta.Patch(model);
-            var updateRequest = new UpdateAssetRequest(nameof(MongoDB), model);
+            model.UpdatedDate = UtcNow;
+            var updateRequest = new UpdateRequest<Asset>(nameof(MongoDB), x => x.Id == id, model, _logger);
             await _mediator.Send(updateRequest, cancellationToken).ConfigureAwait(false);
             return NoContent();
         }
@@ -106,7 +114,8 @@
                 return BadRequest(ModelState);
             }
 
-            var request = new UpdateAssetRequest(nameof(MongoDB), model);
+            model.UpdatedDate = UtcNow;
+            var request = new UpdateRequest<Asset>(nameof(MongoDB), x => x.Id == id, model, _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return NoContent();
         }
@@ -123,7 +132,7 @@
             [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
             CancellationToken cancellationToken)
         {
-            var request = new DeleteAssetRequest(nameof(MongoDB), id);
+            var request = new DeleteRequest<Asset>(nameof(MongoDB), x => x.Id == id, _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return NoContent();
         }

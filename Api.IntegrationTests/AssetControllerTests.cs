@@ -7,9 +7,9 @@
     using System.Threading.Tasks;
     using Microsoft.AspNetCore.Mvc.Testing;
     using Microsoft.Extensions.Configuration;
-    using Services.Extensions;
     using Xunit;
     using Xunit.Abstractions;
+    using static System.Console;
     using static System.Guid;
     using static System.Net.Mime.MediaTypeNames.Application;
     using static System.Text.Encoding;
@@ -48,8 +48,8 @@
                     configuration.AddEnvironmentVariables("ASPNETCORE");
                 });
             });
-            await _factory.Services.InitializeCollectionsAsync(KeyValuePairs).ConfigureAwait(true);
-            await _factory.Services.BuildIndexesAsync(AssetIndexes).ConfigureAwait(true);
+            await _factory.Services.InitializeCollectionsAsync(KeyValuePairs).ConfigureAwait(false);
+            await _factory.Services.BuildIndexesAsync(AssetIndexes).ConfigureAwait(false);
             var client = _factory.CreateClient();
             var model = new Asset
             {
@@ -63,15 +63,17 @@
             stopwatch.Start();
             using (var httpContent = new StringContent(content, UTF8, Json))
             {
-                using var response = await client.PostAsync(requestUri, httpContent).ConfigureAwait(true);
+                using var response = await client.PostAsync(requestUri, httpContent).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
-                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(true);
+                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(false);
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Model created in   {0}", stopwatch.Elapsed);
+            var message = $"Model created in   {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Assert
             Assert.NotEqual(Empty, result.Id);
@@ -83,16 +85,18 @@
 
             // Act
             stopwatch.Restart();
-            using (var response = await client.GetAsync(requestUri).ConfigureAwait(true))
+            using (var response = await client.GetAsync(requestUri).ConfigureAwait(false))
             {
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
-                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(true);
+                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(false);
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Model retrieved in {0}", stopwatch.Elapsed);
+            message = $"Model retrieved in {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Assert
             Assert.Equal(model.Id, result.Id);
@@ -106,26 +110,30 @@
             stopwatch.Restart();
             using (var httpContent = new StringContent(content, UTF8, Json))
             {
-                using var response = await client.PatchAsync(requestUri, httpContent).ConfigureAwait(true);
+                using var response = await client.PatchAsync(requestUri, httpContent).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Model updated in   {0}", stopwatch.Elapsed);
+            message = $"Model updated in   {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Act
             stopwatch.Restart();
-            using (var response = await client.GetAsync(requestUri).ConfigureAwait(true))
+            using (var response = await client.GetAsync(requestUri).ConfigureAwait(false))
             {
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
-                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(true);
+                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(false);
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Model retrieved in {0}", stopwatch.Elapsed);
+            message = $"Model retrieved in {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Assert
             Assert.Equal(model.Id, result.Id);
@@ -139,26 +147,30 @@
             stopwatch.Restart();
             using (var httpContent = new StringContent(content, UTF8, Json))
             {
-                using var response = await client.PutAsync(requestUri, httpContent).ConfigureAwait(true);
+                using var response = await client.PutAsync(requestUri, httpContent).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Model replaced in  {0}", stopwatch.Elapsed);
+            message = $"Model replaced in  {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Act
             stopwatch.Restart();
-            using (var response = await client.GetAsync(requestUri).ConfigureAwait(true))
+            using (var response = await client.GetAsync(requestUri).ConfigureAwait(false))
             {
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
-                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(true);
+                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(false);
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Model retrieved in {0}", stopwatch.Elapsed);
+            message = $"Model retrieved in {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Assert
             Assert.Equal(model.Id, result.Id);
@@ -168,32 +180,38 @@
 
             // Arrange
             stopwatch.Restart();
-            using (var response = await client.DeleteAsync(requestUri).ConfigureAwait(true))
+            using (var response = await client.DeleteAsync(requestUri).ConfigureAwait(false))
             {
                 response.EnsureSuccessStatusCode();
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Model deleted in   {0}", stopwatch.Elapsed);
+            message = $"Model deleted in   {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Act
             stopwatch.Restart();
             long length;
-            using (var response = await client.GetAsync(requestUri).ConfigureAwait(true))
+            using (var response = await client.GetAsync(requestUri).ConfigureAwait(false))
             {
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
+                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
                 length = body.Length;
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
-            _output.WriteLine("Model retrieved in {0}", stopwatch.Elapsed);
+            message = $"Model retrieved in {stopwatch.Elapsed}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Assert
             Assert.Equal(0, length);
-            _output.WriteLine("Finished all in    {0}", total);
+            message = $"Finished all in    {total}";
+            _output.WriteLine(message);
+            await Out.WriteLineAsync(message).ConfigureAwait(false);
         }
     }
 }
