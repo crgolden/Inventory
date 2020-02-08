@@ -3,6 +3,7 @@
     using System;
     using System.ComponentModel.DataAnnotations;
     using System.Diagnostics.CodeAnalysis;
+    using System.Security.Claims;
     using System.Threading;
     using System.Threading.Tasks;
     using Common;
@@ -10,13 +11,17 @@
     using MediatR;
     using Microsoft.AspNet.OData;
     using Microsoft.AspNet.OData.Routing;
+    using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Logging;
     using Swashbuckle.AspNetCore.Annotations;
     using static System.DateTime;
+    using static Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults;
     using static Microsoft.AspNetCore.Http.StatusCodes;
+    using static Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
 
     [ODataRoutePrefix("Asset")]
+    [Authorize(AuthenticationSchemes = AuthenticationScheme, Roles = "User")]
     [SwaggerTag("Create, Read, Update, and Delete Assets")]
     public class AssetController : ODataController
     {
@@ -65,6 +70,7 @@
                 return BadRequest(ModelState);
             }
 
+            model.CreatedBy = Guid.Parse(User.FindFirstValue(Sub));
             var request = new CreateRequest<Asset>(nameof(MongoDB), model, _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return Created(model);
@@ -87,6 +93,7 @@
             var getRequest = new GetRequest<Asset>(nameof(MongoDB), new object[] { id }, _logger);
             var model = await _mediator.Send(getRequest, cancellationToken).ConfigureAwait(false);
             delta.Patch(model);
+            model.UpdatedBy = Guid.Parse(User.FindFirstValue(Sub));
             model.UpdatedDate = UtcNow;
             var updateRequest = new UpdateRequest<Asset>(nameof(MongoDB), x => x.Id == id, model, _logger);
             await _mediator.Send(updateRequest, cancellationToken).ConfigureAwait(false);
@@ -114,6 +121,7 @@
                 return BadRequest(ModelState);
             }
 
+            model.UpdatedBy = Guid.Parse(User.FindFirstValue(Sub));
             model.UpdatedDate = UtcNow;
             var request = new UpdateRequest<Asset>(nameof(MongoDB), x => x.Id == id, model, _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);

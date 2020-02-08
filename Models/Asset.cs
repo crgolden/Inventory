@@ -14,7 +14,11 @@
 
         public Guid Id { get; set; }
 
+        public Guid CreatedBy { get; set; }
+
         public DateTime CreatedDate { get; set; }
+
+        public Guid? UpdatedBy { get; set; }
 
         public DateTime? UpdatedDate { get; set; }
 
@@ -37,11 +41,23 @@
                 {
                     asset.Name = property.Value.ToString();
                 }
+                else if (nameof(CreatedBy).ToUpperInvariant() == name &&
+                         property.Value.ValueKind == JsonValueKind.String &&
+                         property.Value.TryGetGuid(out var createdBy))
+                {
+                    asset.CreatedBy = createdBy;
+                }
                 else if (nameof(CreatedDate).ToUpperInvariant() == name &&
                          property.Value.ValueKind == JsonValueKind.String &&
                          property.Value.TryGetDateTime(out var createdDate))
                 {
                     asset.CreatedDate = createdDate;
+                }
+                else if (nameof(UpdatedBy).ToUpperInvariant() == name &&
+                         property.Value.ValueKind == JsonValueKind.String &&
+                         property.Value.TryGetGuid(out var updatedBy))
+                {
+                    asset.UpdatedBy = updatedBy;
                 }
                 else if (nameof(UpdatedDate).ToUpperInvariant() == name &&
                          property.Value.ValueKind == JsonValueKind.String &&

@@ -6,6 +6,7 @@
     using System.Diagnostics.CodeAnalysis;
     using System.Linq;
     using System.Linq.Expressions;
+    using System.Security.Claims;
     using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
@@ -15,6 +16,7 @@
     using Microsoft.AspNet.OData;
     using Microsoft.AspNet.OData.Query;
     using Microsoft.AspNet.OData.Routing;
+    using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Logging;
     using Microsoft.OData;
@@ -22,9 +24,12 @@
     using static System.DateTime;
     using static System.StringComparison;
     using static Asset;
+    using static Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults;
     using static Microsoft.AspNetCore.Http.StatusCodes;
+    using static Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
 
     [ODataRoutePrefix("Assets")]
+    [Authorize(AuthenticationSchemes = AuthenticationScheme, Roles = "User")]
     [SwaggerTag("Create, Read, Update, and Delete Assets")]
     public class AssetsController : ODataController
     {
@@ -104,6 +109,8 @@
                 return BadRequest(ModelState);
             }
 
+            var userId = Guid.Parse(User.FindFirstValue(Sub));
+            models.ForEach(model => model.CreatedBy = userId);
             var request = new CreateRangeRequest<Asset>(nameof(MongoDB), models, _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
             return Ok(models);
@@ -134,7 +141,12 @@
             }
 
             var models = element.EnumerateArray().Select(FromJsonElement).ToList();
-            models.ForEach(model => model.UpdatedDate = UtcNow);
+            var userId = Guid.Parse(User.FindFirstValue(Sub));
+            models.ForEach(model =>
+            {
+                model.UpdatedBy = userId;
+                model.UpdatedDate = UtcNow;
+            });
             var keyValuePairs = models.ToDictionary(model => (Expression<Func<Asset, bool>>)(x => x.Id == model.Id), model => model);
             var request = new UpdateRangeRequest<Asset>(nameof(MongoDB), keyValuePairs, _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);

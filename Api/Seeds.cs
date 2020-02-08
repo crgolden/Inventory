@@ -12,6 +12,7 @@
         public static IEnumerable<Asset> Assets => Range(0, 5).Select(index => new Asset
         {
             Name = NewGuid().ToString("N", InvariantCulture),
+            CreatedBy = NewGuid(),
             CreatedDate = Now.AddDays(index * -1)
         });
     }

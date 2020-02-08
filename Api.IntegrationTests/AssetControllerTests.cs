@@ -3,15 +3,23 @@
     using System;
     using System.Diagnostics;
     using System.Net.Http;
+    using System.Security.Claims;
+    using System.Text.Encodings.Web;
     using System.Text.Json;
     using System.Threading.Tasks;
+    using Microsoft.AspNetCore.Authentication;
+    using Microsoft.AspNetCore.Authentication.JwtBearer;
     using Microsoft.AspNetCore.Mvc.Testing;
     using Microsoft.Extensions.Configuration;
+    using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Logging;
+    using Microsoft.Extensions.Options;
     using Xunit;
     using Xunit.Abstractions;
     using static System.Console;
     using static System.Guid;
     using static System.Net.Mime.MediaTypeNames.Application;
+    using static System.Security.Claims.ClaimTypes;
     using static System.Text.Encoding;
     using static System.Text.Json.JsonNamingPolicy;
     using static System.Text.Json.JsonSerializer;
@@ -19,6 +27,7 @@
     using static System.UriKind;
     using static ClassMaps;
     using static IndexModels;
+    using static Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
 
     public class AssetControllerTests : IClassFixture<WebApplicationFactory<Startup>>
     {
@@ -41,11 +50,28 @@
             // Arrange
             var total = Zero;
             var stopwatch = new Stopwatch();
+            var userId = NewGuid();
             _factory = _factory.WithWebHostBuilder(webHost =>
             {
                 webHost.ConfigureAppConfiguration((_, configuration) =>
                 {
                     configuration.AddEnvironmentVariables("ASPNETCORE");
+                }).ConfigureServices((_, services) =>
+                {
+                    services.AddTransient<JwtBearerHandler, TestAuthenticationHandler>(sp =>
+                    {
+                        var claims = new[]
+                        {
+                            new Claim(Role, "User"),
+                            new Claim(Sub, userId.ToString())
+                        };
+                        return new TestAuthenticationHandler(
+                            claims,
+                            sp.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>(),
+                            sp.GetRequiredService<ILoggerFactory>(),
+                            sp.GetRequiredService<UrlEncoder>(),
+                            sp.GetRequiredService<ISystemClock>());
+                    });
                 });
             });
             await _factory.Services.InitializeCollectionsAsync(KeyValuePairs).ConfigureAwait(false);
@@ -78,9 +104,14 @@
             // Assert
             Assert.NotEqual(Empty, result.Id);
             Assert.Equal(model.Name, result.Name);
+            Assert.Equal(userId, result.CreatedBy);
             Assert.Equal(model.CreatedDate, result.CreatedDate.ToUniversalTime());
+            Assert.Null(result.UpdatedBy);
             Assert.Null(result.UpdatedDate);
+
+            // Arrange
             model.Id = result.Id;
+            model.CreatedBy = result.CreatedBy;
             requestUri = new Uri($"{requestUri}({model.Id})", Relative);
 
             // Act
@@ -101,7 +132,9 @@
             // Assert
             Assert.Equal(model.Id, result.Id);
             Assert.Equal(model.Name, result.Name);
+            Assert.Equal(userId, result.CreatedBy);
             Assert.Equal(model.CreatedDate, result.CreatedDate.ToUniversalTime(), FromMilliseconds(1));
+            Assert.Null(result.UpdatedBy);
             Assert.Null(result.UpdatedDate);
 
             // Arrange
@@ -138,7 +171,9 @@
             // Assert
             Assert.Equal(model.Id, result.Id);
             Assert.Equal(model.Name, result.Name);
+            Assert.Equal(userId, result.CreatedBy);
             Assert.Equal(model.CreatedDate, result.CreatedDate.ToUniversalTime(), FromMilliseconds(1));
+            Assert.Equal(userId, result.UpdatedBy);
             Assert.NotNull(result.UpdatedDate);
 
             // Arrange
@@ -175,7 +210,9 @@
             // Assert
             Assert.Equal(model.Id, result.Id);
             Assert.Equal(model.Name, result.Name);
+            Assert.Equal(userId, result.CreatedBy);
             Assert.Equal(model.CreatedDate, result.CreatedDate.ToUniversalTime(), FromMilliseconds(1));
+            Assert.Equal(userId, result.UpdatedBy);
             Assert.NotNull(result.UpdatedDate);
 
             // Arrange
