@@ -5,26 +5,44 @@
     using System.Text.Json;
     using static System.DateTime;
 
+    /// <summary>An asset.</summary>
     public class Asset
     {
+        /// <summary>Initializes a new instance of the <see cref="Asset"/> class.</summary>
         public Asset()
         {
             CreatedDate = CreatedDate == default ? UtcNow : CreatedDate;
         }
 
+        /// <summary>Gets or sets the identifier.</summary>
+        /// <value>The identifier.</value>
         public Guid Id { get; set; }
 
+        /// <summary>Gets or sets the created by.</summary>
+        /// <value>The created by.</value>
         public Guid CreatedBy { get; set; }
 
+        /// <summary>Gets or sets the created date.</summary>
+        /// <value>The created date.</value>
         public DateTime CreatedDate { get; set; }
 
+        /// <summary>Gets or sets the updated by.</summary>
+        /// <value>The updated by.</value>
         public Guid? UpdatedBy { get; set; }
 
+        /// <summary>Gets or sets the updated date.</summary>
+        /// <value>The updated date.</value>
         public DateTime? UpdatedDate { get; set; }
 
+        /// <summary>Gets or sets the name.</summary>
+        /// <value>The name.</value>
         [StringLength(255)]
         public string Name { get; set; }
 
+        /// <summary>Maps a <see cref="JsonElement"/> to an <see cref="Asset"/>.</summary>
+        /// <param name="element">The element.</param>
+        /// <returns>A mapped <see cref="Asset"/>.</returns>
+        /// <exception cref="ArgumentException"><paramref name="element"/> must be an object.</exception>
         public static Asset FromJsonElement(JsonElement element)
         {
             var asset = new Asset();

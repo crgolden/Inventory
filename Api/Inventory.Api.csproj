@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>Inventory</RootNamespace>
     <IncludeOpenAPIAnalyzers>true</IncludeOpenAPIAnalyzers>
+    <CodeAnalysisRuleSet>.ruleset</CodeAnalysisRuleSet>
     <SkipDefaultEditorConfigAsAdditionalFile>true</SkipDefaultEditorConfigAsAdditionalFile>
     <UserSecretsId>75d66946-e5f6-47c8-a792-751864bb2e1d</UserSecretsId>
   </PropertyGroup>
@@ -20,12 +21,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Common.Attributes" Version="1.0.0-beta1" />
+    <PackageReference Include="Core.AspNetCore" Version="1.0.0-beta3" />
+    <PackageReference Include="Core.MediatR" Version="1.0.0-beta1" />
+    <PackageReference Include="Core.Serilog" Version="1.0.0-beta1" />
+    <PackageReference Include="Core.Swagger" Version="1.0.0-beta3" />
     <PackageReference Include="JetBrains.Annotations" Version="2019.1.3" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="3.1.1" />
     <PackageReference Include="Microsoft.CodeAnalysis.FxCopAnalyzers" Version="2.9.8">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Services.Data.Mongo" Version="1.0.0-beta3" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="8.3.0.14607">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -37,12 +44,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Common\Attributes\Common.Attributes.csproj" />
-    <ProjectReference Include="..\..\Core\AspNetCore\Core.AspNetCore.csproj" />
-    <ProjectReference Include="..\..\Core\MediatR\Core.MediatR.csproj" />
-    <ProjectReference Include="..\..\Core\Serilog\Core.Serilog.csproj" />
-    <ProjectReference Include="..\..\Core\Swagger\Core.Swagger.csproj" />
-    <ProjectReference Include="..\..\Services\Data.Mongo\Services.Data.Mongo.csproj" />
     <ProjectReference Include="..\Models\Inventory.Models.csproj" />
   </ItemGroup>
 

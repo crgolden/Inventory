@@ -9,16 +9,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Inventory.Models", "Models\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Inventory.Api.IntegrationTests", "Api.IntegrationTests\Inventory.Api.IntegrationTests.csproj", "{5B69DB68-8877-46B3-B368-2507E70C1B4C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Abstractions", "..\Common\Abstractions\Common.Abstractions.csproj", "{B7DE807B-B786-46F0-AB1E-2BC7E0AD864B}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Services.Data.Mongo", "..\Services\Data.Mongo\Services.Data.Mongo.csproj", "{901F5772-9D6E-4DF5-B4D8-7E2288390F65}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Core.Swagger", "..\Core\Swagger\Core.Swagger.csproj", "{875EB25A-5D47-44D6-B686-BB5B39C4ACDC}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Claims", "..\Common\Claims\Common.Claims.csproj", "{5C2EF9BB-B877-4D49-B4B0-FA4720066517}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Enums", "..\Common\Enums\Common.Enums.csproj", "{01A63E6D-F2CB-485C-969E-89367C622071}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1DA3245C-BBD3-4465-AFDB-9D72BD7CBC62}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
@@ -26,16 +16,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.ruleset = .ruleset
 		README.md = README.md
 	EndProjectSection
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.EventIds", "..\Common\EventIds\Common.EventIds.csproj", "{0AB0583C-00F8-4FAE-92C0-62CECB7B2C0B}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Core.AspNetCore", "..\Core\AspNetCore\Core.AspNetCore.csproj", "{48AFCFEE-9AA2-4A14-888A-C28FB6EA594B}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Attributes", "..\Common\Attributes\Common.Attributes.csproj", "{C40DF444-1742-4478-8995-C13F0F300B01}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Core.Serilog", "..\Core\Serilog\Core.Serilog.csproj", "{13B68ACA-B542-499C-9732-AE0132B8A2E4}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Core.MediatR", "..\Core\MediatR\Core.MediatR.csproj", "{1DBFFA44-EB20-4C49-BF87-5B8A21C472F8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -55,46 +35,6 @@ Global
 		{5B69DB68-8877-46B3-B368-2507E70C1B4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5B69DB68-8877-46B3-B368-2507E70C1B4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5B69DB68-8877-46B3-B368-2507E70C1B4C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B7DE807B-B786-46F0-AB1E-2BC7E0AD864B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B7DE807B-B786-46F0-AB1E-2BC7E0AD864B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B7DE807B-B786-46F0-AB1E-2BC7E0AD864B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B7DE807B-B786-46F0-AB1E-2BC7E0AD864B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{901F5772-9D6E-4DF5-B4D8-7E2288390F65}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{901F5772-9D6E-4DF5-B4D8-7E2288390F65}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{901F5772-9D6E-4DF5-B4D8-7E2288390F65}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{901F5772-9D6E-4DF5-B4D8-7E2288390F65}.Release|Any CPU.Build.0 = Release|Any CPU
-		{875EB25A-5D47-44D6-B686-BB5B39C4ACDC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{875EB25A-5D47-44D6-B686-BB5B39C4ACDC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{875EB25A-5D47-44D6-B686-BB5B39C4ACDC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{875EB25A-5D47-44D6-B686-BB5B39C4ACDC}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5C2EF9BB-B877-4D49-B4B0-FA4720066517}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5C2EF9BB-B877-4D49-B4B0-FA4720066517}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5C2EF9BB-B877-4D49-B4B0-FA4720066517}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5C2EF9BB-B877-4D49-B4B0-FA4720066517}.Release|Any CPU.Build.0 = Release|Any CPU
-		{01A63E6D-F2CB-485C-969E-89367C622071}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{01A63E6D-F2CB-485C-969E-89367C622071}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{01A63E6D-F2CB-485C-969E-89367C622071}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{01A63E6D-F2CB-485C-969E-89367C622071}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0AB0583C-00F8-4FAE-92C0-62CECB7B2C0B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0AB0583C-00F8-4FAE-92C0-62CECB7B2C0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0AB0583C-00F8-4FAE-92C0-62CECB7B2C0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0AB0583C-00F8-4FAE-92C0-62CECB7B2C0B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{48AFCFEE-9AA2-4A14-888A-C28FB6EA594B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{48AFCFEE-9AA2-4A14-888A-C28FB6EA594B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{48AFCFEE-9AA2-4A14-888A-C28FB6EA594B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{48AFCFEE-9AA2-4A14-888A-C28FB6EA594B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C40DF444-1742-4478-8995-C13F0F300B01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C40DF444-1742-4478-8995-C13F0F300B01}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C40DF444-1742-4478-8995-C13F0F300B01}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C40DF444-1742-4478-8995-C13F0F300B01}.Release|Any CPU.Build.0 = Release|Any CPU
-		{13B68ACA-B542-499C-9732-AE0132B8A2E4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{13B68ACA-B542-499C-9732-AE0132B8A2E4}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{13B68ACA-B542-499C-9732-AE0132B8A2E4}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{13B68ACA-B542-499C-9732-AE0132B8A2E4}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1DBFFA44-EB20-4C49-BF87-5B8A21C472F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1DBFFA44-EB20-4C49-BF87-5B8A21C472F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1DBFFA44-EB20-4C49-BF87-5B8A21C472F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1DBFFA44-EB20-4C49-BF87-5B8A21C472F8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
