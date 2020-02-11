@@ -38,7 +38,19 @@
             {
                 var section = context.Configuration.GetSerilogOptionsSection();
                 builder.ClearProviders().AddSerilog(context.Configuration, section);
+                if (context.HostingEnvironment.IsProduction())
+                {
+                    builder.AddAzureWebAppDiagnostics();
+                }
             })
-            .ConfigureWebHostDefaults(webBuilder => webBuilder.UseStartup<Startup>());
+            .ConfigureWebHostDefaults(webBuilder => webBuilder
+                .ConfigureAppConfiguration((context, configBuilder) =>
+                {
+                    if (context.HostingEnvironment.IsProduction())
+                    {
+                        configBuilder.AddAzureKeyVault("https://crgolden.vault.azure.net/");
+                    }
+                })
+                .UseStartup<Startup>());
     }
 }

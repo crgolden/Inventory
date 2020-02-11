@@ -40,6 +40,9 @@
         {
             DefaultInboundClaimTypeMap.Clear();
             DefaultOutboundClaimTypeMap.Clear();
+            services.AddApplicationInsightsTelemetry(options =>
+            {
+            });
             services.AddMvc(options =>
             {
                 options.EnableEndpointRouting = false;
@@ -58,6 +61,7 @@
                 options.Authority = _authority;
                 options.Audience = _audience;
             });
+            services.AddHealthChecks();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -71,6 +75,7 @@
             app.UseStaticFiles();
             app.UseExceptionHandler(app1 => app1.Run(async context => await context.HandleException().ConfigureAwait(false)));
             app.UseHttpsRedirection();
+            app.UseHealthChecks("/health");
             app.UseSwagger();
             app.UseSwaggerUI(options =>
             {
