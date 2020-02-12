@@ -24,7 +24,7 @@
     <PackageReference Include="Common.Attributes" Version="1.0.0-beta1" />
     <PackageReference Include="Core.AspNetCore" Version="1.0.0-beta3" />
     <PackageReference Include="Core.MediatR" Version="1.0.0-beta1" />
-    <PackageReference Include="Core.Serilog" Version="1.0.0-beta1" />
+    <PackageReference Include="Core.Serilog" Version="1.0.0-beta2" />
     <PackageReference Include="Core.Swagger" Version="1.0.0-beta3" />
     <PackageReference Include="JetBrains.Annotations" Version="2019.1.3" />
     <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.12.1" />
