@@ -3,10 +3,11 @@
     using System;
     using System.ComponentModel.DataAnnotations;
     using System.Text.Json;
+    using Common;
     using static System.DateTime;
 
     /// <summary>An asset.</summary>
-    public class Asset
+    public class Asset : ICreatable<Guid>
     {
         /// <summary>Initializes a new instance of the <see cref="Asset"/> class.</summary>
         public Asset()
@@ -18,12 +19,10 @@
         /// <value>The identifier.</value>
         public Guid Id { get; set; }
 
-        /// <summary>Gets or sets the created by.</summary>
-        /// <value>The created by.</value>
+        /// <inheritdoc />
         public Guid CreatedBy { get; set; }
 
-        /// <summary>Gets or sets the created date.</summary>
-        /// <value>The created date.</value>
+        /// <inheritdoc />
         public DateTime CreatedDate { get; set; }
 
         /// <summary>Gets or sets the updated by.</summary>

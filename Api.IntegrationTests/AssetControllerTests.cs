@@ -2,6 +2,7 @@
 {
     using System;
     using System.Diagnostics;
+    using System.Net;
     using System.Net.Http;
     using System.Security.Claims;
     using System.Text.Encodings.Web;
@@ -18,6 +19,7 @@
     using Xunit.Abstractions;
     using static System.Console;
     using static System.Guid;
+    using static System.Net.HttpStatusCode;
     using static System.Net.Mime.MediaTypeNames.Application;
     using static System.Security.Claims.ClaimTypes;
     using static System.Text.Encoding;
@@ -230,12 +232,10 @@
 
             // Act
             stopwatch.Restart();
-            long length;
+            HttpStatusCode statusCode;
             using (var response = await client.GetAsync(requestUri).ConfigureAwait(false))
             {
-                response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                length = body.Length;
+                statusCode = response.StatusCode;
             }
 
             stopwatch.Stop();
@@ -245,7 +245,7 @@
             await Out.WriteLineAsync(message).ConfigureAwait(false);
 
             // Assert
-            Assert.Equal(0, length);
+            Assert.Equal(NotFound, statusCode);
             message = $"Finished all in    {total}";
             _output.WriteLine(message);
             await Out.WriteLineAsync(message).ConfigureAwait(false);

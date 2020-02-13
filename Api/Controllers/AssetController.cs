@@ -13,7 +13,9 @@
     using Microsoft.AspNet.OData.Routing;
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Mvc;
+    using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Logging;
+    using Notifications;
     using Swashbuckle.AspNetCore.Annotations;
     using static System.DateTime;
     using static Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults;
@@ -27,11 +29,16 @@
     {
         private readonly IMediator _mediator;
         private readonly ILogger<AssetController> _logger;
+        private readonly IMemoryCache _cache;
 
-        public AssetController(IMediator mediator, ILogger<AssetController> logger)
+        public AssetController(
+            IMediator mediator,
+            ILogger<AssetController> logger,
+            IMemoryCache cache)
         {
             _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         [ODataRoute("({id})", RouteName = nameof(GetAsset))]
@@ -42,13 +49,24 @@
             OperationId = nameof(GetAsset),
             Tags = new[] { "Asset" }
         )]
+        [Authorize(Policy = nameof(GetAsset))]
         public async Task<IActionResult> GetAsset(
             [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
             CancellationToken cancellationToken)
         {
-            var request = new GetRequest<Asset>(nameof(MongoDB), new object[] { id }, _logger);
-            var model = await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-            return Ok(model);
+            IActionResult result;
+            if (_cache.TryGetValue(id.ToString(), out _))
+            {
+                var request = new Requests.GetRequest<Asset>(nameof(MongoDB), id.ToString(), _logger);
+                var model = await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
+                result = Ok(model);
+            }
+            else
+            {
+                result = NotFound();
+            }
+
+            return result;
         }
 
         [ODataRoute(RouteName = nameof(PostAsset))]
@@ -64,16 +82,23 @@
             [SwaggerParameter("The Asset", Required = true), FromBody, Required] Asset model,
             CancellationToken cancellationToken)
         {
+            IActionResult result;
             if (model.Id != default)
             {
                 ModelState.AddModelError(nameof(model), "Id must be empty");
-                return BadRequest(ModelState);
+                result = BadRequest(ModelState);
+            }
+            else
+            {
+                model.CreatedBy = Guid.Parse(User.FindFirstValue(Sub));
+                var request = new CreateRequest<Asset>(nameof(MongoDB), model, _logger);
+                await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
+                var notification = new CreateNotification<Asset>(model.Id.ToString(), model);
+                await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
+                result = Created(model);
             }
 
-            model.CreatedBy = Guid.Parse(User.FindFirstValue(Sub));
-            var request = new CreateRequest<Asset>(nameof(MongoDB), model, _logger);
-            await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-            return Created(model);
+            return result;
         }
 
         [ODataRoute("({id})", RouteName = nameof(PatchAsset))]
@@ -84,20 +109,33 @@
             OperationId = nameof(PatchAsset),
             Tags = new[] { "Asset" }
         )]
+        [Authorize(Policy = nameof(PatchAsset))]
         [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Checked by `Required` attribute")]
         public async Task<IActionResult> PatchAsset(
             [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
             [SwaggerParameter("The Asset", Required = true), Required] Delta<Asset> delta,
             CancellationToken cancellationToken)
         {
-            var getRequest = new GetRequest<Asset>(nameof(MongoDB), new object[] { id }, _logger);
-            var model = await _mediator.Send(getRequest, cancellationToken).ConfigureAwait(false);
-            delta.Patch(model);
-            model.UpdatedBy = Guid.Parse(User.FindFirstValue(Sub));
-            model.UpdatedDate = UtcNow;
-            var updateRequest = new UpdateRequest<Asset>(nameof(MongoDB), x => x.Id == id, model, _logger);
-            await _mediator.Send(updateRequest, cancellationToken).ConfigureAwait(false);
-            return NoContent();
+            IActionResult result;
+            if (_cache.TryGetValue(id.ToString(), out _))
+            {
+                var getRequest = new Requests.GetRequest<Asset>(nameof(MongoDB), id.ToString(), _logger);
+                var model = await _mediator.Send(getRequest, cancellationToken).ConfigureAwait(false);
+                delta.Patch(model);
+                model.UpdatedBy = Guid.Parse(User.FindFirstValue(Sub));
+                model.UpdatedDate = UtcNow;
+                var request = new UpdateRequest<Asset>(nameof(MongoDB), x => x.Id == id, model, _logger);
+                await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
+                var notification = new UpdateNotification<Asset>(id.ToString(), model);
+                await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
+                result = NoContent();
+            }
+            else
+            {
+                result = NotFound();
+            }
+
+            return result;
         }
 
         [ODataRoute("({id})", RouteName = nameof(PutAsset))]
@@ -108,24 +146,38 @@
             OperationId = nameof(PutAsset),
             Tags = new[] { "Asset" }
         )]
+        [Authorize(Policy = nameof(PutAsset))]
         [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Checked by `Required` attribute")]
         public async Task<IActionResult> PutAsset(
             [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
             [SwaggerParameter("The Asset", Required = true), Required] Delta<Asset> delta,
             CancellationToken cancellationToken)
         {
-            var model = delta.GetInstance();
-            if (model.Id != id)
+            IActionResult result;
+            if (delta.GetInstance()?.Id != id)
             {
                 ModelState.AddModelError(nameof(id), "Ids must match");
-                return BadRequest(ModelState);
+                result = BadRequest(ModelState);
+            }
+            else if (_cache.TryGetValue(id.ToString(), out _))
+            {
+                var getRequest = new Requests.GetRequest<Asset>(nameof(MongoDB), id.ToString(), _logger);
+                var model = await _mediator.Send(getRequest, cancellationToken).ConfigureAwait(false);
+                delta.Put(model);
+                model.UpdatedBy = Guid.Parse(User.FindFirstValue(Sub));
+                model.UpdatedDate = UtcNow;
+                var updateRequest = new UpdateRequest<Asset>(nameof(MongoDB), x => x.Id == id, model, _logger);
+                await _mediator.Send(updateRequest, cancellationToken).ConfigureAwait(false);
+                var notification = new UpdateNotification<Asset>(id.ToString(), model);
+                await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
+                result = NoContent();
+            }
+            else
+            {
+                result = NotFound();
             }
 
-            model.UpdatedBy = Guid.Parse(User.FindFirstValue(Sub));
-            model.UpdatedDate = UtcNow;
-            var request = new UpdateRequest<Asset>(nameof(MongoDB), x => x.Id == id, model, _logger);
-            await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-            return NoContent();
+            return result;
         }
 
         [ODataRoute("({id})", RouteName = nameof(DeleteAsset))]
@@ -140,9 +192,21 @@
             [SwaggerParameter("The Asset Id", Required = true), FromODataUri, NotDefault] Guid id,
             CancellationToken cancellationToken)
         {
-            var request = new DeleteRequest<Asset>(nameof(MongoDB), x => x.Id == id, _logger);
-            await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-            return NoContent();
+            IActionResult result;
+            if (_cache.TryGetValue(id.ToString(), out _))
+            {
+                var request = new DeleteRequest<Asset>(nameof(MongoDB), x => x.Id == id, _logger);
+                await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
+                var notification = new DeleteNotification(id.ToString());
+                await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
+                result = NoContent();
+            }
+            else
+            {
+                result = NotFound();
+            }
+
+            return result;
         }
     }
 }
