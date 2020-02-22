@@ -4,11 +4,12 @@
     using System.Threading;
     using System.Threading.Tasks;
     using MediatR;
+    using Requests;
     using StackExchange.Redis;
     using static System.Text.Json.JsonSerializer;
 
     public class RequestHandler<T> :
-        IRequestHandler<Requests.GetRequest<T>, T>
+        IRequestHandler<GetRequest<T>, T>
         where T : class?
     {
         private readonly IMediator _mediator;
@@ -25,7 +26,7 @@
             _database = redis.GetDatabase();
         }
 
-        public Task<T> Handle(Requests.GetRequest<T> request, CancellationToken cancellationToken)
+        public Task<T> Handle(GetRequest<T> request, CancellationToken cancellationToken)
         {
             if (request == default)
             {

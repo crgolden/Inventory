@@ -2,23 +2,17 @@
 {
     using System;
     using MediatR;
-    using static System.String;
 
     public class UpdateNotification<T> : INotification
         where T : class
     {
-        public UpdateNotification(string key, T model)
+        public UpdateNotification(object key, T model)
         {
-            if (IsNullOrWhiteSpace(key))
-            {
-                throw new ArgumentNullException(nameof(key));
-            }
-
-            Key = key;
+            Key = key ?? throw new ArgumentNullException(nameof(key));
             Model = model ?? throw new ArgumentNullException(nameof(model));
         }
 
-        public string Key { get; }
+        public object Key { get; }
 
         public T Model { get; }
     }

@@ -7,7 +7,7 @@
     using static System.DateTime;
 
     /// <summary>An asset.</summary>
-    public class Asset : ICreatable<Guid>
+    public class Asset : IKeyable<Guid>, ICreatable<Guid>, INameable
     {
         /// <summary>Initializes a new instance of the <see cref="Asset"/> class.</summary>
         public Asset()
@@ -18,6 +18,9 @@
         /// <summary>Gets or sets the identifier.</summary>
         /// <value>The identifier.</value>
         public Guid Id { get; set; }
+
+        /// <inheritdoc />
+        public Guid Key => Id;
 
         /// <inheritdoc />
         public Guid CreatedBy { get; set; }

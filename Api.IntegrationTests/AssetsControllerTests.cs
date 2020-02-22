@@ -30,9 +30,9 @@
     using static System.Text.Json.JsonSerializer;
     using static System.TimeSpan;
     using static System.UriKind;
-    using static ClassMaps;
-    using static IndexModels;
     using static Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
+    using static Models.ClassMaps;
+    using static Models.IndexModels;
 
     public class AssetsControllerTests : IClassFixture<WebApplicationFactory<Startup>>
     {

@@ -19,15 +19,16 @@
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Logging;
     using Microsoft.OData;
-    using StackExchange.Redis;
+    using Notifications;
     using Swashbuckle.AspNetCore.Annotations;
     using static System.DateTime;
-    using static System.Text.Json.JsonSerializer;
-    using static Asset;
+    using static System.Net.Mime.MediaTypeNames.Application;
     using static Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults;
     using static Microsoft.AspNetCore.Http.StatusCodes;
     using static Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
 
+    [Produces(Json)]
+    [Consumes(Json)]
     [ODataRoutePrefix("Assets")]
     [Authorize(AuthenticationSchemes = AuthenticationScheme, Roles = "User")]
     [SwaggerTag("Create, Read, Update, and Delete Assets")]
@@ -35,21 +36,11 @@
     {
         private readonly IMediator _mediator;
         private readonly ILogger<AssetsController> _logger;
-        private readonly IDatabase _database;
 
-        public AssetsController(
-            IMediator mediator,
-            ILogger<AssetsController> logger,
-            IConnectionMultiplexer redis)
+        public AssetsController(IMediator mediator, ILogger<AssetsController> logger)
         {
             _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            if (redis == default)
-            {
-                throw new ArgumentNullException(nameof(redis));
-            }
-
-            _database = redis.GetDatabase();
         }
 
         [ODataRoute(RouteName = nameof(GetAssets))]
@@ -77,8 +68,15 @@
                 return BadRequest(ModelState);
             }
 
+            if (!User.IsInRole("Admin"))
+            {
+                query = query.Where(x => x.CreatedBy == Guid.Parse(User.FindFirstValue(Sub)));
+            }
+
             var getRangeRequest = new GetRangeRequest<Asset>(nameof(MongoDB), query, _logger);
             var response = await _mediator.Send(getRangeRequest, cancellationToken).ConfigureAwait(false);
+            var notification = new GetRangeNotification<Asset>(response.ToDictionary<Asset, object>(x => x.Id));
+            await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
             return Ok(response);
         }
 
@@ -106,7 +104,7 @@
                 return BadRequest(ModelState);
             }
 
-            var models = element.EnumerateArray().Select(FromJsonElement).ToList();
+            var models = element.EnumerateArray().Select(x => x.ToModel<Asset>()).ToList();
             if (models.Any(x => x.Id != default))
             {
                 ModelState.AddModelError(nameof(element), "Ids must be empty");
@@ -117,7 +115,8 @@
             models.ForEach(model => model.CreatedBy = userId);
             var request = new CreateRangeRequest<Asset>(nameof(MongoDB), models, _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-            await SetCachedModels(models).ConfigureAwait(false);
+            var notification = new CreateRangeNotification<Asset>(models.ToDictionary<Asset, object>(x => x.Id));
+            await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
             return Ok(models);
         }
 
@@ -129,6 +128,7 @@
             OperationId = nameof(PutAssets),
             Tags = new[] { "Assets" }
         )]
+        [Authorize(Policy = nameof(PutAssets))]
         public async Task<IActionResult> PutAssets(
             [SwaggerParameter("The Assets", Required = true), FromBody, Required] JsonElement element,
             CancellationToken cancellationToken)
@@ -145,36 +145,18 @@
                 return BadRequest(ModelState);
             }
 
-            var models = element.EnumerateArray().Select(FromJsonElement).ToList();
+            var models = element.EnumerateArray().Select(x => x.ToModel<Asset>()).ToList();
             var userId = Guid.Parse(User.FindFirstValue(Sub));
-            var dictionary = models.ToDictionary<Asset, RedisKey, Asset?>(model => model.Id.ToString(), _ => default);
-            var allowed = await GetCachedModels(dictionary, userId).ConfigureAwait(false);
-            if (!allowed)
-            {
-                return Forbid(AuthenticationScheme);
-            }
-
-            allowed = await GetNonCachedModels(dictionary, userId, cancellationToken).ConfigureAwait(false);
-            if (!allowed)
-            {
-                return Forbid(AuthenticationScheme);
-            }
-
-            if (dictionary.Any(x => x.Value == default))
-            {
-                var keys = dictionary.Where(x => x.Value == default).Select(x => Guid.Parse(x.Key));
-                models.RemoveAll(model => keys.Contains(model.Id));
-            }
-
             models.ForEach(model =>
             {
                 model.UpdatedBy = userId;
                 model.UpdatedDate = UtcNow;
             });
-            var keyValuePairs = models.ToDictionary(model => (Expression<Func<Asset, bool>>)(x => x.Id == model.Id), model => model);
+            var keyValuePairs = models.ToDictionary(model => (Expression<Func<Asset, bool>>)(x => x.Id == model.Id));
             var updateRequest = new UpdateRangeRequest<Asset>(nameof(MongoDB), keyValuePairs, _logger);
             await _mediator.Send(updateRequest, cancellationToken).ConfigureAwait(false);
-            await SetCachedModels(models).ConfigureAwait(false);
+            var notification = new UpdateRangeNotification<Asset>(models.ToDictionary<Asset, object>(x => x.Id));
+            await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
             return NoContent();
         }
 
@@ -186,6 +168,7 @@
             OperationId = nameof(DeleteAssets),
             Tags = new[] { "Assets" }
         )]
+        [Authorize(Policy = nameof(DeleteAssets))]
         public async Task<IActionResult> DeleteAssets(
             [SwaggerParameter("The Asset Ids", Required = true), FromQuery, Required] Guid[] ids,
             CancellationToken cancellationToken)
@@ -196,79 +179,12 @@
                 return BadRequest(ModelState);
             }
 
-            var userId = Guid.Parse(User.FindFirstValue(Sub));
-            var dictionary = ids.ToDictionary<Guid, RedisKey, Asset?>(id => id.ToString(), _ => default);
-            var allowed = await GetCachedModels(dictionary, userId).ConfigureAwait(false);
-            if (!allowed)
-            {
-                return Forbid(AuthenticationScheme);
-            }
-
-            allowed = await GetNonCachedModels(dictionary, userId, cancellationToken).ConfigureAwait(false);
-            if (!allowed)
-            {
-                return Forbid(AuthenticationScheme);
-            }
-
-            if (dictionary.Any(x => x.Value == default))
-            {
-                var keys = dictionary.Where(x => x.Value == default).Select(x => Guid.Parse(x.Key));
-                ids = ids.Where(id => !keys.Contains(id)).ToArray();
-            }
-
             var expressions = ids.Select(id => (Expression<Func<Asset, bool>>)(asset => asset.Id == id));
             var request = new DeleteRangeRequest<Asset>(nameof(MongoDB), expressions.ToArray(), _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-            await _database.KeyDeleteAsync(ids.Select<Guid, RedisKey>(x => x.ToString()).ToArray()).ConfigureAwait(false);
+            var notification = new DeleteRangeNotification(ids.Cast<object>().ToArray());
+            await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
             return NoContent();
-        }
-
-        private async Task<bool> GetCachedModels(Dictionary<RedisKey, Asset?> dictionary, Guid userId)
-        {
-            var values = await _database.StringGetAsync(dictionary.Keys.ToArray()).ConfigureAwait(false);
-            foreach (var model in values.Select(value => Deserialize<Asset>(value)))
-            {
-                if (model.CreatedBy != userId)
-                {
-                    return false;
-                }
-
-                dictionary[model.Id.ToString()] = model;
-            }
-
-            return true;
-        }
-
-        private Task<bool> SetCachedModels(IEnumerable<Asset> models)
-        {
-            var values = models.Select(model => new KeyValuePair<RedisKey, RedisValue>(model.Id.ToString(), Serialize(model)));
-            return _database.StringSetAsync(values.ToArray());
-        }
-
-        private async ValueTask<bool> GetNonCachedModels(IDictionary<RedisKey, Asset?> dictionary, Guid userId, CancellationToken cancellationToken)
-        {
-            if (dictionary.All(x => x.Value != default))
-            {
-                return true;
-            }
-
-            var queryRequest = new QueryRequest<Asset>(nameof(MongoDB));
-            var query = await _mediator.Send(queryRequest, cancellationToken).ConfigureAwait(false);
-            var keys = dictionary.Where(x => x.Value == default).Select(x => Guid.Parse(x.Key)).ToArray();
-            query = query.Where(x => keys.Contains(x.Id));
-            var getRequest = new GetRangeRequest<Asset>(nameof(MongoDB), query, _logger);
-            var models = await _mediator.Send(getRequest, cancellationToken).ConfigureAwait(false);
-            foreach (var model in models)
-            {
-                if (model.CreatedBy != userId)
-                {
-                    return false;
-                }
-
-                dictionary[model.Id.ToString()] = model;
-            }
-
-            return true;
         }
     }
 }

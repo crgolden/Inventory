@@ -2,20 +2,14 @@
 {
     using System;
     using MediatR;
-    using static System.String;
 
     public class DeleteNotification : INotification
     {
-        public DeleteNotification(string key)
+        public DeleteNotification(object key)
         {
-            if (IsNullOrWhiteSpace(key))
-            {
-                throw new ArgumentNullException(nameof(key));
-            }
-
-            Key = key;
+            Key = key ?? throw new ArgumentNullException(nameof(key));
         }
 
-        public string Key { get; }
+        public object Key { get; }
     }
 }

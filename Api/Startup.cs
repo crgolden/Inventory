@@ -2,7 +2,10 @@
 {
     using System;
     using System.Diagnostics.CodeAnalysis;
+    using System.Text.Json.Serialization;
+    using Authorization;
     using Controllers;
+    using Core.Converters;
     using Core.Filters;
     using MediatR;
     using Microsoft.AspNet.OData;
@@ -87,6 +90,8 @@
             services.AddScoped<INotificationHandler<CreateNotification<Asset>>, NotificationHandlers.NotificationHandler<Asset>>();
             services.AddScoped<INotificationHandler<UpdateNotification<Asset>>, NotificationHandlers.NotificationHandler<Asset>>();
             services.AddScoped<INotificationHandler<DeleteNotification>, NotificationHandlers.NotificationHandler<Asset>>();
+            services.AddScoped<INotificationHandler<GetRangeNotification<Asset>>, NotificationHandlers.NotificationHandler<Asset>>();
+            services.AddSingleton(typeof(JsonConverter<>), typeof(JsonElementConverter<>));
             services.AddMongo(_mongoSection);
             services.AddSwagger(_swaggerSection);
             services.AddODataApiExplorer(options =>
@@ -101,7 +106,7 @@
             });
             services.AddAuthorization(options =>
             {
-                var createdByRequirement = new CreatedByRequirement<Asset, Guid>();
+                var createdByRequirement = new CreatedByRequirement<Asset, Guid, Guid>(nameof(MongoDB), new[] { "Admin" });
                 options.AddPolicy(nameof(AssetController.GetAsset), config =>
                 {
                     config.Requirements.Add(createdByRequirement);
@@ -118,8 +123,20 @@
                 {
                     config.Requirements.Add(createdByRequirement);
                 });
+                options.AddPolicy(nameof(AssetsController.PostAssets), config =>
+                {
+                    config.Requirements.Add(createdByRequirement);
+                });
+                options.AddPolicy(nameof(AssetsController.PutAssets), config =>
+                {
+                    config.Requirements.Add(createdByRequirement);
+                });
+                options.AddPolicy(nameof(AssetsController.DeleteAssets), config =>
+                {
+                    config.Requirements.Add(createdByRequirement);
+                });
             });
-            services.AddScoped<IAuthorizationHandler, AuthorizationHandler<Asset, Guid>>();
+            services.AddScoped<IAuthorizationHandler, CreatedByRequirementHandler<Asset, Guid, Guid>>();
             services.AddHealthChecks();
         }
 

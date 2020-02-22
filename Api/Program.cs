@@ -7,9 +7,9 @@
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Hosting;
     using Microsoft.Extensions.Logging;
-    using static ClassMaps;
-    using static IndexModels;
-    using static Seeds;
+    using static Models.ClassMaps;
+    using static Models.IndexModels;
+    using static Models.Seeds;
 
     public static class Program
     {

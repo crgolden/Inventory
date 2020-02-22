@@ -1,4 +1,4 @@
-﻿namespace Inventory
+﻿namespace Inventory.Models
 {
     using Microsoft.AspNet.OData.Builder;
     using Microsoft.AspNetCore.Mvc;

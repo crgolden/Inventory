@@ -22,7 +22,7 @@
 
   <ItemGroup>
     <PackageReference Include="Common.Attributes" Version="1.0.0-beta1" />
-    <PackageReference Include="Core.AspNetCore" Version="1.0.0-beta3" />
+    <PackageReference Include="Core.AspNetCore" Version="1.0.0-beta4" />
     <PackageReference Include="Core.MediatR" Version="1.0.0-beta2" />
     <PackageReference Include="Core.Serilog" Version="1.0.0-beta2" />
     <PackageReference Include="Core.Swagger" Version="1.0.0-beta3" />
