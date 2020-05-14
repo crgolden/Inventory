@@ -58,7 +58,7 @@
             IActionResult result;
             if (_cache.TryGetValue(id, out _))
             {
-                var request = new Requests.GetRequest<Asset>(nameof(MongoDB), id, _logger);
+                var request = new GetRequest<Asset>(nameof(MongoDB), new object[] { id }, _logger);
                 var model = await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
                 result = Ok(model);
             }
@@ -95,7 +95,7 @@
                 model.CreatedBy = Guid.Parse(User.FindFirstValue(Sub));
                 var request = new CreateRequest<Asset>(nameof(MongoDB), model, _logger);
                 await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-                var notification = new CreateNotification<Asset>(model.Id, model);
+                var notification = new CreateNotification<Asset, Guid>(model.Id, model);
                 await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
                 result = Created(model);
             }
@@ -121,14 +121,14 @@
             IActionResult result;
             if (_cache.TryGetValue(id, out _))
             {
-                var getRequest = new Requests.GetRequest<Asset>(nameof(MongoDB), id.ToString(), _logger);
+                var getRequest = new GetRequest<Asset>(nameof(MongoDB), new object[] { id }, _logger);
                 var model = await _mediator.Send(getRequest, cancellationToken).ConfigureAwait(false);
                 delta.Patch(model);
                 model.UpdatedBy = Guid.Parse(User.FindFirstValue(Sub));
                 model.UpdatedDate = UtcNow;
                 var updateRequest = new UpdateRequest<Asset>(nameof(MongoDB), x => x.Id == id, model, _logger);
                 await _mediator.Send(updateRequest, cancellationToken).ConfigureAwait(false);
-                var notification = new UpdateNotification<Asset>(id, model);
+                var notification = new UpdateNotification<Asset, Guid>(id, model);
                 await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
                 result = NoContent();
             }
@@ -163,14 +163,14 @@
             }
             else if (_cache.TryGetValue(id, out _))
             {
-                var getRequest = new Requests.GetRequest<Asset>(nameof(MongoDB), id, _logger);
+                var getRequest = new GetRequest<Asset>(nameof(MongoDB), new object[] { id }, _logger);
                 var model = await _mediator.Send(getRequest, cancellationToken).ConfigureAwait(false);
                 delta.Put(model);
                 model.UpdatedBy = Guid.Parse(User.FindFirstValue(Sub));
                 model.UpdatedDate = UtcNow;
                 var updateRequest = new UpdateRequest<Asset>(nameof(MongoDB), x => x.Id == id, model, _logger);
                 await _mediator.Send(updateRequest, cancellationToken).ConfigureAwait(false);
-                var notification = new UpdateNotification<Asset>(id, model);
+                var notification = new UpdateNotification<Asset, Guid>(id, model);
                 await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
                 result = NoContent();
             }
@@ -199,7 +199,7 @@
             {
                 var request = new DeleteRequest<Asset>(nameof(MongoDB), x => x.Id == id, _logger);
                 await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-                var notification = new DeleteNotification(id);
+                var notification = new DeleteNotification<Guid>(id);
                 await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
                 result = NoContent();
             }

@@ -4,13 +4,14 @@
     using System.Collections.Generic;
     using MediatR;
 
-    public class DeleteRangeNotification : INotification
+    public class DeleteRangeNotification<TId> : INotification
+        where TId : notnull
     {
-        public DeleteRangeNotification(IReadOnlyCollection<object> keys)
+        public DeleteRangeNotification(IReadOnlyCollection<TId> keys)
         {
             Keys = keys ?? throw new ArgumentNullException(nameof(keys));
         }
 
-        public IReadOnlyCollection<object> Keys { get; }
+        public IReadOnlyCollection<TId> Keys { get; }
     }
 }

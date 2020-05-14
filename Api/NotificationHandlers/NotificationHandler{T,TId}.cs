@@ -5,6 +5,7 @@
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
+    using Common;
     using Extensions;
     using MediatR;
     using Microsoft.Extensions.Caching.Memory;
@@ -12,16 +13,18 @@
     using Notifications;
     using StackExchange.Redis;
     using static System.Text.Json.JsonSerializer;
+    using static StackExchange.Redis.CommandFlags;
 
-    public class NotificationHandler<T> :
-        INotificationHandler<CreateNotification<T>>,
-        INotificationHandler<CreateRangeNotification<T>>,
-        INotificationHandler<UpdateNotification<T>>,
-        INotificationHandler<UpdateRangeNotification<T>>,
-        INotificationHandler<DeleteNotification>,
-        INotificationHandler<DeleteRangeNotification>,
-        INotificationHandler<GetRangeNotification<T>>
-        where T : class
+    public class NotificationHandler<T, TId> :
+        INotificationHandler<CreateNotification<T, TId>>,
+        INotificationHandler<CreateRangeNotification<T, TId>>,
+        INotificationHandler<UpdateNotification<T, TId>>,
+        INotificationHandler<UpdateRangeNotification<T, TId>>,
+        INotificationHandler<DeleteNotification<TId>>,
+        INotificationHandler<DeleteRangeNotification<TId>>,
+        INotificationHandler<GetRangeNotification<T, TId>>
+        where T : class, IKeyable<TId>
+        where TId : notnull
     {
         private readonly IDatabase _database;
         private readonly IMemoryCache _cache;
@@ -42,45 +45,18 @@
             _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         }
 
-        public Task Handle(CreateNotification<T> notification, CancellationToken cancellationToken)
+        public Task Handle(CreateNotification<T, TId> notification, CancellationToken cancellationToken)
         {
             if (notification == default)
             {
                 throw new ArgumentNullException(nameof(notification));
             }
 
-            _cache.SetCacheEntry(notification.Key, notification.Model, _options);
-            return _database.StringSetAsync(notification.Key.ToString(), Serialize(notification.Model));
+            _cache.SetCacheEntry(notification.Key, notification.Value, _options);
+            return _database.StringSetAsync(notification.Key.ToString(), Serialize(notification.Value), flags: FireAndForget);
         }
 
-        public Task Handle(CreateRangeNotification<T> notification, CancellationToken cancellationToken)
-        {
-            if (notification == default)
-            {
-                throw new ArgumentNullException(nameof(notification));
-            }
-
-            foreach (var (key, value) in notification.KeyValuePairs)
-            {
-                _cache.SetCacheEntry(key, value, _options);
-            }
-
-            var values = notification.KeyValuePairs.Select(x => new KeyValuePair<RedisKey, RedisValue>(x.Key.ToString(), Serialize(x.Value)));
-            return _database.StringSetAsync(values.ToArray());
-        }
-
-        public Task Handle(UpdateNotification<T> notification, CancellationToken cancellationToken)
-        {
-            if (notification == default)
-            {
-                throw new ArgumentNullException(nameof(notification));
-            }
-
-            _cache.SetCacheEntry(notification.Key, notification.Model, _options);
-            return _database.StringSetAsync(notification.Key.ToString(), Serialize(notification.Model));
-        }
-
-        public Task Handle(UpdateRangeNotification<T> notification, CancellationToken cancellationToken)
+        public Task Handle(CreateRangeNotification<T, TId> notification, CancellationToken cancellationToken)
         {
             if (notification == default)
             {
@@ -93,10 +69,37 @@
             }
 
             var values = notification.KeyValuePairs.Select(x => new KeyValuePair<RedisKey, RedisValue>(x.Key.ToString(), Serialize(x.Value)));
-            return _database.StringSetAsync(values.ToArray());
+            return _database.StringSetAsync(values.ToArray(), flags: FireAndForget);
         }
 
-        public Task Handle(DeleteNotification notification, CancellationToken cancellationToken)
+        public Task Handle(UpdateNotification<T, TId> notification, CancellationToken cancellationToken)
+        {
+            if (notification == default)
+            {
+                throw new ArgumentNullException(nameof(notification));
+            }
+
+            _cache.SetCacheEntry(notification.Key, notification.Value, _options);
+            return _database.StringSetAsync(notification.Key.ToString(), Serialize(notification.Value), flags: FireAndForget);
+        }
+
+        public Task Handle(UpdateRangeNotification<T, TId> notification, CancellationToken cancellationToken)
+        {
+            if (notification == default)
+            {
+                throw new ArgumentNullException(nameof(notification));
+            }
+
+            foreach (var (key, value) in notification.KeyValuePairs)
+            {
+                _cache.SetCacheEntry(key, value, _options);
+            }
+
+            var values = notification.KeyValuePairs.Select(x => new KeyValuePair<RedisKey, RedisValue>(x.Key.ToString(), Serialize(x.Value)));
+            return _database.StringSetAsync(values.ToArray(), flags: FireAndForget);
+        }
+
+        public Task Handle(DeleteNotification<TId> notification, CancellationToken cancellationToken)
         {
             if (notification == default)
             {
@@ -104,10 +107,10 @@
             }
 
             _cache.Remove(notification.Key);
-            return _database.KeyDeleteAsync(notification.Key.ToString());
+            return _database.KeyDeleteAsync(notification.Key.ToString(), FireAndForget);
         }
 
-        public Task Handle(DeleteRangeNotification notification, CancellationToken cancellationToken)
+        public Task Handle(DeleteRangeNotification<TId> notification, CancellationToken cancellationToken)
         {
             if (notification == default)
             {
@@ -119,10 +122,10 @@
                 _cache.Remove(key);
             }
 
-            return _database.KeyDeleteAsync(notification.Keys.Select<object, RedisKey>(x => x.ToString()).ToArray());
+            return _database.KeyDeleteAsync(notification.Keys.Select<TId, RedisKey>(x => x.ToString()).ToArray(), FireAndForget);
         }
 
-        public Task Handle(GetRangeNotification<T> notification, CancellationToken cancellationToken)
+        public Task Handle(GetRangeNotification<T, TId> notification, CancellationToken cancellationToken)
         {
             if (notification == default)
             {
@@ -135,7 +138,7 @@
             }
 
             var values = notification.KeyValuePairs.Select(x => new KeyValuePair<RedisKey, RedisValue>(x.Key.ToString(), Serialize(x.Value)));
-            return _database.StringSetAsync(values.ToArray());
+            return _database.StringSetAsync(values.ToArray(), flags: FireAndForget);
         }
     }
 }

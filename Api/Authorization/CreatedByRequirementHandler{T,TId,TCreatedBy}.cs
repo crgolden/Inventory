@@ -18,17 +18,19 @@
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
-    using Microsoft.Extensions.Primitives;
     using StackExchange.Redis;
+    using static System.ComponentModel.TypeDescriptor;
     using static System.String;
     using static System.StringComparison;
     using static System.Text.Json.JsonSerializer;
     using static System.Threading.Tasks.Task;
     using static Microsoft.AspNetCore.Http.HttpMethods;
     using static Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
+    using static StackExchange.Redis.CommandFlags;
 
     public class CreatedByRequirementHandler<T, TId, TCreatedBy> : AuthorizationHandler<CreatedByRequirement<T, TId, TCreatedBy>>
         where T : class, IKeyable<TId>, ICreatable<TCreatedBy>, new()
+        where TId : notnull
         where TCreatedBy : IComparable<TCreatedBy>, IEquatable<TCreatedBy>
     {
         private readonly IMediator _mediator;
@@ -127,7 +129,7 @@
                 actionContext.HttpContext.Request.Body.Position = 0;
             }
 
-            var keyValuePairs = models.ToDictionary<T, RedisKey, T?>(model => model.Key?.ToString(), _ => default);
+            var keyValuePairs = models.ToDictionary<T, TId, T?>(model => model.Key, _ => default);
             await HandleKeyValuePairsAsync(context, keyValuePairs, requirement).ConfigureAwait(false);
         }
 
@@ -138,7 +140,8 @@
         {
             var ids = actionContext.HttpContext.Request.Query.Where(x => x.Key.StartsWith("ids[", InvariantCultureIgnoreCase) &&
                                                                          x.Key.EndsWith("]", InvariantCultureIgnoreCase));
-            var keyValuePairs = ids.Select(x => x.Value).ToDictionary<StringValues, RedisKey, T?>(id => id.ToString(), _ => default);
+            var converter = GetConverter(typeof(TId));
+            var keyValuePairs = ids.Select(x => (TId)converter.ConvertFromString(x.Value)).ToDictionary<TId, TId, T?>(id => id, _ => default);
             await HandleKeyValuePairsAsync(context, keyValuePairs, requirement).ConfigureAwait(false);
         }
 
@@ -147,17 +150,17 @@
             ActionContext actionContext,
             CreatedByRequirement<T, TId, TCreatedBy> requirement)
         {
-            var key = actionContext.RouteData.Values["id"];
+            var key = (TId)actionContext.RouteData.Values["id"];
             if (!_cache.TryGetValue(key, out T value))
             {
                 var redisValue = await _database.StringGetAsync(key.ToString()).ConfigureAwait(false);
                 if (redisValue.IsNullOrEmpty)
                 {
-                    var request = new GetRequest<T>(requirement.Name, new[] { key }, _logger);
+                    var request = new GetRequest<T>(requirement.Name, new object[] { key }, _logger);
                     value = await _mediator.Send(request).ConfigureAwait(false);
                     if (value != default)
                     {
-                        await _database.StringSetAsync(key.ToString(), Serialize(value)).ConfigureAwait(false);
+                        await _database.StringSetAsync(key.ToString(), Serialize(value), flags: FireAndForget).ConfigureAwait(false);
                     }
                 }
                 else
@@ -176,7 +179,7 @@
 
         private async Task HandleKeyValuePairsAsync(
             AuthorizationHandlerContext context,
-            IDictionary<RedisKey, T?> keyValuePairs,
+            IDictionary<TId, T?> keyValuePairs,
             CreatedByRequirement<T, TId, TCreatedBy> requirement)
         {
             var userId = context.User.FindFirstValue(Sub);
@@ -195,11 +198,11 @@
             context.Succeed(requirement);
         }
 
-        private async Task<bool> GetCachedModels(IDictionary<RedisKey, T?> keyValuePairs, string userId)
+        private async Task<bool> GetCachedModels(IDictionary<TId, T?> keyValuePairs, string userId)
         {
-            var keys = new List<RedisKey>();
-            var cached = new Dictionary<string, T>();
-            foreach (string key in keyValuePairs.Keys)
+            var keys = new List<TId>();
+            var cached = new Dictionary<TId, T>();
+            foreach (var key in keyValuePairs.Keys)
             {
                 if (_cache.TryGetValue(key, out T value))
                 {
@@ -216,18 +219,26 @@
                 keyValuePairs[key] = value;
             }
 
-            var values = await _database.StringGetAsync(keys.ToArray()).ConfigureAwait(false);
-            var allowed = true;
-            foreach (var model in values.Where(x => !x.IsNullOrEmpty).Select(x => Deserialize<T>(x, _jsonSerializerOptions)))
+            if (keys.Any())
             {
-                allowed = SetKey(keyValuePairs, model, userId);
+                var values = await _database.StringGetAsync(keys.Select<TId, RedisKey>(x => x.ToString()).ToArray()).ConfigureAwait(false);
+                foreach (var value in values.Where(x => !x.IsNullOrEmpty).Select(x => Deserialize<T>(x, _jsonSerializerOptions)))
+                {
+                    cached.Add(value.Key, value);
+                }
+            }
+
+            var allowed = true;
+            foreach (var value in cached.Values)
+            {
+                allowed = SetKey(keyValuePairs, value, userId);
             }
 
             return allowed;
         }
 
         private async ValueTask<bool> GetNonCachedModels(
-            IDictionary<RedisKey, T?> keyValuePairs,
+            IDictionary<TId, T?> keyValuePairs,
             string userId,
             INameable requirement)
         {
@@ -238,8 +249,8 @@
 
             var queryRequest = new QueryRequest<T>(requirement.Name);
             var query = await _mediator.Send(queryRequest).ConfigureAwait(false);
-            var keys = keyValuePairs.Where(x => x.Value == default).Select<KeyValuePair<RedisKey, T?>, string>(x => x.Key).ToArray();
-            query = query.Where(x => x.Key != null && keys.Contains(x.Key.ToString()));
+            var keys = keyValuePairs.Where(x => x.Value == default).Select(x => x.Key).ToArray();
+            query = query.Where(x => keys.Contains(x.Key));
             var getRangeRequest = new GetRangeRequest<T>(requirement.Name, query, _logger);
             var models = await _mediator.Send(getRangeRequest).ConfigureAwait(false);
             var values = new List<KeyValuePair<RedisKey, RedisValue>>();
@@ -252,13 +263,13 @@
 
             if (values.Any(x => !IsNullOrWhiteSpace(x.Key)))
             {
-                await _database.StringSetAsync(values.Where(x => !IsNullOrWhiteSpace(x.Key)).ToArray()).ConfigureAwait(false);
+                await _database.StringSetAsync(values.Where(x => !IsNullOrWhiteSpace(x.Key)).ToArray(), flags: FireAndForget).ConfigureAwait(false);
             }
 
             return allowed;
         }
 
-        private bool SetKey(IDictionary<RedisKey, T?> keyValuePairs, T model, string userId)
+        private bool SetKey(IDictionary<TId, T?> keyValuePairs, T model, string userId)
         {
             if (model.Key == null)
             {
@@ -271,7 +282,7 @@
                 return false;
             }
 
-            keyValuePairs[model.Key.ToString()] = model;
+            keyValuePairs[model.Key] = model;
             return true;
         }
     }

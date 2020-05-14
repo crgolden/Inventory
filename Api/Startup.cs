@@ -1,7 +1,6 @@
 ﻿namespace Inventory
 {
     using System;
-    using System.Diagnostics.CodeAnalysis;
     using System.Text.Json.Serialization;
     using Authorization;
     using Controllers;
@@ -51,13 +50,12 @@
             _mongoSection = configuration.GetMongoDataOptionsSection();
             _swaggerSection = configuration.GetSwaggerOptionsSection();
             _distributedCacheEntryOptionsSection = configuration.GetSection(nameof(MemoryCacheEntryOptions));
+            _redisOptionsSection = configuration.GetSection(nameof(RedisOptions));
             _authority = configuration.GetValue<string>("Authority");
             _audience = configuration.GetValue<string>("Audience");
-            _redisOptionsSection = configuration.GetSection("RedisOptions");
         }
 
         // This method gets called by the runtime. Use this method to add services to the container.
-        [SuppressMessage("Design", "ASP0000:Do not call 'IServiceCollection.BuildServiceProvider' in 'ConfigureServices'", Justification = "Forces configs and validations to run")]
         public void ConfigureServices(IServiceCollection services)
         {
             DefaultInboundClaimTypeMap.Clear();
@@ -65,10 +63,10 @@
             services.AddApplicationInsightsTelemetry(options =>
             {
             });
-            services.AddMvc(options =>
+            services.AddMvc(setupAction =>
             {
-                options.EnableEndpointRouting = false;
-                options.Filters.Add<ModelStateActionFilter>();
+                setupAction.EnableEndpointRouting = false;
+                setupAction.Filters.Add<ModelStateActionFilter>();
             }).SetCompatibilityVersion(Latest);
             services.Configure<RedisOptions>(_redisOptionsSection);
             services.AddSingleton<IConnectionMultiplexer>(sp =>
@@ -81,57 +79,59 @@
                 options.EndPoints.Add(redisOptions.Host, redisOptions.Port);
                 return Connect(options);
             });
-            services.AddMemoryCache(options =>
+            services.AddMemoryCache(setupAction =>
             {
             });
             services.Configure<MemoryCacheEntryOptions>(_distributedCacheEntryOptionsSection);
-            services.AddMediatR(new[] { typeof(Asset) }, _mediatRSection, service => service.AsScoped());
-            services.AddScoped<IRequestHandler<Requests.GetRequest<Asset>, Asset>, RequestHandlers.RequestHandler<Asset>>();
-            services.AddScoped<INotificationHandler<CreateNotification<Asset>>, NotificationHandlers.NotificationHandler<Asset>>();
-            services.AddScoped<INotificationHandler<UpdateNotification<Asset>>, NotificationHandlers.NotificationHandler<Asset>>();
-            services.AddScoped<INotificationHandler<DeleteNotification>, NotificationHandlers.NotificationHandler<Asset>>();
-            services.AddScoped<INotificationHandler<GetRangeNotification<Asset>>, NotificationHandlers.NotificationHandler<Asset>>();
+            services.AddMediatR(new[] { typeof(Asset) }, _mediatRSection, configureService => configureService.AsScoped());
+            services.AddScoped<INotificationHandler<CreateNotification<Asset, Guid>>, NotificationHandlers.NotificationHandler<Asset, Guid>>();
+            services.AddScoped<INotificationHandler<CreateRangeNotification<Asset, Guid>>, NotificationHandlers.NotificationHandler<Asset, Guid>>();
+            services.AddScoped<INotificationHandler<UpdateNotification<Asset, Guid>>, NotificationHandlers.NotificationHandler<Asset, Guid>>();
+            services.AddScoped<INotificationHandler<UpdateRangeNotification<Asset, Guid>>, NotificationHandlers.NotificationHandler<Asset, Guid>>();
+            services.AddScoped<INotificationHandler<DeleteNotification<Guid>>, NotificationHandlers.NotificationHandler<Asset, Guid>>();
+            services.AddScoped<INotificationHandler<DeleteRangeNotification<Guid>>, NotificationHandlers.NotificationHandler<Asset, Guid>>();
+            services.AddScoped<INotificationHandler<GetRangeNotification<Asset, Guid>>, NotificationHandlers.NotificationHandler<Asset, Guid>>();
             services.AddSingleton(typeof(JsonConverter<>), typeof(JsonElementConverter<>));
             services.AddMongo(_mongoSection);
             services.AddSwagger(_swaggerSection);
-            services.AddODataApiExplorer(options =>
+            services.AddODataApiExplorer(setupAction =>
             {
                 var getAssetsMethod = typeof(AssetsController).GetMethod(nameof(AssetsController.GetAssets));
-                options.QueryOptions.Controller<AssetsController>().Action(getAssetsMethod!).Allow(All).AllowTop(default);
+                setupAction.QueryOptions.Controller<AssetsController>().Action(getAssetsMethod!).Allow(All).AllowTop(default);
             });
-            services.AddAuthentication().AddJwtBearer(options =>
+            services.AddAuthentication().AddJwtBearer(configureOptions =>
             {
-                options.Authority = _authority;
-                options.Audience = _audience;
+                configureOptions.Authority = _authority;
+                configureOptions.Audience = _audience;
             });
-            services.AddAuthorization(options =>
+            services.AddAuthorization(configure =>
             {
                 var createdByRequirement = new CreatedByRequirement<Asset, Guid, Guid>(nameof(MongoDB), new[] { "Admin" });
-                options.AddPolicy(nameof(AssetController.GetAsset), config =>
+                configure.AddPolicy(nameof(AssetController.GetAsset), config =>
                 {
                     config.Requirements.Add(createdByRequirement);
                 });
-                options.AddPolicy(nameof(AssetController.PatchAsset), config =>
+                configure.AddPolicy(nameof(AssetController.PatchAsset), config =>
                 {
                     config.Requirements.Add(createdByRequirement);
                 });
-                options.AddPolicy(nameof(AssetController.PutAsset), config =>
+                configure.AddPolicy(nameof(AssetController.PutAsset), config =>
                 {
                     config.Requirements.Add(createdByRequirement);
                 });
-                options.AddPolicy(nameof(AssetController.DeleteAsset), config =>
+                configure.AddPolicy(nameof(AssetController.DeleteAsset), config =>
                 {
                     config.Requirements.Add(createdByRequirement);
                 });
-                options.AddPolicy(nameof(AssetsController.PostAssets), config =>
+                configure.AddPolicy(nameof(AssetsController.PostAssets), config =>
                 {
                     config.Requirements.Add(createdByRequirement);
                 });
-                options.AddPolicy(nameof(AssetsController.PutAssets), config =>
+                configure.AddPolicy(nameof(AssetsController.PutAssets), config =>
                 {
                     config.Requirements.Add(createdByRequirement);
                 });
-                options.AddPolicy(nameof(AssetsController.DeleteAssets), config =>
+                configure.AddPolicy(nameof(AssetsController.DeleteAssets), config =>
                 {
                     config.Requirements.Add(createdByRequirement);
                 });
@@ -153,19 +153,19 @@
             app.UseHttpsRedirection();
             app.UseHealthChecks("/health");
             app.UseSwagger();
-            app.UseSwaggerUI(options =>
+            app.UseSwaggerUI(setupAction =>
             {
-                options.InjectJavascript("setToken.js");
+                setupAction.InjectJavascript("setToken.js");
             });
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseApiVersioning();
-            app.UseMvc(routeBuilder =>
+            app.UseMvc(configureRoutes =>
             {
-                var options = routeBuilder.ServiceProvider.GetRequiredService<ODataOptions>();
+                var options = configureRoutes.ServiceProvider.GetRequiredService<ODataOptions>();
                 options.UrlKeyDelimiter = Parentheses;
-                var modelBuilder = routeBuilder.ServiceProvider.GetRequiredService<VersionedODataModelBuilder>();
-                routeBuilder.MapVersionedODataRoutes("odata", "api/v{version:apiVersion}", modelBuilder.GetEdmModels());
+                var modelBuilder = configureRoutes.ServiceProvider.GetRequiredService<VersionedODataModelBuilder>();
+                configureRoutes.MapVersionedODataRoutes("odata", "api/v{version:apiVersion}", modelBuilder.GetEdmModels());
             });
         }
     }

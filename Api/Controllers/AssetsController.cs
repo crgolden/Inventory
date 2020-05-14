@@ -75,7 +75,7 @@
 
             var getRangeRequest = new GetRangeRequest<Asset>(nameof(MongoDB), query, _logger);
             var response = await _mediator.Send(getRangeRequest, cancellationToken).ConfigureAwait(false);
-            var notification = new GetRangeNotification<Asset>(response.ToDictionary<Asset, object>(x => x.Id));
+            var notification = new GetRangeNotification<Asset, Guid>(response.ToDictionary(x => x.Id));
             await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
             return Ok(response);
         }
@@ -115,7 +115,7 @@
             models.ForEach(model => model.CreatedBy = userId);
             var request = new CreateRangeRequest<Asset>(nameof(MongoDB), models, _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-            var notification = new CreateRangeNotification<Asset>(models.ToDictionary<Asset, object>(x => x.Id));
+            var notification = new CreateRangeNotification<Asset, Guid>(models.ToDictionary(x => x.Id));
             await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
             return Ok(models);
         }
@@ -155,7 +155,7 @@
             var keyValuePairs = models.ToDictionary(model => (Expression<Func<Asset, bool>>)(x => x.Id == model.Id));
             var updateRequest = new UpdateRangeRequest<Asset>(nameof(MongoDB), keyValuePairs, _logger);
             await _mediator.Send(updateRequest, cancellationToken).ConfigureAwait(false);
-            var notification = new UpdateRangeNotification<Asset>(models.ToDictionary<Asset, object>(x => x.Id));
+            var notification = new UpdateRangeNotification<Asset, Guid>(models.ToDictionary(x => x.Id));
             await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
             return NoContent();
         }
@@ -182,7 +182,7 @@
             var expressions = ids.Select(id => (Expression<Func<Asset, bool>>)(asset => asset.Id == id));
             var request = new DeleteRangeRequest<Asset>(nameof(MongoDB), expressions.ToArray(), _logger);
             await _mediator.Send(request, cancellationToken).ConfigureAwait(false);
-            var notification = new DeleteRangeNotification(ids.Cast<object>().ToArray());
+            var notification = new DeleteRangeNotification<Guid>(ids);
             await _mediator.Publish(notification, cancellationToken).ConfigureAwait(false);
             return NoContent();
         }

@@ -15,6 +15,8 @@
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
+    using Moq;
+    using StackExchange.Redis;
     using Xunit;
     using Xunit.Abstractions;
     using static System.Console;
@@ -30,6 +32,7 @@
     using static Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
     using static Models.ClassMaps;
     using static Models.IndexModels;
+    using static Moq.Times;
 
     public class AssetControllerTests : IClassFixture<WebApplicationFactory<Startup>>
     {
@@ -53,13 +56,17 @@
             var total = Zero;
             var stopwatch = new Stopwatch();
             var userId = NewGuid();
+            var database = new Mock<IDatabase>();
             _factory = _factory.WithWebHostBuilder(webHost =>
             {
                 webHost.ConfigureAppConfiguration((_, configuration) =>
                 {
                     configuration.AddEnvironmentVariables("ASPNETCORE");
-                }).ConfigureServices((_, services) =>
+                }).ConfigureServices((context, services) =>
                 {
+                    var redis = new Mock<IConnectionMultiplexer>();
+                    redis.Setup(x => x.GetDatabase(It.IsAny<int>(), It.IsAny<object>())).Returns(database.Object);
+                    services.AddSingleton(redis.Object);
                     services.AddTransient<JwtBearerHandler, TestAuthenticationHandler>(sp =>
                     {
                         var claims = new[]
@@ -76,8 +83,8 @@
                     });
                 });
             });
-            await _factory.Services.InitializeCollectionsAsync(KeyValuePairs).ConfigureAwait(false);
-            await _factory.Services.BuildIndexesAsync(AssetIndexes).ConfigureAwait(false);
+            await _factory.Services.InitializeCollectionsAsync(KeyValuePairs).ConfigureAwait(true);
+            await _factory.Services.BuildIndexesAsync(AssetIndexes).ConfigureAwait(true);
             var client = _factory.CreateClient();
             var model = new Asset
             {
@@ -91,17 +98,17 @@
             stopwatch.Start();
             using (var httpContent = new StringContent(content, UTF8, Json))
             {
-                using var response = await client.PostAsync(requestUri, httpContent).ConfigureAwait(false);
+                using var response = await client.PostAsync(requestUri, httpContent).ConfigureAwait(true);
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(false);
+                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
+                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(true);
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
             var message = $"Model created in   {stopwatch.Elapsed}";
             _output.WriteLine(message);
-            await Out.WriteLineAsync(message).ConfigureAwait(false);
+            await Out.WriteLineAsync(message).ConfigureAwait(true);
 
             // Assert
             Assert.NotEqual(Empty, result.Id);
@@ -118,18 +125,18 @@
 
             // Act
             stopwatch.Restart();
-            using (var response = await client.GetAsync(requestUri).ConfigureAwait(false))
+            using (var response = await client.GetAsync(requestUri).ConfigureAwait(true))
             {
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(false);
+                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
+                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(true);
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
             message = $"Model retrieved in {stopwatch.Elapsed}";
             _output.WriteLine(message);
-            await Out.WriteLineAsync(message).ConfigureAwait(false);
+            await Out.WriteLineAsync(message).ConfigureAwait(true);
 
             // Assert
             Assert.Equal(model.Id, result.Id);
@@ -145,7 +152,7 @@
             stopwatch.Restart();
             using (var httpContent = new StringContent(content, UTF8, Json))
             {
-                using var response = await client.PatchAsync(requestUri, httpContent).ConfigureAwait(false);
+                using var response = await client.PatchAsync(requestUri, httpContent).ConfigureAwait(true);
                 response.EnsureSuccessStatusCode();
             }
 
@@ -153,22 +160,22 @@
             total = total.Add(stopwatch.Elapsed);
             message = $"Model updated in   {stopwatch.Elapsed}";
             _output.WriteLine(message);
-            await Out.WriteLineAsync(message).ConfigureAwait(false);
+            await Out.WriteLineAsync(message).ConfigureAwait(true);
 
             // Act
             stopwatch.Restart();
-            using (var response = await client.GetAsync(requestUri).ConfigureAwait(false))
+            using (var response = await client.GetAsync(requestUri).ConfigureAwait(true))
             {
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(false);
+                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
+                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(true);
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
             message = $"Model retrieved in {stopwatch.Elapsed}";
             _output.WriteLine(message);
-            await Out.WriteLineAsync(message).ConfigureAwait(false);
+            await Out.WriteLineAsync(message).ConfigureAwait(true);
 
             // Assert
             Assert.Equal(model.Id, result.Id);
@@ -184,7 +191,7 @@
             stopwatch.Restart();
             using (var httpContent = new StringContent(content, UTF8, Json))
             {
-                using var response = await client.PutAsync(requestUri, httpContent).ConfigureAwait(false);
+                using var response = await client.PutAsync(requestUri, httpContent).ConfigureAwait(true);
                 response.EnsureSuccessStatusCode();
             }
 
@@ -192,22 +199,22 @@
             total = total.Add(stopwatch.Elapsed);
             message = $"Model replaced in  {stopwatch.Elapsed}";
             _output.WriteLine(message);
-            await Out.WriteLineAsync(message).ConfigureAwait(false);
+            await Out.WriteLineAsync(message).ConfigureAwait(true);
 
             // Act
             stopwatch.Restart();
-            using (var response = await client.GetAsync(requestUri).ConfigureAwait(false))
+            using (var response = await client.GetAsync(requestUri).ConfigureAwait(true))
             {
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(false);
+                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(true);
+                result = await DeserializeAsync<Asset>(body, JsonSerializerOptions).ConfigureAwait(true);
             }
 
             stopwatch.Stop();
             total = total.Add(stopwatch.Elapsed);
             message = $"Model retrieved in {stopwatch.Elapsed}";
             _output.WriteLine(message);
-            await Out.WriteLineAsync(message).ConfigureAwait(false);
+            await Out.WriteLineAsync(message).ConfigureAwait(true);
 
             // Assert
             Assert.Equal(model.Id, result.Id);
@@ -219,7 +226,7 @@
 
             // Arrange
             stopwatch.Restart();
-            using (var response = await client.DeleteAsync(requestUri).ConfigureAwait(false))
+            using (var response = await client.DeleteAsync(requestUri).ConfigureAwait(true))
             {
                 response.EnsureSuccessStatusCode();
             }
@@ -228,12 +235,12 @@
             total = total.Add(stopwatch.Elapsed);
             message = $"Model deleted in   {stopwatch.Elapsed}";
             _output.WriteLine(message);
-            await Out.WriteLineAsync(message).ConfigureAwait(false);
+            await Out.WriteLineAsync(message).ConfigureAwait(true);
 
             // Act
             stopwatch.Restart();
             HttpStatusCode statusCode;
-            using (var response = await client.GetAsync(requestUri).ConfigureAwait(false))
+            using (var response = await client.GetAsync(requestUri).ConfigureAwait(true))
             {
                 statusCode = response.StatusCode;
             }
@@ -242,13 +249,16 @@
             total = total.Add(stopwatch.Elapsed);
             message = $"Model retrieved in {stopwatch.Elapsed}";
             _output.WriteLine(message);
-            await Out.WriteLineAsync(message).ConfigureAwait(false);
+            await Out.WriteLineAsync(message).ConfigureAwait(true);
 
             // Assert
+            database.Verify(x => x.StringSetAsync(It.IsAny<RedisKey>(), It.IsAny<RedisValue>(), It.IsAny<TimeSpan?>(), It.IsAny<When>(), It.IsAny<CommandFlags>()), Exactly(3));
+            database.Verify(x => x.KeyDeleteAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()), Once);
+            database.Verify(x => x.StringGetAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()), Once);
             Assert.Equal(NotFound, statusCode);
             message = $"Finished all in    {total}";
             _output.WriteLine(message);
-            await Out.WriteLineAsync(message).ConfigureAwait(false);
+            await Out.WriteLineAsync(message).ConfigureAwait(true);
         }
     }
 }
