@@ -5,12 +5,12 @@
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
+    using Extensions;
     using MediatR;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Options;
     using Notifications;
     using StackExchange.Redis;
-    using static System.String;
     using static System.Text.Json.JsonSerializer;
 
     public class NotificationHandler<T> :
@@ -49,7 +49,7 @@
                 throw new ArgumentNullException(nameof(notification));
             }
 
-            SetMemoryCache(notification.Key.ToString(), notification.Model);
+            _cache.SetCacheEntry(notification.Key, notification.Model, _options);
             return _database.StringSetAsync(notification.Key.ToString(), Serialize(notification.Model));
         }
 
@@ -62,7 +62,7 @@
 
             foreach (var (key, value) in notification.KeyValuePairs)
             {
-                SetMemoryCache(key.ToString(), value);
+                _cache.SetCacheEntry(key, value, _options);
             }
 
             var values = notification.KeyValuePairs.Select(x => new KeyValuePair<RedisKey, RedisValue>(x.Key.ToString(), Serialize(x.Value)));
@@ -76,6 +76,7 @@
                 throw new ArgumentNullException(nameof(notification));
             }
 
+            _cache.SetCacheEntry(notification.Key, notification.Model, _options);
             return _database.StringSetAsync(notification.Key.ToString(), Serialize(notification.Model));
         }
 
@@ -88,7 +89,7 @@
 
             foreach (var (key, value) in notification.KeyValuePairs)
             {
-                SetMemoryCache(key.ToString(), value);
+                _cache.SetCacheEntry(key, value, _options);
             }
 
             var values = notification.KeyValuePairs.Select(x => new KeyValuePair<RedisKey, RedisValue>(x.Key.ToString(), Serialize(x.Value)));
@@ -106,17 +107,6 @@
             return _database.KeyDeleteAsync(notification.Key.ToString());
         }
 
-        public Task Handle(GetRangeNotification<T> notification, CancellationToken cancellationToken)
-        {
-            if (notification == default)
-            {
-                throw new ArgumentNullException(nameof(notification));
-            }
-
-            var values = notification.KeyValuePairs.Select(x => new KeyValuePair<RedisKey, RedisValue>(x.Key.ToString(), Serialize(x.Value)));
-            return _database.StringSetAsync(values.ToArray());
-        }
-
         public Task Handle(DeleteRangeNotification notification, CancellationToken cancellationToken)
         {
             if (notification == default)
@@ -132,30 +122,20 @@
             return _database.KeyDeleteAsync(notification.Keys.Select<object, RedisKey>(x => x.ToString()).ToArray());
         }
 
-        private void SetMemoryCache(string? key, T? value)
+        public Task Handle(GetRangeNotification<T> notification, CancellationToken cancellationToken)
         {
-            if (IsNullOrEmpty(key) || value == default)
+            if (notification == default)
             {
-                return;
+                throw new ArgumentNullException(nameof(notification));
             }
 
-            using var entry = _cache.CreateEntry(key);
-            entry.Value = value;
-            entry.AbsoluteExpiration = _options.AbsoluteExpiration;
-            entry.AbsoluteExpirationRelativeToNow = _options.AbsoluteExpirationRelativeToNow;
-            entry.SlidingExpiration = _options.SlidingExpiration;
-            foreach (var token in _options.ExpirationTokens)
+            foreach (var (key, value) in notification.KeyValuePairs)
             {
-                entry.ExpirationTokens.Add(token);
+                _cache.SetCacheEntry(key, value, _options);
             }
 
-            foreach (var callback in _options.PostEvictionCallbacks)
-            {
-                entry.PostEvictionCallbacks.Add(callback);
-            }
-
-            entry.Priority = _options.Priority;
-            entry.Size = _options.Size;
+            var values = notification.KeyValuePairs.Select(x => new KeyValuePair<RedisKey, RedisValue>(x.Key.ToString(), Serialize(x.Value)));
+            return _database.StringSetAsync(values.ToArray());
         }
     }
 }

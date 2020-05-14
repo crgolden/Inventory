@@ -63,10 +63,10 @@
             var userId = NewGuid();
             _factory = _factory.WithWebHostBuilder(webHost =>
             {
-                webHost.ConfigureAppConfiguration((_, configuration) =>
+                webHost.ConfigureAppConfiguration((context, configuration) =>
                 {
                     configuration.AddEnvironmentVariables("ASPNETCORE");
-                }).ConfigureServices((_, services) =>
+                }).ConfigureServices((context, services) =>
                 {
                     services.AddTransient<JwtBearerHandler, TestAuthenticationHandler>(sp =>
                     {
@@ -222,8 +222,8 @@
                 var requestUri = new Uri(sb.ToString().TrimEnd(' ', 'o', 'r'), Relative);
                 using var response = await client.GetAsync(requestUri).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
-                var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                return Deserialize<ODataValue<List<Asset>>>(body, JsonSerializerOptions);
+                var body = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                return await DeserializeAsync<ODataValue<List<Asset>>>(body, JsonSerializerOptions);
             });
 
             // Act

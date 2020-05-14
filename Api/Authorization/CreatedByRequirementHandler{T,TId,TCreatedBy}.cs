@@ -10,6 +10,7 @@
     using System.Threading.Tasks;
     using Common;
     using Core.Requests;
+    using Extensions;
     using MediatR;
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Http;
@@ -146,17 +147,17 @@
             ActionContext actionContext,
             CreatedByRequirement<T, TId, TCreatedBy> requirement)
         {
-            var key = actionContext.RouteData.Values["id"].ToString();
+            var key = actionContext.RouteData.Values["id"];
             if (!_cache.TryGetValue(key, out T value))
             {
-                var redisValue = await _database.StringGetAsync(key).ConfigureAwait(false);
+                var redisValue = await _database.StringGetAsync(key.ToString()).ConfigureAwait(false);
                 if (redisValue.IsNullOrEmpty)
                 {
                     var request = new GetRequest<T>(requirement.Name, new[] { key }, _logger);
                     value = await _mediator.Send(request).ConfigureAwait(false);
                     if (value != default)
                     {
-                        await _database.StringSetAsync(key, Serialize(value)).ConfigureAwait(false);
+                        await _database.StringSetAsync(key.ToString(), Serialize(value)).ConfigureAwait(false);
                     }
                 }
                 else
@@ -164,7 +165,7 @@
                     value = Deserialize<T>(redisValue, _jsonSerializerOptions);
                 }
 
-                SetMemoryCache(key, value);
+                _cache.SetCacheEntry(key, value, _memoryCacheEntryOptions);
             }
 
             if (value == default || string.Equals(value.CreatedBy.ToString(), context.User.FindFirstValue(Sub), InvariantCultureIgnoreCase))
@@ -264,41 +265,14 @@
                 return true;
             }
 
-            var key = model.Key.ToString();
-            SetMemoryCache(key, model);
+            _cache.SetCacheEntry(model.Key, model, _memoryCacheEntryOptions);
             if (!string.Equals(model.CreatedBy.ToString(), userId, InvariantCultureIgnoreCase))
             {
                 return false;
             }
 
-            keyValuePairs[key] = model;
+            keyValuePairs[model.Key.ToString()] = model;
             return true;
-        }
-
-        private void SetMemoryCache(string? key, T? value)
-        {
-            if (IsNullOrEmpty(key) || value == default)
-            {
-                return;
-            }
-
-            using var entry = _cache.CreateEntry(key);
-            entry.Value = value;
-            entry.AbsoluteExpiration = _memoryCacheEntryOptions.AbsoluteExpiration;
-            entry.AbsoluteExpirationRelativeToNow = _memoryCacheEntryOptions.AbsoluteExpirationRelativeToNow;
-            entry.SlidingExpiration = _memoryCacheEntryOptions.SlidingExpiration;
-            foreach (var token in _memoryCacheEntryOptions.ExpirationTokens)
-            {
-                entry.ExpirationTokens.Add(token);
-            }
-
-            foreach (var callback in _memoryCacheEntryOptions.PostEvictionCallbacks)
-            {
-                entry.PostEvictionCallbacks.Add(callback);
-            }
-
-            entry.Priority = _memoryCacheEntryOptions.Priority;
-            entry.Size = _memoryCacheEntryOptions.Size;
         }
     }
 }

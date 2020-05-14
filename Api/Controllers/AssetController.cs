@@ -4,6 +4,7 @@
     using System.ComponentModel.DataAnnotations;
     using System.Diagnostics.CodeAnalysis;
     using System.Security.Claims;
+    using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
     using Common;
@@ -79,10 +80,11 @@
         )]
         [SuppressMessage("Design", "CA1062:Validate arguments of public methods", Justification = "Checked by `Required` attribute")]
         public async Task<IActionResult> PostAsset(
-            [SwaggerParameter("The Asset", Required = true), FromBody, Required] Asset model,
+            [SwaggerParameter("The Asset", Required = true), FromBody, Required] JsonElement element,
             CancellationToken cancellationToken)
         {
             IActionResult result;
+            var model = element.ToModel<Asset>();
             if (model.Id != default)
             {
                 ModelState.AddModelError(nameof(model), "Id must be empty");

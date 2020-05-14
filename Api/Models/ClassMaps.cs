@@ -11,6 +11,7 @@
             {
                 cm.AutoMap();
                 cm.MapIdMember(c => c.Id);
+                cm.UnmapMember(c => c.Key);
             })
         };
     }
