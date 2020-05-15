@@ -15,6 +15,7 @@
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Mvc;
+    using Microsoft.AspNetCore.Routing;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
@@ -99,58 +100,58 @@
 
             if (actionContext.RouteData.Values.ContainsKey("id"))
             {
-                return HandleByIdAsync(context, actionContext, requirement);
+                return HandleByIdAsync(context, actionContext.RouteData.Values, requirement).AsTask();
             }
 
             if (IsPut(actionContext.HttpContext.Request.Method))
             {
-                return HandlePutAsync(context, actionContext, requirement);
+                return HandlePutAsync(context, actionContext.HttpContext.Request, requirement).AsTask();
             }
 
             if (IsDelete(actionContext.HttpContext.Request.Method))
             {
-                return HandleDeleteAsync(context, actionContext, requirement);
+                return HandleDeleteAsync(context, actionContext.HttpContext.Request.Query, requirement).AsTask();
             }
 
             return CompletedTask;
         }
 
-        private async Task HandlePutAsync(
+        private async ValueTask HandlePutAsync(
             AuthorizationHandlerContext context,
-            ActionContext actionContext,
+            HttpRequest request,
             CreatedByRequirement<T, TId, TCreatedBy> requirement)
         {
-            List<T> models;
-            actionContext.HttpContext.Request.EnableBuffering();
-            using (var reader = new StreamReader(actionContext.HttpContext.Request.Body, leaveOpen: true))
+            ICollection<T> models;
+            request.EnableBuffering();
+            using (var reader = new StreamReader(request.Body, leaveOpen: true))
             {
                 var body = await reader.ReadToEndAsync().ConfigureAwait(false);
-                models = Deserialize<List<T>>(body, _jsonSerializerOptions);
-                actionContext.HttpContext.Request.Body.Position = 0;
+                models = Deserialize<ICollection<T>>(body, _jsonSerializerOptions);
+                request.Body.Position = 0;
             }
 
-            var keyValuePairs = models.ToDictionary<T, TId, T?>(model => model.Key, _ => default);
+            var keyValuePairs = models.ToDictionary(model => model.Key, model => default(T?));
             await HandleKeyValuePairsAsync(context, keyValuePairs, requirement).ConfigureAwait(false);
         }
 
-        private async Task HandleDeleteAsync(
+        private async ValueTask HandleDeleteAsync(
             AuthorizationHandlerContext context,
-            ActionContext actionContext,
+            IQueryCollection query,
             CreatedByRequirement<T, TId, TCreatedBy> requirement)
         {
-            var ids = actionContext.HttpContext.Request.Query.Where(x => x.Key.StartsWith("ids[", InvariantCultureIgnoreCase) &&
-                                                                         x.Key.EndsWith("]", InvariantCultureIgnoreCase));
+            var ids = query.Where(x => x.Key.StartsWith("ids[", InvariantCultureIgnoreCase) &&
+                                       x.Key.EndsWith("]", InvariantCultureIgnoreCase));
             var converter = GetConverter(typeof(TId));
-            var keyValuePairs = ids.Select(x => (TId)converter.ConvertFromString(x.Value)).ToDictionary<TId, TId, T?>(id => id, _ => default);
+            var keyValuePairs = ids.Select(id => (TId)converter.ConvertFromString(id.Value)).ToDictionary(id => id, id => default(T?));
             await HandleKeyValuePairsAsync(context, keyValuePairs, requirement).ConfigureAwait(false);
         }
 
-        private async Task HandleByIdAsync(
+        private async ValueTask HandleByIdAsync(
             AuthorizationHandlerContext context,
-            ActionContext actionContext,
+            RouteValueDictionary routeValues,
             CreatedByRequirement<T, TId, TCreatedBy> requirement)
         {
-            var key = (TId)actionContext.RouteData.Values["id"];
+            var key = (TId)routeValues["id"];
             if (!_cache.TryGetValue(key, out T value))
             {
                 var redisValue = await _database.StringGetAsync(key.ToString()).ConfigureAwait(false);
@@ -168,16 +169,20 @@
                     value = Deserialize<T>(redisValue, _jsonSerializerOptions);
                 }
 
-                _cache.SetCacheEntry(key, value, _memoryCacheEntryOptions);
+                if (value != default)
+                {
+                    _cache.SetCacheEntry(key, value, _memoryCacheEntryOptions);
+                }
             }
 
-            if (value == default || string.Equals(value.CreatedBy.ToString(), context.User.FindFirstValue(Sub), InvariantCultureIgnoreCase))
+            var userId = context.User.FindFirstValue(Sub);
+            if (value == default || string.Equals(value.CreatedBy.ToString(), userId, InvariantCultureIgnoreCase))
             {
                 context.Succeed(requirement);
             }
         }
 
-        private async Task HandleKeyValuePairsAsync(
+        private async ValueTask HandleKeyValuePairsAsync(
             AuthorizationHandlerContext context,
             IDictionary<TId, T?> keyValuePairs,
             CreatedByRequirement<T, TId, TCreatedBy> requirement)
@@ -189,7 +194,7 @@
                 return;
             }
 
-            allowed = await GetNonCachedModels(keyValuePairs, userId, requirement).ConfigureAwait(false);
+            allowed = await GetNonCachedModels(keyValuePairs, userId, requirement.Name).ConfigureAwait(false);
             if (!allowed)
             {
                 return;
@@ -198,10 +203,10 @@
             context.Succeed(requirement);
         }
 
-        private async Task<bool> GetCachedModels(IDictionary<TId, T?> keyValuePairs, string userId)
+        private async ValueTask<bool> GetCachedModels(IDictionary<TId, T?> keyValuePairs, string userId)
         {
-            var keys = new List<TId>();
-            var cached = new Dictionary<TId, T>();
+            var keys = new List<TId>(keyValuePairs.Count);
+            var cached = new Dictionary<TId, T>(keyValuePairs.Count);
             foreach (var key in keyValuePairs.Keys)
             {
                 if (_cache.TryGetValue(key, out T value))
@@ -237,28 +242,25 @@
             return allowed;
         }
 
-        private async ValueTask<bool> GetNonCachedModels(
-            IDictionary<TId, T?> keyValuePairs,
-            string userId,
-            INameable requirement)
+        private async ValueTask<bool> GetNonCachedModels(IDictionary<TId, T?> keyValuePairs, string userId, string name)
         {
             if (keyValuePairs.All(x => x.Value != default))
             {
                 return true;
             }
 
-            var queryRequest = new QueryRequest<T>(requirement.Name);
+            var queryRequest = new QueryRequest<T>(name);
             var query = await _mediator.Send(queryRequest).ConfigureAwait(false);
             var keys = keyValuePairs.Where(x => x.Value == default).Select(x => x.Key).ToArray();
             query = query.Where(x => keys.Contains(x.Key));
-            var getRangeRequest = new GetRangeRequest<T>(requirement.Name, query, _logger);
+            var getRangeRequest = new GetRangeRequest<T>(name, query, _logger);
             var models = await _mediator.Send(getRangeRequest).ConfigureAwait(false);
-            var values = new List<KeyValuePair<RedisKey, RedisValue>>();
+            var values = new List<KeyValuePair<RedisKey, RedisValue>>(models.Count);
             var allowed = true;
-            foreach (var model in models)
+            foreach (var model in models.Where(x => x.Key != null))
             {
                 allowed = SetKey(keyValuePairs, model, userId);
-                values.Add(new KeyValuePair<RedisKey, RedisValue>(model.Key?.ToString(), Serialize(model)));
+                values.Add(new KeyValuePair<RedisKey, RedisValue>(model.Key.ToString(), Serialize(model)));
             }
 
             if (values.Any(x => !IsNullOrWhiteSpace(x.Key)))

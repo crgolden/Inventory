@@ -5,6 +5,7 @@
     using System.Diagnostics.CodeAnalysis;
     using Common;
     using Microsoft.AspNetCore.Authorization;
+    using static System.Array;
     using static System.String;
 
     [SuppressMessage("Major Code Smell", "S2326:Unused type parameters should be removed", Justification = "Used for handler typing")]
@@ -20,16 +21,15 @@
             }
 
             Name = name;
-            if (allowedRoles != null)
-            {
-                AllowedRoles = allowedRoles;
-            }
+            AllowedRoles = allowedRoles ?? Empty<string>();
         }
 
         /// <summary>Gets the name of the <see cref="IDataQueryService"/> to use for this requirement.</summary>
         /// <value>The name of the <see cref="IDataQueryService"/> to use for this requirement.</value>
         public string Name { get; }
 
-        public IReadOnlyCollection<string> AllowedRoles { get; } = new List<string>();
+        /// <summary>Gets the allowed roles.</summary>
+        /// <value>The allowed roles.</value>
+        public IReadOnlyCollection<string> AllowedRoles { get; }
     }
 }

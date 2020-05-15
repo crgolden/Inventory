@@ -59,7 +59,7 @@
             var database = new Mock<IDatabase>();
             _factory = _factory.WithWebHostBuilder(webHost =>
             {
-                webHost.ConfigureAppConfiguration((_, configuration) =>
+                webHost.ConfigureAppConfiguration((context, configuration) =>
                 {
                     configuration.AddEnvironmentVariables("ASPNETCORE");
                 }).ConfigureServices((context, services) =>
