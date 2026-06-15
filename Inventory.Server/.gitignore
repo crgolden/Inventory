@@ -6,11 +6,6 @@
 # Claude Code
 .claude/
 
-# Playwright
-inventory.client/playwright-report/
-inventory.client/test-results/
-inventory.client/e2e/.auth/user.json
-
 # User-specific files
 *.rsuser
 *.suo

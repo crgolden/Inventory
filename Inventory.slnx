@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="coverage.settings.xml" />
+    <File Path="DESIGN.md" />
+    <File Path="dotnet-tools.json" />
+    <File Path="global.json" />
+    <File Path="Invoke-SmokeTests.ps1" />
+    <File Path="README.md" />
+    <File Path="TESTING.md" />
+  </Folder>
+  <Project Path="inventory.client/inventory.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="Inventory.Tests/Inventory.Tests.csproj" Id="37e1d097-f35f-4eff-bed0-f3cb90e31e71" />
+  <Project Path="Inventory.Server/Inventory.Server.csproj" />
+</Solution>
