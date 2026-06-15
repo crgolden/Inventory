@@ -6,7 +6,7 @@ name: Build and deploy ASP.Net Core app to Azure Web App - crgolden-inventory
 on:
   push:
     branches:
-      - main
+      - master
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
@@ -343,7 +343,7 @@ jobs:
     name: Post-deploy smoke
     runs-on: windows-latest
     needs: [build, deploy]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     permissions:
       contents: read
 
