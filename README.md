@@ -1,6 +1,6 @@
 # Inventory
 
-[![Build and deploy ASP.Net Core app to Azure Web App - crgolden-inventory](https://github.com/crgolden/Inventory/actions/workflows/main_crgolden-inventory.yml/badge.svg)](https://github.com/crgolden/Inventory/actions/workflows/main_crgolden-inventory.yml)
+[![Build and deploy ASP.Net Core app to Azure Web App - crgolden-inventory](https://github.com/crgolden/Inventory/actions/workflows/master_crgolden-inventory.yml/badge.svg)](https://github.com/crgolden/Inventory/actions/workflows/master_crgolden-inventory.yml)
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=crgolden_Inventory&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=crgolden_Inventory)
 
