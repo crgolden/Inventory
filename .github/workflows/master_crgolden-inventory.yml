@@ -118,7 +118,7 @@ jobs:
             /d:sonar.host.url="https://sonarcloud.io" `
             /d:sonar.cs.opencover.reportsPaths="coverage.opencover.xml" `
             /d:sonar.cs.vscoveragexml.reportsPaths="coverage-e2e.xml" `
-            /d:sonar.javascript.lcov.reportPaths="inventory.client/coverage/lcov.info" `
+            /d:sonar.javascript.lcov.reportPaths="coverage/lcov.info" `
             /d:sonar.exclusions="inventory.client/aspnetcore-https.js,inventory.client/start-os.js,**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
             /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup.ts,**/Program.cs" `
             /d:sonar.test.inclusions="**/*.spec.ts" `
@@ -147,11 +147,14 @@ jobs:
       - name: Fix LCOV paths for SonarQube
         shell: powershell
         run: |
-          # istanbul on Windows writes SF: paths with backslashes (e.g. SF:src\app\app.component.ts).
-          # SonarCloud indexes files with forward slashes, so prefix the repo-relative dir AND normalize
-          # separators; otherwise every TS file fails to match and all client coverage is dropped.
+          # The Scanner for .NET (v8+) indexes inventory.client as its own module whose base dir IS
+          # inventory.client, so the JS coverage sensor resolves both sonar.javascript.lcov.reportPaths
+          # (coverage/lcov.info) and the lcov SF: paths relative to inventory.client — i.e. module-relative
+          # (src/...), NOT repo-relative. Do NOT prefix inventory.client/ (that double-nests and the sensor
+          # reports "No LCOV files were found"). istanbul on Windows writes backslash separators, so only
+          # normalize them to forward slashes for matching.
           (Get-Content "inventory.client/coverage/lcov.info") `
-            -replace '^SF:', 'SF:inventory.client/' -replace '\\', '/' |
+            -replace '\\', '/' |
             Set-Content "inventory.client/coverage/lcov.info"
 
       - name: Get Playwright version
