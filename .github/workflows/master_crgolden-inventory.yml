@@ -120,7 +120,7 @@ jobs:
             /d:sonar.cs.vscoveragexml.reportsPaths="coverage-e2e.xml" `
             /d:sonar.javascript.lcov.reportPaths="inventory.client/coverage/lcov.info" `
             /d:sonar.exclusions="inventory.client/aspnetcore-https.js,inventory.client/start-os.js,**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
-            /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup.ts" `
+            /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup.ts,**/Program.cs" `
             /d:sonar.test.inclusions="**/*.spec.ts" `
             /d:sonar.scanner.skipJreProvisioning=true
 
@@ -147,8 +147,11 @@ jobs:
       - name: Fix LCOV paths for SonarQube
         shell: powershell
         run: |
+          # istanbul on Windows writes SF: paths with backslashes (e.g. SF:src\app\app.component.ts).
+          # SonarCloud indexes files with forward slashes, so prefix the repo-relative dir AND normalize
+          # separators; otherwise every TS file fails to match and all client coverage is dropped.
           (Get-Content "inventory.client/coverage/lcov.info") `
-            -replace '^SF:', 'SF:inventory.client/' |
+            -replace '^SF:', 'SF:inventory.client/' -replace '\\', '/' |
             Set-Content "inventory.client/coverage/lcov.info"
 
       - name: Get Playwright version

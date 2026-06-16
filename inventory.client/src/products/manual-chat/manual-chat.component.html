@@ -47,6 +47,7 @@
         id="manual-chat-input"
         class="form-control"
         rows="2"
+        aria-label="Ask for a manual link"
         placeholder="Ask for a manual link&hellip;"
         [value]="input()"
         (input)="input.set($any($event.target).value)"
