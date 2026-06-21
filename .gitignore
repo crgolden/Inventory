@@ -5,6 +5,7 @@
 
 # Claude Code
 .claude/
+.playwright-cli/
 
 # Playwright
 inventory.client/playwright-report/
