@@ -9,15 +9,15 @@ This document describes the visual design system for the Inventory Angular 21 fr
 | Tool | Version | Role |
 |------|---------|------|
 | Bootstrap | `^5.3.8` | CSS framework (installed via npm, imported via SCSS — no CDN) |
-| Bootstrap Icons | `^1.11.3` | Icon library (npm, imported via SCSS) |
-| Sass | `^1.77.0` | SCSS compiler |
+| Bootstrap Icons | `^1.13.1` | Icon library (npm, imported via SCSS) |
+| Sass | `^1.101.0` | SCSS compiler |
 | Inter | Google Fonts (400/500/600) | Body and heading typeface (`<link>` in `index.html`) |
 
-### `@import` vs `@use`
+### `@use` with Bootstrap variable overrides
 
-Bootstrap's Sass variable overrides (`$primary`, `$body-bg`, etc.) **require `@import`**, not `@use`. Bootstrap 5.x declares all its `!default` variables inside partials (`_variables.scss`), not at the `bootstrap.scss` entry point. Dart Sass's `@use` module system creates a scope boundary — variables declared in the caller file before `@use` are in the caller's namespace and are never seen by Bootstrap's module. The `with (...)` clause on `@use` only passes variables declared at the entry-point level, so it also cannot reach `_variables.scss` declarations.
+Bootstrap's Sass variable overrides (`$primary`, `$body-bg`, etc.) are applied through Dart Sass's module system, **not** the legacy `@import`. `styles.scss` calls `@use 'bootstrap/scss/bootstrap' with (...)` and passes the overrides in the `with (...)` clause. Because every Bootstrap variable is declared `!default`, the value supplied through `with (...)` wins regardless of which partial (`_variables.scss`, etc.) ultimately declares the variable — the configuration is bound when the module is first loaded, before the `!default` is evaluated.
 
-`@import` shares a flat global scope, which is exactly what Bootstrap's `!default` variable pattern expects. Two Dart Sass deprecation warnings appear in `npm run build` output as a result; they are non-fatal and unavoidable with Bootstrap 5's current SCSS architecture. They will be resolved when Bootstrap migrates to the `@use` module system (planned for Bootstrap 6).
+This is the approach the code uses today (see `inventory.client/src/styles.scss`), and it avoids the flat-global-scope `@import` entry point along with its Dart Sass deprecation warnings. Bootstrap Icons is likewise pulled in via `@use 'bootstrap-icons/font/bootstrap-icons'`.
 
 ### Silent-login iframe
 

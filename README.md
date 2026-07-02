@@ -35,7 +35,7 @@ Inventory is the **end-user surface** of a five-app system. The BFF holds the OI
 
 **Backend (`Inventory.Server/`)**
 - Minimal API with controller-based routing
-- [Duende BFF](https://docs.duendesoftware.com/identityserver/v7/bff/) proxies OIDC login/logout and secures API calls
+- [Duende BFF](https://docs.duendesoftware.com/bff/) proxies OIDC login/logout and secures API calls
 - All secrets (OIDC client credentials, Elasticsearch credentials) fetched at startup from **Azure Key Vault**
 - Data protection keys stored in **Azure Blob Storage**, encrypted with an **Azure Key Vault** key
 - Distributed tracing and metrics via **OpenTelemetry** exported to **Azure Monitor**
@@ -55,12 +55,22 @@ Inventory is the **end-user surface** of a five-app system. The BFF holds the OI
 | `/products`, `/products/new`, `/products/:id`, `/products/:id/edit` | authenticated | [Products API](https://github.com/crgolden/Products) via BFF (`/products/api/**` → Products `/odata/**`), with access token attached |
 | `/products/new`, `/products/:id/edit` (embedded `ManualChatPanel`) | authenticated | [Manuals API](https://github.com/crgolden/Manuals) via BFF (`/manuals/api/**` → Manuals `/api/**`), with access token attached |
 
+### Manual-finder chat panel
+
+The create and edit product forms embed `ManualChatPanelComponent` (`inventory.client/src/products/manual-chat/`) — a retractable AI panel that helps the user locate a product manual. Its chat lifecycle, all proxied through the BFF to the [Manuals API](https://github.com/crgolden/Manuals):
+
+1. `POST /manuals/api/chats` creates a chat.
+2. `PATCH` sets the chat title to `"Manual: {name} {brand} {modelNumber}"` (trimmed to 60 characters).
+3. `POST /manuals/api/chats/{id}/messages/stream` streams the assistant reply over SSE — consumed via the Fetch API (not `EventSource`, so the BFF's auth cookie and `X-CSRF` header are sent).
+
+When a reply contains a manual URL, the panel surfaces it as a clickable chip; selecting the chip patches `form.controls.manualUrl`, which is persisted on the product as `Product.ManualUrl`.
+
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Framework | ASP.NET Core 10 (Minimal API) |
-| Auth | Duende BFF 7 |
+| Auth | Duende BFF 4 (`Duende.BFF.Yarp`) |
 | Frontend | Angular 21 |
 | Observability | Azure Monitor, OpenTelemetry, Serilog, Elasticsearch |
 | Hosting | Azure App Service |
@@ -188,7 +198,7 @@ See [TESTING.md](TESTING.md) for full details on the E2E test infrastructure, CI
 
 ## Deployment
 
-The GitHub Actions workflow triggers on pushes to `main` and pull requests.
+The GitHub Actions workflow triggers on pushes to `master` and pull requests.
 
 **Build job** — runs on every trigger:
 1. Builds the full solution (`dotnet build --configuration Release`) and the Angular frontend
@@ -196,7 +206,7 @@ The GitHub Actions workflow triggers on pushes to `main` and pull requests.
 3. Logs in to Azure via OIDC and runs backend E2E tests with `ASPNETCORE_ENVIRONMENT=CI`
 4. Runs SonarCloud analysis, publishes the web app, and uploads the artifact
 
-**Deploy job** — runs after a successful build on `main`:
+**Deploy job** — runs after a successful build on `master`:
 1. Deploys the web app to **Azure App Service** `crgolden-inventory` (Production slot) via Azure OIDC
 
 Code quality is continuously monitored by [SonarCloud](https://sonarcloud.io/summary/new_code?id=crgolden_Inventory).

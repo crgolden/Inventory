@@ -13,7 +13,7 @@ Unit test coding standards (MockBehavior.Strict, argument verification, SetupSeq
 | E2E (regression) | `Category=E2E` | `Inventory.Tests` | No — test server is a static-file-only Kestrel host; all API routes are Playwright mocks | Yes (for static files) | Every push/PR |
 | E2E (smoke) | `Category=Smoke` | `Inventory.Tests` | No — targets the deployed app directly | No | Post-deploy only |
 
-Smoke tests are a tagged subset of E2E tests (`[Trait("Category", "Smoke")]` on top of `[Trait("Category", "E2E")]`). They compile into the same binary, but run in a different mode: when `SmokeBaseUrl` is set, `PlaywrightFixture` skips `InventoryWebApplicationFactory` entirely and points Playwright straight at that URL. CI sets `SmokeBaseUrl` to the Azure App Service URL emitted by the deploy step.
+Smoke tests carry only `[Trait("Category", "Smoke")]` — they are **not** also tagged `E2E`, so the `Category=E2E` filter does not pick them up. They compile into the same binary as the regression E2E tests but run in a different mode: when `SmokeBaseUrl` is set, `PlaywrightFixture` skips `InventoryWebApplicationFactory` entirely and points Playwright straight at that URL. CI sets `SmokeBaseUrl` to the Azure App Service URL emitted by the deploy step.
 
 ---
 
