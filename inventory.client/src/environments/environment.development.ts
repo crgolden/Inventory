@@ -1,2 +1,2 @@
 // environment.development.ts
-export const environment = { production: false, enableTelemetry: false };
+export const environment = { production: false };

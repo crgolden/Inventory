@@ -1,1 +1,1 @@
-export const environment = { production: true, enableTelemetry: true };
+export const environment = { production: true };

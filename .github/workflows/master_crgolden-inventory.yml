@@ -179,7 +179,6 @@ jobs:
       - name: Run E2E tests with coverage
         env:
           ASPNETCORE_ENVIRONMENT: CI
-          APPLICATIONINSIGHTS_CONNECTION_STRING: ${{ vars.APPLICATIONINSIGHTS_CONNECTION_STRING }}
           OidcAuthority: ${{ vars.OIDC_AUTHORITY }}
           ManualsApiAddress: ${{ vars.MANUALS_API_ADDRESS }}
           ProductsApiAddress: ${{ vars.PRODUCTS_API_ADDRESS }}

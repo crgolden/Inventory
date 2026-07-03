@@ -28,7 +28,7 @@ Inventory is the **end-user surface** of a five-app system. The BFF holds the OI
                     ┌──────────────────────┼──────────────────────┐
                     │                      │                      │
              ┌──────▼──────┐    ┌──────────▼──────┐    ┌─────────▼──────┐
-             │  Azure Key  │    │  Azure Monitor  │    │  Elasticsearch │
+             │  Azure Key  │    │  Grafana Alloy  │    │  Elasticsearch │
              │    Vault    │    │  + OpenTelemetry│    │  + Serilog     │
              └─────────────┘    └─────────────────┘    └────────────────┘
 ```
@@ -38,7 +38,7 @@ Inventory is the **end-user surface** of a five-app system. The BFF holds the OI
 - [Duende BFF](https://docs.duendesoftware.com/bff/) proxies OIDC login/logout and secures API calls
 - All secrets (OIDC client credentials, Elasticsearch credentials) fetched at startup from **Azure Key Vault**
 - Data protection keys stored in **Azure Blob Storage**, encrypted with an **Azure Key Vault** key
-- Distributed tracing and metrics via **OpenTelemetry** exported to **Azure Monitor**
+- Distributed tracing and metrics via **OpenTelemetry** exported to **Grafana Alloy** (OTLP)
 - Structured logging via **Serilog** → Elasticsearch (production) / console (development)
 
 **Frontend (`inventory.client/`)**
@@ -72,7 +72,7 @@ When a reply contains a manual URL, the panel surfaces it as a clickable chip; s
 | Framework | ASP.NET Core 10 (Minimal API) |
 | Auth | Duende BFF 4 (`Duende.BFF.Yarp`) |
 | Frontend | Angular 21 |
-| Observability | Azure Monitor, OpenTelemetry, Serilog, Elasticsearch |
+| Observability | OpenTelemetry → Grafana Alloy (OTLP), Serilog → Elasticsearch |
 | Hosting | Azure App Service |
 | Secrets | Azure Key Vault |
 | Data Protection | Azure Blob Storage + Azure Key Vault |
@@ -88,7 +88,7 @@ When a reply contains a manual URL, the panel surfaces it as a clickable chip; s
 **Azure resources (production / staging):**
 - Azure Key Vault with the secrets listed below
 - Azure Blob Storage container for data protection keys
-- Azure Monitor workspace (Application Insights connection string)
+- Grafana Alloy OTLP endpoint
 - Elasticsearch cluster
 
 ## Getting Started

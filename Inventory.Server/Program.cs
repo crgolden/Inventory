@@ -230,19 +230,6 @@ try
         }
     });
     webApplication.MapHealthChecks("/health").DisableHttpMetrics();
-    webApplication.MapGet("/config/telemetry", () =>
-        {
-            if (!builder.Environment.IsProduction())
-            {
-                return Results.Empty;
-            }
-
-            var value = new
-            {
-                connectionString = builder.Configuration.GetRequired<string>("APPLICATIONINSIGHTS_CONNECTION_STRING")
-            };
-            return TypedResults.Ok(value);
-        }).DisableHttpMetrics();
     webApplication
         .UseAuthentication()
         .UseBff();

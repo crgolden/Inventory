@@ -1,2 +1,2 @@
 // environment.ci.ts
-export const environment = { production: true, enableTelemetry: false };
+export const environment = { production: true };

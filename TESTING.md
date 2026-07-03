@@ -27,7 +27,7 @@ Smoke tests carry only `[Trait("Category", "Smoke")]` — they are **not** also 
 |---|---|---|
 | `Debug` (default) | `ng build --configuration development` — no optimization, fast (~1 min) | Local development and local test runs |
 | `Release` (default) | `ng build --configuration production` — AOT, minification, tree-shaking (~4–5 min) | Local production-bundle testing only |
-| `Release /p:AngularConfiguration=ci` | `ng build --configuration ci` — same optimizations as `production`, `enableTelemetry: false` | CI build step — tests run without the `/config/telemetry` fetch |
+| `Release /p:AngularConfiguration=ci` | `ng build --configuration ci` — same optimizations as `production` | CI build step |
 
 The `BuildAngularRelease` target accepts `/p:AngularConfiguration=<name>` to select any Angular configuration defined in `angular.json`. The default for Release is `production`. CI explicitly passes `ci`; adding a staging environment requires only a new `environment.staging.ts`, a matching entry in `angular.json`, and `/p:AngularConfiguration=staging` in the pipeline.
 
@@ -212,7 +212,7 @@ Covers the embedded `ManualChatPanelComponent` on `/products/new`. All `/manuals
 
 ### Build job (every push / PR)
 
-1. Build solution (`dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci`) — Angular uses `environment.ci.ts` (`enableTelemetry: false`); no `/config/telemetry` call during tests. `dotnet publish` (step 9) rebuilds Angular without the override, producing the `production` bundle (`enableTelemetry: true`) for the deployed artifact.
+1. Build solution (`dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci`) — Angular uses `environment.ci.ts`. `dotnet publish` (step 9) rebuilds Angular without the override, producing the `production` bundle for the deployed artifact.
 2. Backend unit tests with coverage (`dotnet coverlet … --filter-trait Category=Unit`, OpenCover → `coverage.opencover.xml`)
 3. Frontend unit tests with coverage (`npx vitest run --coverage`)
 4. Azure login (OIDC)
