@@ -125,6 +125,8 @@ jobs:
             /d:sonar.scanner.skipJreProvisioning=true
 
       - name: Build with dotnet
+        env:
+          NuGetPackageSourceCredentials_GitHub: Username=${{ github.actor }};Password=${{ secrets.PACKAGES_READ_TOKEN }}
         run: dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci
 
       - name: Run unit tests with coverage
@@ -294,6 +296,8 @@ jobs:
           include-hidden-files: true
 
       - name: dotnet publish
+        env:
+          NuGetPackageSourceCredentials_GitHub: Username=${{ github.actor }};Password=${{ secrets.PACKAGES_READ_TOKEN }}
         run: >
           dotnet publish Inventory.Server/Inventory.Server.csproj
           -c Release
