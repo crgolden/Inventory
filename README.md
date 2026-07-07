@@ -165,7 +165,8 @@ The Angular dev server proxies `/bff` and other API paths to `https://localhost:
 ```
 Inventory.Server/     # ASP.NET Core 10 BFF — OIDC session, API proxy, data protection
 inventory.client/     # Angular 21 SPA — signals, BFF session, chat and product UI
-Inventory.Tests/      # xUnit v3 — unit tests (Moq) and E2E tests (Playwright/Chromium)
+Inventory.Tests.Unit/ # xUnit v3 — backend unit tests (Moq)
+Inventory.Tests.E2E/  # xUnit v3 — E2E/smoke tests (Playwright/Chromium)
 ```
 
 ## Commands
@@ -181,11 +182,12 @@ cd inventory.client && npm run build
 # Output → inventory.client/dist/inventory.client/browser/
 
 # Backend unit tests (no Azure required)
-dotnet build Inventory.Tests --configuration Debug
-.\Inventory.Tests\bin\Debug\net10.0\Inventory.Tests.exe -trait "Category=Unit" -showLiveOutput
+dotnet build Inventory.Tests.Unit --configuration Debug
+.\Inventory.Tests.Unit\bin\Debug\net10.0\Inventory.Tests.Unit.exe -trait "Category=Unit" -showLiveOutput
 
 # Backend E2E tests (Playwright; no Azure credentials needed — static-file Kestrel + Playwright API mocks)
-.\Inventory.Tests\bin\Debug\net10.0\Inventory.Tests.exe -trait "Category=E2E" -showLiveOutput
+dotnet build Inventory.Tests.E2E --configuration Debug
+.\Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe -trait "Category=E2E" -showLiveOutput
 
 # Frontend unit tests (Vitest)
 cd inventory.client && npm test

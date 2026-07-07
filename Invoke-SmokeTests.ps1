@@ -20,7 +20,7 @@ $env:AdminPassword  = $secrets.AdminPassword
 
 try
 {
-    & ".\Inventory.Tests\bin\Debug\net10.0\Inventory.Tests.exe" -trait "Category=Smoke" -showLiveOutput
+    & ".\Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe" -trait "Category=Smoke" -showLiveOutput
 }
 finally
 {

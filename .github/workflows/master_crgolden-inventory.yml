@@ -131,9 +131,9 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          dotnet coverlet Inventory.Tests\bin\Release\net10.0 `
+          dotnet coverlet Inventory.Tests.Unit\bin\Release\net10.0 `
             --target "dotnet" `
-            --targetargs "test --project Inventory.Tests --no-build --configuration Release -- --filter-trait Category=Unit --report-xunit-trx --report-xunit-trx-filename unit-tests.trx" `
+            --targetargs "test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait Category=Unit --report-xunit-trx --report-xunit-trx-filename unit-tests.trx" `
             --format opencover --output "coverage.opencover.xml" `
             --skipautoprops `
             --exclude-by-attribute GeneratedCodeAttribute `
@@ -163,7 +163,7 @@ jobs:
         id: playwright-version
         shell: pwsh
         run: |
-          $version = (Select-Xml -Path Inventory.Tests/Inventory.Tests.csproj `
+          $version = (Select-Xml -Path Inventory.Tests.E2E/Inventory.Tests.E2E.csproj `
             -XPath '//PackageReference[@Include="Microsoft.Playwright"]/@Version').Node.Value
           echo "version=$version" >> $env:GITHUB_OUTPUT
 
@@ -176,7 +176,7 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: pwsh "${{ github.workspace }}\Inventory.Tests\bin\Release\net10.0\playwright.ps1" install --with-deps chromium
+        run: pwsh "${{ github.workspace }}\Inventory.Tests.E2E\bin\Release\net10.0\playwright.ps1" install --with-deps chromium
 
       - name: Run E2E tests with coverage
         env:
@@ -188,7 +188,7 @@ jobs:
           InventoryClientSecret: ${{ secrets.INVENTORY_CLIENT_SECRET }}
         run: |
           dotnet-coverage collect `
-            "dotnet test --project Inventory.Tests --no-build --configuration Release -- --filter-trait Category=E2E --report-xunit-trx --report-xunit-trx-filename e2e-tests.trx" `
+            "dotnet test --project Inventory.Tests.E2E --no-build --configuration Release -- --filter-trait Category=E2E --report-xunit-trx --report-xunit-trx-filename e2e-tests.trx" `
             -f xml -o "coverage-e2e.xml" -s "coverage.settings.xml"
 
       - name: Upload test results
@@ -196,14 +196,14 @@ jobs:
         if: always()
         with:
           name: test-results
-          path: Inventory.Tests/bin/Release/net10.0/TestResults/
+          path: Inventory.Tests.E2E/bin/Release/net10.0/TestResults/
 
       - name: Upload Playwright failure artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         if: always()
         with:
           name: inventory-playwright-artifacts
-          path: Inventory.Tests/bin/Release/net10.0/TestResults/PlaywrightArtifacts/
+          path: Inventory.Tests.E2E/bin/Release/net10.0/TestResults/PlaywrightArtifacts/
           if-no-files-found: ignore
 
       - name: Report E2E results
@@ -215,8 +215,8 @@ jobs:
         run: |
           $appName     = 'Inventory'
           $suiteName   = 'E2E'
-          $resultsDir  = 'Inventory.Tests/bin/Release/net10.0/TestResults'
-          $artifactDir = 'Inventory.Tests/bin/Release/net10.0/TestResults/PlaywrightArtifacts'
+          $resultsDir  = 'Inventory.Tests.E2E/bin/Release/net10.0/TestResults'
+          $artifactDir = 'Inventory.Tests.E2E/bin/Release/net10.0/TestResults/PlaywrightArtifacts'
 
           $trx = Get-ChildItem $resultsDir -Filter *.trx | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
           if (-not $trx) {
@@ -292,7 +292,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: test-binaries
-          path: Inventory.Tests/bin/Release/net10.0/
+          path: Inventory.Tests.E2E/bin/Release/net10.0/
           include-hidden-files: true
 
       - name: dotnet publish
@@ -361,7 +361,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: test-binaries
-          path: Inventory.Tests/bin/Release/net10.0/
+          path: Inventory.Tests.E2E/bin/Release/net10.0/
 
       - name: Cache Playwright browsers
         id: cache-playwright
@@ -372,10 +372,10 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: pwsh "${{ github.workspace }}\Inventory.Tests\bin\Release\net10.0\playwright.ps1" install --with-deps chromium
+        run: pwsh "${{ github.workspace }}\Inventory.Tests.E2E\bin\Release\net10.0\playwright.ps1" install --with-deps chromium
 
       - name: Clear downloaded test results
-        run: Remove-Item Inventory.Tests/bin/Release/net10.0/TestResults -Recurse -Force -ErrorAction SilentlyContinue
+        run: Remove-Item Inventory.Tests.E2E/bin/Release/net10.0/TestResults -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Warm up deployed app
         shell: pwsh
@@ -400,9 +400,9 @@ jobs:
           AdminEmail: ${{ secrets.TEST_USERNAME }}
           AdminPassword: ${{ secrets.TEST_PASSWORD }}
         run: |
-          $resultsDir = "${{ github.workspace }}\Inventory.Tests\bin\Release\net10.0\TestResults"
+          $resultsDir = "${{ github.workspace }}\Inventory.Tests.E2E\bin\Release\net10.0\TestResults"
           New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
-          & "${{ github.workspace }}\Inventory.Tests\bin\Release\net10.0\Inventory.Tests.exe" `
+          & "${{ github.workspace }}\Inventory.Tests.E2E\bin\Release\net10.0\Inventory.Tests.E2E.exe" `
             -trait "Category=Smoke" `
             -trx "$resultsDir\smoke-tests.trx"
 
@@ -411,14 +411,14 @@ jobs:
         if: always()
         with:
           name: smoke-test-results
-          path: Inventory.Tests/bin/Release/net10.0/TestResults/
+          path: Inventory.Tests.E2E/bin/Release/net10.0/TestResults/
 
       - name: Upload smoke Playwright failure artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         if: always()
         with:
           name: inventory-smoke-playwright-artifacts
-          path: Inventory.Tests/bin/Release/net10.0/TestResults/PlaywrightArtifacts/
+          path: Inventory.Tests.E2E/bin/Release/net10.0/TestResults/PlaywrightArtifacts/
           if-no-files-found: ignore
 
       - name: Report smoke results
@@ -430,8 +430,8 @@ jobs:
         run: |
           $appName     = 'Inventory'
           $suiteName   = 'Smoke'
-          $resultsDir  = 'Inventory.Tests/bin/Release/net10.0/TestResults'
-          $artifactDir = 'Inventory.Tests/bin/Release/net10.0/TestResults/PlaywrightArtifacts'
+          $resultsDir  = 'Inventory.Tests.E2E/bin/Release/net10.0/TestResults'
+          $artifactDir = 'Inventory.Tests.E2E/bin/Release/net10.0/TestResults/PlaywrightArtifacts'
 
           $trx = Get-ChildItem $resultsDir -Filter *.trx | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
           if (-not $trx) {

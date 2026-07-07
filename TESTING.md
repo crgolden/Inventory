@@ -1,6 +1,6 @@
 # Testing
 
-The Inventory test suite is split across three tiers: **backend unit tests** (xUnit v3), **frontend unit tests** (Vitest), and **browser-based E2E tests** (Playwright). Unit and E2E tests share the same `Inventory.Tests` project; frontend tests live inside `inventory.client/`.
+The Inventory test suite is split across three tiers: **backend unit tests** (xUnit v3, `Inventory.Tests.Unit`), **frontend unit tests** (Vitest, `inventory.client/`), and **browser-based E2E tests** (Playwright, `Inventory.Tests.E2E`). Unit and E2E tests are physically separate projects — the Unit project has no Playwright dependency and runs its collections in parallel; the E2E project owns `PlaywrightFixture` and runs sequentially against a single Kestrel/browser instance.
 
 Unit test coding standards (MockBehavior.Strict, argument verification, SetupSequence, no control-flow in tests, etc.) are in the workspace-level [Unit Test Standards](../TESTING.md#unit-test-standards). Note for Playwright E2E tests: a `for` or `foreach` is acceptable when it is test setup (e.g. sending N chat messages to prime state) rather than an assertion branch.
 
@@ -8,10 +8,10 @@ Unit test coding standards (MockBehavior.Strict, argument verification, SetupSeq
 
 | Tier | Trait / tool | Project | Requires Azure? | Requires Angular build? | Runs in CI |
 |------|-------------|---------|-----------------|------------------------|------------|
-| Backend unit | `Category=Unit` | `Inventory.Tests` | No | No | Every push/PR |
+| Backend unit | `Category=Unit` | `Inventory.Tests.Unit` | No | No | Every push/PR |
 | Frontend unit | Vitest | `inventory.client` | No | No | Every push/PR |
-| E2E (regression) | `Category=E2E` | `Inventory.Tests` | No — test server is a static-file-only Kestrel host; all API routes are Playwright mocks | Yes (for static files) | Every push/PR |
-| E2E (smoke) | `Category=Smoke` | `Inventory.Tests` | No — targets the deployed app directly | No | Post-deploy only |
+| E2E (regression) | `Category=E2E` | `Inventory.Tests.E2E` | No — test server is a static-file-only Kestrel host; all API routes are Playwright mocks | Yes (for static files) | Every push/PR |
+| E2E (smoke) | `Category=Smoke` | `Inventory.Tests.E2E` | No — targets the deployed app directly | No | Post-deploy only |
 
 Smoke tests carry only `[Trait("Category", "Smoke")]` — they are **not** also tagged `E2E`, so the `Category=E2E` filter does not pick them up. They compile into the same binary as the regression E2E tests but run in a different mode: when `SmokeBaseUrl` is set, `PlaywrightFixture` skips `InventoryWebApplicationFactory` entirely and points Playwright straight at that URL. CI sets `SmokeBaseUrl` to the Azure App Service URL emitted by the deploy step.
 
@@ -49,8 +49,8 @@ For the `.NET 10 SDK xUnit caveat` (why `dotnet test` doesn't work), see the wor
 ### Backend Unit Tests
 
 ```powershell
-dotnet build Inventory.Tests --configuration Debug
-.\Inventory.Tests\bin\Debug\net10.0\Inventory.Tests.exe -trait "Category=Unit" -showLiveOutput
+dotnet build Inventory.Tests.Unit --configuration Debug
+.\Inventory.Tests.Unit\bin\Debug\net10.0\Inventory.Tests.Unit.exe -trait "Category=Unit" -showLiveOutput
 ```
 
 ### E2E Tests (critical pre-commit subset — ~5 tests, ~10 min)
@@ -58,11 +58,11 @@ dotnet build Inventory.Tests --configuration Debug
 A `Category=Critical` trait is applied to the 5 highest-signal E2E tests — the ones most likely to catch a real regression. Run these before every check-in instead of the full suite:
 
 ```powershell
-dotnet build Inventory.Tests --configuration Debug   # includes Angular dev build
-.\Inventory.Tests\bin\Debug\net10.0\Inventory.Tests.exe -trait "Category=Critical" -showLiveOutput
+dotnet build Inventory.Tests.E2E --configuration Debug   # includes Angular dev build
+.\Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe -trait "Category=Critical" -showLiveOutput
 
 # Redirect output for in-flight inspection
-cmd /c "Inventory.Tests\bin\Debug\net10.0\Inventory.Tests.exe -trait ""Category=Critical"" -showLiveOutput > C:\temp\inventory-e2e.txt 2>&1"
+cmd /c "Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe -trait ""Category=Critical"" -showLiveOutput > C:\temp\inventory-e2e.txt 2>&1"
 ```
 
 | Test | File |
@@ -86,8 +86,8 @@ npx vitest run --coverage  # with LCOV coverage report → coverage/lcov.info
 ### E2E tests (regression — full suite)
 
 ```powershell
-dotnet build Inventory.Tests --configuration Debug
-.\Inventory.Tests\bin\Debug\net10.0\Inventory.Tests.exe -trait "Category=E2E" -showLiveOutput
+dotnet build Inventory.Tests.E2E --configuration Debug
+.\Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe -trait "Category=E2E" -showLiveOutput
 ```
 
 ### E2E tests (smoke subset only)
@@ -121,8 +121,10 @@ Credentials are required whenever `SmokeBaseUrl` is set — the fixture will thr
 ### Run all tests in sequence
 
 ```powershell
-dotnet build Inventory.Tests --configuration Debug
-.\Inventory.Tests\bin\Debug\net10.0\Inventory.Tests.exe -showLiveOutput
+dotnet build Inventory.Tests.Unit --configuration Debug
+.\Inventory.Tests.Unit\bin\Debug\net10.0\Inventory.Tests.Unit.exe -showLiveOutput
+dotnet build Inventory.Tests.E2E --configuration Debug
+.\Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe -showLiveOutput
 cd inventory.client && npx vitest run --coverage
 ```
 
@@ -218,8 +220,8 @@ Covers the embedded `ManualChatPanelComponent` on `/products/new`. All `/manuals
 4. Azure login (OIDC)
 5. Cache + install Playwright Chromium
 6. E2E tests with coverage (`dotnet-coverage collect … --filter-trait Category=E2E`)
-7. Upload TRX artifacts (`Inventory.Tests/bin/Release/net10.0/TestResults/`)
-8. Upload test binaries artifact (`Inventory.Tests/bin/Release/net10.0/`) — consumed by the smoke job
+7. Upload TRX artifacts (`Inventory.Tests.E2E/bin/Release/net10.0/TestResults/`)
+8. Upload test binaries artifact (`Inventory.Tests.E2E/bin/Release/net10.0/`) — consumed by the smoke job
 9. Publish app + SonarCloud analysis
 
 ### Smoke job (post-deploy, `main` only)
@@ -234,14 +236,14 @@ Runs after the deploy job. Downloads the pre-built `test-binaries` artifact from
 
 ### Playwright browser cache
 
-Both the build and smoke jobs cache the Playwright Chromium binary keyed on the hash of `Inventory.Tests/Inventory.Tests.csproj`. The cache is stored at `~\AppData\Local\ms-playwright` on Windows runners.
+Both the build and smoke jobs cache the Playwright Chromium binary keyed on the hash of `Inventory.Tests.E2E/Inventory.Tests.E2E.csproj`. The cache is stored at `~\AppData\Local\ms-playwright` on Windows runners.
 
 ### Playwright reporting
 
-`Inventory.Tests` records Playwright diagnostics for every E2E/smoke browser context, then keeps them only when the xUnit test fails. Retained failure folders are written under:
+`Inventory.Tests.E2E` records Playwright diagnostics for every E2E/smoke browser context, then keeps them only when the xUnit test fails. Retained failure folders are written under:
 
 ```text
-Inventory.Tests/bin/<Configuration>/net10.0/TestResults/PlaywrightArtifacts/<E2E|Smoke>/<test-name>/<context-id>/
+Inventory.Tests.E2E/bin/<Configuration>/net10.0/TestResults/PlaywrightArtifacts/<E2E|Smoke>/<test-name>/<context-id>/
 ```
 
 Each retained folder contains:
@@ -266,7 +268,7 @@ CI also publishes the same TRX outcomes to Azure DevOps and Azure Monitor:
 | Azure DevOps | `https://dev.azure.com/crgolden/`, project `Inventory` — published inline by the CI workflow |
 | Azure Monitor | Shared Application Insights `crgolden` — `PlaywrightTestRun`/`PlaywrightTestCase` customEvents posted inline by the CI workflow |
 
-CI uses the `AZURE_DEVOPS_EXT_PAT` secret and the `PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING` variable (set both in the repo's Actions settings). The publish + telemetry logic is inline in the "Publish Playwright results" steps of `.github/workflows/main_crgolden-inventory.yml` — there are no standalone scripts.
+CI uses the `AZURE_DEVOPS_EXT_PAT` secret and the `PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING` variable (set both in the repo's Actions settings). The publish + telemetry logic is inline in the "Publish Playwright results" steps of `.github/workflows/master_crgolden-inventory.yml` — there are no standalone scripts.
 
 Provision or repair the workbook (from the Tools workspace):
 
@@ -286,11 +288,11 @@ stays VS Coverage XML; the frontend emits LCOV. SonarCloud unions all three.
 
 ```powershell
 # .NET unit (OpenCover) — the Inventory.Server BFF surface is tiny; real client logic is Vitest/LCOV
-dotnet build Inventory.Tests --configuration Release /p:AngularConfiguration=ci
+dotnet build Inventory.Tests.Unit --configuration Release /p:AngularConfiguration=ci
 dotnet tool restore
-dotnet coverlet Inventory.Tests\bin\Release\net10.0 `
+dotnet coverlet Inventory.Tests.Unit\bin\Release\net10.0 `
   --target "dotnet" `
-  --targetargs "test --project Inventory.Tests --no-build --configuration Release -- --filter-trait Category=Unit" `
+  --targetargs "test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait Category=Unit" `
   --format opencover --output "coverage.opencover.xml" `
   --skipautoprops --exclude-by-attribute GeneratedCodeAttribute `
   --exclude-by-file "**/obj/**" --exclude-by-file "**/Program.cs" `
@@ -303,7 +305,7 @@ $env:SONAR_TOKEN = "<token>"
   "-Dsonar.projectKey=crgolden_Inventory" `
   "-Dsonar.organization=crgolden" `
   "-Dsonar.sources=Inventory.Server,inventory.client/src" `
-  "-Dsonar.tests=Inventory.Tests" `
+  "-Dsonar.tests=Inventory.Tests.Unit,Inventory.Tests.E2E" `
   "-Dsonar.exclusions=inventory.client/aspnetcore-https.js,inventory.client/start-os.js,**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
   "-Dsonar.coverage.exclusions=inventory.client/e2e/**,inventory.client/src/test-setup.ts" `
   "-Dsonar.test.inclusions=**/*.spec.ts" `

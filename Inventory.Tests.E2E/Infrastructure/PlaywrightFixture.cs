@@ -1,4 +1,4 @@
-namespace Inventory.Tests.Infrastructure;
+namespace Inventory.Tests.E2E.Infrastructure;
 
 using System.Text.Json;
 using System.Text.RegularExpressions;

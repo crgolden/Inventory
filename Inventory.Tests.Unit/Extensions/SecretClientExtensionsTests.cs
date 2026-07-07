@@ -1,4 +1,4 @@
-namespace Inventory.Tests.Extensions;
+namespace Inventory.Tests.Unit.Extensions;
 
 using System.Collections.Generic;
 using System.Threading;

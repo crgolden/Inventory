@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Inventory.Tests")]
+[assembly: InternalsVisibleTo("Inventory.Tests.Unit")]

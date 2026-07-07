@@ -1,6 +1,6 @@
 namespace Inventory.Tests.E2E;
 
-using Infrastructure;
+using Inventory.Tests.E2E.Infrastructure;
 using Microsoft.Playwright;
 
 [Collection(E2ECollection.Name)]

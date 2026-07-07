@@ -1,8 +1,8 @@
-using Inventory.Tests.Infrastructure;
+using Inventory.Tests.E2E.Infrastructure;
 
 [assembly: PlaywrightArtifactFinalizer]
 
-namespace Inventory.Tests.Infrastructure;
+namespace Inventory.Tests.E2E.Infrastructure;
 
 using System.Collections.Concurrent;
 using System.Reflection;
