@@ -19,7 +19,7 @@
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Duende.BFF.Yarp" Version="4.2.0" />
     <PackageReference Include="Elastic.Serilog.Sinks" Version="9.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Azure" Version="1.14.0" />
     <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.16.0" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
