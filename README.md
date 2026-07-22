@@ -36,7 +36,7 @@ Inventory is the **end-user surface** of a five-app system. The BFF holds the OI
 **Backend (`Inventory.Server/`)**
 - Minimal API with controller-based routing
 - [Duende BFF](https://docs.duendesoftware.com/bff/) proxies OIDC login/logout and secures API calls
-- All secrets (OIDC client credentials, Elasticsearch credentials) fetched at startup from **Azure Key Vault**
+- All secrets (OIDC client credentials, Elasticsearch credentials) come from **Azure Key Vault** references in App Service Application Settings, resolved into configuration by the platform before the app starts — no Key Vault SDK calls in `Program.cs`
 - Data protection keys stored in **Azure Blob Storage**, encrypted with an **Azure Key Vault** key
 - Distributed tracing and metrics via **OpenTelemetry** exported to **Grafana Alloy** (OTLP)
 - Structured logging via **Serilog** → Elasticsearch (production) / console (development)
@@ -106,9 +106,6 @@ In development, user secrets are used (ID `5480cab8-b41b-4dae-8c41-dbc2c01a15e0`
     "ExcludeVisualStudioCredential": false
   },
 
-  // Key Vault URI
-  "KeyVaultUri": "https://<vault-name>.vault.azure.net/",
-
   // Azure Blob Storage URI for data protection keys
   "BlobUri": "https://<account>.blob.core.windows.net/<container>/keys.xml",
 
@@ -128,7 +125,7 @@ In development, user secrets are used (ID `5480cab8-b41b-4dae-8c41-dbc2c01a15e0`
 }
 ```
 
-**Key Vault secrets required at runtime:**
+**Secrets required at runtime** (Key Vault-referenced App Service Application Settings in production, User Secrets in development):
 
 | Secret name | Description |
 |-------------|-------------|

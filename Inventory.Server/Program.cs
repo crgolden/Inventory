@@ -2,7 +2,6 @@
 using System.Diagnostics;
 using System.Security.Claims;
 using Azure.Identity;
-using Azure.Security.KeyVault.Secrets;
 using Duende.Bff;
 using Duende.Bff.DynamicFrontends;
 using Duende.Bff.Yarp;
@@ -36,7 +35,13 @@ try
     Uri oidcAuthority = builder.Configuration.GetRequired<Uri>("OidcAuthority"),
         manualsApiAddress = builder.Configuration.GetRequired<Uri>("ManualsApiAddress"),
         productsApiAddress = builder.Configuration.GetRequired<Uri>("ProductsApiAddress");
-    string inventoryClientId, inventoryClientSecret;
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Configuration.AddUserSecrets("5480cab8-b41b-4dae-8c41-dbc2c01a15e0");
+    }
+
+    string inventoryClientId = builder.Configuration.GetRequired<string>("InventoryClientId"),
+        inventoryClientSecret = builder.Configuration.GetRequired<string>("InventoryClientSecret");
     if (builder.Environment.IsProduction())
     {
         var defaultAzureCredentialOptionsSection = builder.Configuration.GetRequiredSection(nameof(DefaultAzureCredentialOptions));
@@ -44,13 +49,10 @@ try
         var tokenCredential = new DefaultAzureCredential(defaultAzureCredentialOptions);
         Uri blobUri = builder.Configuration.GetRequired<Uri>("BlobUri"),
             dataProtectionKeyIdentifier = builder.Configuration.GetRequired<Uri>("DataProtectionKeyIdentifier"),
-            elasticsearchNode = builder.Configuration.GetRequired<Uri>("ElasticsearchNode"),
-            keyVaultUrl = builder.Configuration.GetRequired<Uri>("KeyVaultUri");
+            elasticsearchNode = builder.Configuration.GetRequired<Uri>("ElasticsearchNode");
         var applicationName = builder.Configuration.GetRequired<string>("WEBSITE_SITE_NAME");
-        var secretClient = new SecretClient(keyVaultUrl, tokenCredential);
-        var secrets = secretClient.GetInventorySecrets();
-        inventoryClientId = secrets.InventoryClientId.Value;
-        inventoryClientSecret = secrets.InventoryClientSecret.Value;
+        var elasticsearchUsername = builder.Configuration.GetRequired<string>("ElasticsearchUsername");
+        var elasticsearchPassword = builder.Configuration.GetRequired<string>("ElasticsearchPassword");
         builder.Services.Configure<AspNetCoreTraceInstrumentationOptions>(options =>
             options.Filter = context => !context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase));
         builder.Logging.AddOpenTelemetry(openTelemetryLoggerOptions =>
@@ -78,7 +80,7 @@ try
                     },
                     transportConfiguration =>
                     {
-                        var header = new BasicAuthentication(secrets.ElasticsearchUsername.Value, secrets.ElasticsearchPassword.Value);
+                        var header = new BasicAuthentication(elasticsearchUsername, elasticsearchPassword);
                         transportConfiguration.Authentication(header);
                     }))
             .AddOpenTelemetry()
@@ -106,14 +108,6 @@ try
     }
     else
     {
-        if (builder.Environment.IsDevelopment())
-        {
-            builder.Configuration.AddUserSecrets("5480cab8-b41b-4dae-8c41-dbc2c01a15e0");
-        }
-
-        var secrets = builder.Configuration.GetInventorySecrets();
-        inventoryClientId = secrets.InventoryClientId;
-        inventoryClientSecret = secrets.InventoryClientSecret;
         builder.Services
             .AddSerilog((serviceProvider, loggerConfiguration) => loggerConfiguration
                 .ReadFrom.Configuration(builder.Configuration)
