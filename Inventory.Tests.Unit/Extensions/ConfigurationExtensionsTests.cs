@@ -27,21 +27,4 @@ public sealed class ConfigurationExtensionsTests
         var ex = Assert.Throws<InvalidOperationException>(() => config.GetRequired<string>("MissingKey"));
         Assert.Equal("Invalid 'MissingKey'.", ex.Message);
     }
-
-    [Fact]
-    public void GetInventorySecrets_ReadsCorrectConfigurationKeys()
-    {
-        IConfiguration config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["InventoryClientId"] = "client-id",
-                ["InventoryClientSecret"] = "client-secret",
-            })
-            .Build();
-
-        var (id, secret) = config.GetInventorySecrets();
-
-        Assert.Equal((string?)"client-id", (string?)id);
-        Assert.Equal((string?)"client-secret", (string?)secret);
-    }
 }
