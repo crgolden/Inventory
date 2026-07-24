@@ -3,7 +3,7 @@ import { NavMenuComponent } from './nav-menu.component';
 import { AuthService } from '../auth/auth.service';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes } from '@angular/router';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 
 describe('NavMenuComponent', () => {
   let component: NavMenuComponent;
@@ -11,11 +11,9 @@ describe('NavMenuComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [NavMenuComponent,
-        ],
+      imports: [NavMenuComponent],
       providers: [{ provide: AuthService, useClass: AuthServiceStub }, provideRouter(testRoutes)],
-    })
-    .compileComponents();
+    }).compileComponents();
 
     fixture = TestBed.createComponent(NavMenuComponent);
     component = fixture.componentInstance;
@@ -48,7 +46,8 @@ describe('NavMenuComponent', () => {
   });
 });
 @Component({
-  template: ''
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '',
 })
 class DummyComponent {}
 // Define dummy routes.  Include routes for ALL paths used by routerLink in your component.

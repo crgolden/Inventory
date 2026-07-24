@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { By } from '@angular/platform-browser';
 import { ManualChatComponent } from './manual-chat.component';
@@ -14,7 +14,7 @@ describe('ManualChatComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ManualChatComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(withXhr()), provideHttpClientTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ManualChatComponent);
@@ -37,12 +37,9 @@ describe('ManualChatComponent', () => {
 
   it('urlsFor extracts unique http(s) URLs from assistant content', () => {
     const urls = component.urlsFor(
-      'Try https://example.com/a.pdf or https://example.com/b.pdf. Duplicate: https://example.com/a.pdf'
+      'Try https://example.com/a.pdf or https://example.com/b.pdf. Duplicate: https://example.com/a.pdf',
     );
-    expect(urls).toEqual([
-      'https://example.com/a.pdf',
-      'https://example.com/b.pdf',
-    ]);
+    expect(urls).toEqual(['https://example.com/a.pdf', 'https://example.com/b.pdf']);
   });
 
   it('urlsFor strips trailing markdown/paren punctuation', () => {
@@ -52,7 +49,7 @@ describe('ManualChatComponent', () => {
 
   it('selectUrl emits manualUrlSelected', () => {
     const emitted: string[] = [];
-    component.manualUrlSelected.subscribe(v => emitted.push(v));
+    component.manualUrlSelected.subscribe((v) => emitted.push(v));
     component.selectUrl('https://example.com/picked.pdf');
     expect(emitted).toEqual(['https://example.com/picked.pdf']);
   });

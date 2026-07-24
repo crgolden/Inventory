@@ -1,12 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  provideHttpClient,
-  withInterceptorsFromDi,
-} from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { provideHttpClient, withInterceptorsFromDi, withXhr } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
 import { ProductService } from './product.service';
 import { ODataResponse, Product } from './product.model';
@@ -51,7 +45,7 @@ describe('ProductService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClient(withXhr(), withInterceptorsFromDi()),
         provideHttpClientTesting(),
       ],
     });
@@ -71,7 +65,7 @@ describe('ProductService', () => {
     it('requests the OData Products collection ordered by Name', () => {
       service.getAll().subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
+      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
       expect(params(req.request.urlWithParams).get('$orderby')).toBe('Name');
       req.flush({ value: [mockApiProduct] });
     });
@@ -79,7 +73,7 @@ describe('ProductService', () => {
     it('unwraps the OData value envelope and maps PascalCase API response to Product', async () => {
       const promise = firstValueFrom(service.getAll());
 
-      http.expectOne(r => r.urlWithParams.startsWith(BASE)).flush({ value: [mockApiProduct] });
+      http.expectOne((r) => r.urlWithParams.startsWith(BASE)).flush({ value: [mockApiProduct] });
 
       const products = await promise;
       expect(products.length).toBe(1);
@@ -92,7 +86,7 @@ describe('ProductService', () => {
 
       service.getAll('oled').subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
+      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
       const filter = params(req.request.urlWithParams).get('$filter') ?? '';
       expect(filter).toContain("contains(tolower(Name), tolower('oled'))");
       req.flush(envelope);
@@ -103,7 +97,7 @@ describe('ProductService', () => {
 
       service.getAll('').subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
+      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
       expect(params(req.request.urlWithParams).has('$filter')).toBe(false);
       req.flush(envelope);
     });
@@ -113,7 +107,7 @@ describe('ProductService', () => {
 
       service.getAll('  dyson  ').subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
+      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
       const filter = params(req.request.urlWithParams).get('$filter') ?? '';
       expect(filter).toContain("tolower('dyson')");
       req.flush(envelope);
@@ -146,13 +140,23 @@ describe('ProductService', () => {
       const req = http.expectOne(BASE);
       expect(req.request.method).toBe('POST');
       expect(req.request.body).toEqual({ name: 'New Item' });
-      req.flush(null, { headers: { Location: `${BASE}(${mockProduct.id})` }, status: 201, statusText: 'Created' });
+      req.flush(null, {
+        headers: { Location: `${BASE}(${mockProduct.id})` },
+        status: 201,
+        statusText: 'Created',
+      });
     });
 
     it('extracts the id from the Location header', async () => {
       const promise = firstValueFrom(service.create({ name: 'New Item' }));
 
-      http.expectOne(BASE).flush(null, { headers: { Location: `${BASE}(${mockProduct.id})` }, status: 201, statusText: 'Created' });
+      http
+        .expectOne(BASE)
+        .flush(null, {
+          headers: { Location: `${BASE}(${mockProduct.id})` },
+          status: 201,
+          statusText: 'Created',
+        });
 
       const id = await promise;
       expect(id).toBe(mockProduct.id);
@@ -182,10 +186,9 @@ describe('ProductService', () => {
     it('completes without error on 204', async () => {
       const promise = firstValueFrom(service.delete(mockProduct.id));
 
-      http.expectOne(`${BASE}(${mockProduct.id})`).flush(
-        null,
-        { status: 204, statusText: 'No Content' }
-      );
+      http
+        .expectOne(`${BASE}(${mockProduct.id})`)
+        .flush(null, { status: 204, statusText: 'No Content' });
 
       await expect(promise).resolves.toBeNull();
     });

@@ -4,7 +4,7 @@
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=crgolden_Inventory&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=crgolden_Inventory)
 
-A full-stack single-page application built with **Angular 21** and **ASP.NET Core 10**, using the [Backend-for-Frontend (BFF)](https://www.duendesoftware.com/products/bff) security pattern to handle OIDC authentication on the server side.
+A full-stack single-page application built with **Angular 22** and **ASP.NET Core 10**, using the [Backend-for-Frontend (BFF)](https://www.duendesoftware.com/products/bff) security pattern to handle OIDC authentication on the server side.
 
 ## Sibling Applications
 
@@ -21,7 +21,7 @@ Inventory is the **end-user surface** of a five-app system. The BFF holds the OI
 
 ```
 ┌─────────────────────┐        ┌──────────────────────────┐
-│  Angular 21 (SPA)   │◄──────►│  ASP.NET Core 10 (BFF)   │
+│  Angular 22 (SPA)   │◄──────►│  ASP.NET Core 10 (BFF)   │
 │  :50212 (dev)       │        │  :7150 (dev)             │
 └─────────────────────┘        └──────────┬───────────────┘
                                            │
@@ -71,7 +71,7 @@ When a reply contains a manual URL, the panel surfaces it as a clickable chip; s
 |---|---|
 | Framework | ASP.NET Core 10 (Minimal API) |
 | Auth | Duende BFF 4 (`Duende.BFF.Yarp`) |
-| Frontend | Angular 21 |
+| Frontend | Angular 22 |
 | Observability | OpenTelemetry → Grafana Alloy (OTLP), Serilog → Elasticsearch |
 | Hosting | Azure App Service |
 | Secrets | Azure Key Vault |
@@ -161,7 +161,7 @@ The Angular dev server proxies `/bff` and other API paths to `https://localhost:
 
 ```
 Inventory.Server/     # ASP.NET Core 10 BFF — OIDC session, API proxy, data protection
-inventory.client/     # Angular 21 SPA — signals, BFF session, chat and product UI
+inventory.client/     # Angular 22 SPA — signals, BFF session, chat and product UI
 Inventory.Tests.Unit/ # xUnit v3 — backend unit tests (Moq)
 Inventory.Tests.E2E/  # xUnit v3 — E2E/smoke tests (Playwright/Chromium)
 ```

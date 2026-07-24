@@ -3,13 +3,13 @@ import { ProductFormComponent } from './product-form.component';
 import { ProductService } from '../product.service';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes, ActivatedRoute } from '@angular/router';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { of } from 'rxjs';
 import { Product } from '../product.model';
 
-@Component({ template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes: Routes = [
@@ -49,7 +49,7 @@ describe('ProductFormComponent — create mode', () => {
       providers: [
         { provide: ProductService, useValue: mockService },
         provideRouter(testRoutes),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
       ],
     }).compileComponents();
@@ -132,7 +132,7 @@ describe('ProductFormComponent — edit mode', () => {
       providers: [
         { provide: ProductService, useValue: mockService },
         provideRouter(testRoutes),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         {
           provide: ActivatedRoute,
@@ -164,7 +164,7 @@ describe('ProductFormComponent — edit mode', () => {
     fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
     expect(mockService.patch).toHaveBeenCalledWith(
       'aaaaaaaa-0000-0000-0000-000000000042',
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 

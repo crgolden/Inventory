@@ -2,10 +2,10 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ProductDetailComponent } from './product-detail.component';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes, ActivatedRoute } from '@angular/router';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { Product } from '../product.model';
 
-@Component({ template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes: Routes = [
@@ -67,9 +67,13 @@ describe('ProductDetailComponent', () => {
 
   it('without manualUrl, shows a "Find Manual" link that routes to the edit form', () => {
     const links = fixture.debugElement.queryAll(By.css('a.btn-outline-primary'));
-    const findManual = links.find(l => (l.nativeElement.textContent as string).includes('Find Manual'));
+    const findManual = links.find((l) =>
+      (l.nativeElement.textContent as string).includes('Find Manual'),
+    );
     expect(findManual).toBeTruthy();
-    expect(findManual!.nativeElement.getAttribute('href')).toContain(`/products/${mockProduct.id}/edit`);
+    expect(findManual!.nativeElement.getAttribute('href')).toContain(
+      `/products/${mockProduct.id}/edit`,
+    );
   });
 });
 

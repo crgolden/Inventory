@@ -3,11 +3,11 @@ import { ProductListComponent } from './product-list.component';
 import { ProductService } from '../product.service';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes } from '@angular/router';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { of } from 'rxjs';
 import { Product } from '../product.model';
 
-@Component({ template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes: Routes = [
@@ -61,10 +61,7 @@ describe('ProductListComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [ProductListComponent],
-      providers: [
-        { provide: ProductService, useValue: mockService },
-        provideRouter(testRoutes),
-      ],
+      providers: [{ provide: ProductService, useValue: mockService }, provideRouter(testRoutes)],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ProductListComponent);
@@ -97,7 +94,9 @@ describe('ProductListComponent', () => {
   });
 
   it('typing in the search input calls ProductService.getAll with the term', async () => {
-    const input: HTMLInputElement = fixture.debugElement.query(By.css('input[type="search"]')).nativeElement;
+    const input: HTMLInputElement = fixture.debugElement.query(
+      By.css('input[type="search"]'),
+    ).nativeElement;
     input.value = 'vacuum';
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
@@ -111,7 +110,9 @@ describe('ProductListComponent', () => {
   it('shows no-match message when search returns empty list', async () => {
     (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(of([]));
 
-    const input: HTMLInputElement = fixture.debugElement.query(By.css('input[type="search"]')).nativeElement;
+    const input: HTMLInputElement = fixture.debugElement.query(
+      By.css('input[type="search"]'),
+    ).nativeElement;
     input.value = 'xyz';
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();

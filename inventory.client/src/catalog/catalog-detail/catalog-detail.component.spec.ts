@@ -2,15 +2,13 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CatalogDetailComponent } from './catalog-detail.component';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes, ActivatedRoute } from '@angular/router';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { Product } from '../../products/product.model';
 
-@Component({ template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
-const testRoutes: Routes = [
-  { path: 'catalog', component: DummyComponent },
-];
+const testRoutes: Routes = [{ path: 'catalog', component: DummyComponent }];
 
 const mockProduct: Product = {
   id: 'aaaaaaaa-0000-0000-0000-000000000001',

@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { By } from '@angular/platform-browser';
 import { vi } from 'vitest';
@@ -12,7 +12,7 @@ describe('ManualChatPanelComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ManualChatPanelComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(withXhr()), provideHttpClientTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ManualChatPanelComponent);
@@ -58,7 +58,7 @@ describe('ManualChatPanelComponent', () => {
 
   it('re-emits manualUrlSelected from the hosted chat component', () => {
     const emitted: string[] = [];
-    component.manualUrlSelected.subscribe(v => emitted.push(v));
+    component.manualUrlSelected.subscribe((v) => emitted.push(v));
     component.onUrlSelected('https://example.com/manual.pdf');
     expect(emitted).toEqual(['https://example.com/manual.pdf']);
   });
@@ -92,7 +92,10 @@ describe('ManualChatPanelComponent', () => {
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
       } as unknown as MediaQueryList;
-      vi.stubGlobal('matchMedia', vi.fn(() => mockMql));
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => mockMql),
+      );
 
       const narrowFixture = TestBed.createComponent(ManualChatPanelComponent);
       narrowFixture.detectChanges();
@@ -107,7 +110,10 @@ describe('ManualChatPanelComponent', () => {
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
       } as unknown as MediaQueryList;
-      vi.stubGlobal('matchMedia', vi.fn(() => mockMql));
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => mockMql),
+      );
 
       const wideFixture = TestBed.createComponent(ManualChatPanelComponent);
       wideFixture.detectChanges();
@@ -125,7 +131,10 @@ describe('ManualChatPanelComponent', () => {
         }),
         removeEventListener: vi.fn(),
       } as unknown as MediaQueryList;
-      vi.stubGlobal('matchMedia', vi.fn(() => mockMql));
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => mockMql),
+      );
 
       const f = TestBed.createComponent(ManualChatPanelComponent);
       const c = f.componentInstance;

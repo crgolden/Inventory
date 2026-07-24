@@ -1,13 +1,18 @@
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRouteSnapshot, provideRouter, Router, RouterStateSnapshot } from '@angular/router';
+import {
+  ActivatedRouteSnapshot,
+  provideRouter,
+  Router,
+  RouterStateSnapshot,
+} from '@angular/router';
 import { of, throwError, firstValueFrom, EmptyError, Observable } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { catalogResolver } from './catalog.resolver';
 import { CatalogService } from './catalog.service';
 import { Product } from '../products/product.model';
 
-@Component({ template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes = [
@@ -31,7 +36,9 @@ const mockProduct: Product = {
 };
 
 function makeSnapshot(id: string): ActivatedRouteSnapshot {
-  return { paramMap: { get: (key: string) => (key === 'id' ? id : null) } } as unknown as ActivatedRouteSnapshot;
+  return {
+    paramMap: { get: (key: string) => (key === 'id' ? id : null) },
+  } as unknown as ActivatedRouteSnapshot;
 }
 
 describe('catalogResolver', () => {
@@ -44,7 +51,7 @@ describe('catalogResolver', () => {
     });
 
     const result$ = TestBed.runInInjectionContext(() =>
-      catalogResolver(makeSnapshot(mockProduct.id), {} as RouterStateSnapshot)
+      catalogResolver(makeSnapshot(mockProduct.id), {} as RouterStateSnapshot),
     ) as Observable<Product>;
 
     const product = await firstValueFrom(result$);
@@ -69,7 +76,7 @@ describe('catalogResolver', () => {
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     const result$ = TestBed.runInInjectionContext(() =>
-      catalogResolver(makeSnapshot('missing-id'), {} as RouterStateSnapshot)
+      catalogResolver(makeSnapshot('missing-id'), {} as RouterStateSnapshot),
     ) as Observable<Product>;
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
@@ -94,7 +101,7 @@ describe('catalogResolver', () => {
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     const result$ = TestBed.runInInjectionContext(() =>
-      catalogResolver(makeSnapshot('any-id'), {} as RouterStateSnapshot)
+      catalogResolver(makeSnapshot('any-id'), {} as RouterStateSnapshot),
     ) as Observable<Product>;
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);

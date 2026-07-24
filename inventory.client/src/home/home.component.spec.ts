@@ -3,10 +3,10 @@ import { HomeComponent } from './home.component';
 import { AuthService } from '../auth/auth.service';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes } from '@angular/router';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { signal } from '@angular/core';
 
-@Component({ template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes: Routes = [

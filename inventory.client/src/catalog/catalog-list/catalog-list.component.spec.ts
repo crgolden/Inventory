@@ -3,16 +3,14 @@ import { CatalogListComponent } from './catalog-list.component';
 import { CatalogService } from '../catalog.service';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes } from '@angular/router';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { of } from 'rxjs';
 import { Product } from '../../products/product.model';
 
-@Component({ template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
-const testRoutes: Routes = [
-  { path: 'catalog/:id', component: DummyComponent },
-];
+const testRoutes: Routes = [{ path: 'catalog/:id', component: DummyComponent }];
 
 const mockProducts: Product[] = [
   {
@@ -58,10 +56,7 @@ describe('CatalogListComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [CatalogListComponent],
-      providers: [
-        { provide: CatalogService, useValue: mockService },
-        provideRouter(testRoutes),
-      ],
+      providers: [{ provide: CatalogService, useValue: mockService }, provideRouter(testRoutes)],
     }).compileComponents();
 
     fixture = TestBed.createComponent(CatalogListComponent);
@@ -111,9 +106,7 @@ describe('CatalogListComponent', () => {
     headerBtns[0].nativeElement.click();
     fixture.detectChanges();
 
-    expect(mockService.getAll).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: 'Name' })
-    );
+    expect(mockService.getAll).toHaveBeenCalledWith(expect.objectContaining({ orderBy: 'Name' }));
   });
 
   it('clicking the active Name column toggles orderDir to desc', () => {
@@ -124,7 +117,7 @@ describe('CatalogListComponent', () => {
     fixture.detectChanges();
 
     expect(mockService.getAll).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: 'Name', orderDir: 'desc' })
+      expect.objectContaining({ orderBy: 'Name', orderDir: 'desc' }),
     );
   });
 
@@ -134,12 +127,14 @@ describe('CatalogListComponent', () => {
     fixture.detectChanges();
 
     expect(mockService.getAll).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: 'Brand', orderDir: 'asc' })
+      expect.objectContaining({ orderBy: 'Brand', orderDir: 'asc' }),
     );
   });
 
   it('typing in the search input calls getAll with the term after debounce', async () => {
-    const input: HTMLInputElement = fixture.debugElement.query(By.css('input[type="search"]')).nativeElement;
+    const input: HTMLInputElement = fixture.debugElement.query(
+      By.css('input[type="search"]'),
+    ).nativeElement;
     input.value = 'dyson';
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
@@ -147,15 +142,15 @@ describe('CatalogListComponent', () => {
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    expect(mockService.getAll).toHaveBeenCalledWith(
-      expect.objectContaining({ search: 'dyson' })
-    );
+    expect(mockService.getAll).toHaveBeenCalledWith(expect.objectContaining({ search: 'dyson' }));
   });
 
   it('shows no-match message when search returns empty list', async () => {
     (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(of({ items: [], total: 0 }));
 
-    const input: HTMLInputElement = fixture.debugElement.query(By.css('input[type="search"]')).nativeElement;
+    const input: HTMLInputElement = fixture.debugElement.query(
+      By.css('input[type="search"]'),
+    ).nativeElement;
     input.value = 'xyz';
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
@@ -168,7 +163,9 @@ describe('CatalogListComponent', () => {
   });
 
   it('Next Page button is enabled and navigates to page 2 when total exceeds page size', async () => {
-    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(of({ items: mockProducts, total: 25 }));
+    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
+      of({ items: mockProducts, total: 25 }),
+    );
     fixture.componentInstance.total.set(25);
     fixture.detectChanges();
 
@@ -179,8 +176,6 @@ describe('CatalogListComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.componentInstance.page()).toBe(2);
-    expect(mockService.getAll).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 2 })
-    );
+    expect(mockService.getAll).toHaveBeenCalledWith(expect.objectContaining({ page: 2 }));
   });
 });

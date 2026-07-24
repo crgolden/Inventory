@@ -2,14 +2,14 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AppComponent } from './app.component';
 import { RouterOutlet } from '@angular/router';
 import { NavMenuComponent } from '../nav-menu/nav-menu.component';
-import { Component, signal } from '@angular/core';
+import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes } from '@angular/router';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { AuthService } from '../auth/auth.service';
 
-@Component({ template: '' })
+@Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes: Routes = [
@@ -26,7 +26,7 @@ describe('AppComponent', () => {
       imports: [AppComponent, RouterOutlet, NavMenuComponent],
       providers: [
         provideRouter(testRoutes),
-        provideHttpClient(),
+        provideHttpClient(withXhr()),
         provideHttpClientTesting(),
         {
           provide: AuthService,
@@ -83,9 +83,11 @@ describe('AppComponent', () => {
     const authService = TestBed.inject(AuthService);
     expect(component.iframeVisible()).toBe(true);
 
-    component.onMessage(new MessageEvent('message', {
-      data: { source: 'bff-silent-login', isLoggedIn: true }
-    }));
+    component.onMessage(
+      new MessageEvent('message', {
+        data: { source: 'bff-silent-login', isLoggedIn: true },
+      }),
+    );
     fixture.detectChanges();
 
     expect(component.iframeVisible()).toBe(false);
@@ -96,9 +98,11 @@ describe('AppComponent', () => {
     await setup(false);
     const authService = TestBed.inject(AuthService);
 
-    component.onMessage(new MessageEvent('message', {
-      data: { source: 'bff-silent-login', isLoggedIn: false }
-    }));
+    component.onMessage(
+      new MessageEvent('message', {
+        data: { source: 'bff-silent-login', isLoggedIn: false },
+      }),
+    );
     fixture.detectChanges();
 
     expect(component.iframeVisible()).toBe(false);
@@ -110,9 +114,11 @@ describe('AppComponent', () => {
     const authService = TestBed.inject(AuthService);
     const visibleBefore = component.iframeVisible();
 
-    component.onMessage(new MessageEvent('message', {
-      data: { source: 'something-else', isLoggedIn: true }
-    }));
+    component.onMessage(
+      new MessageEvent('message', {
+        data: { source: 'something-else', isLoggedIn: true },
+      }),
+    );
 
     expect(component.iframeVisible()).toBe(visibleBefore);
     expect(authService.refresh).not.toHaveBeenCalled();

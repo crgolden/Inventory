@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withXhr } from '@angular/common/http';
 import { ChatService } from './chat.service';
 import { firstValueFrom } from 'rxjs';
 
@@ -10,7 +10,7 @@ describe('ChatService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(withXhr()), provideHttpClientTesting()],
     });
     service = TestBed.inject(ChatService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -99,14 +99,14 @@ describe('ChatService', () => {
             controller.close();
           },
         }),
-        { status: 200, headers: { 'Content-Type': 'text/event-stream' } }
-      )
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+      ),
     );
 
     const deltas: string[] = [];
     await new Promise<void>((resolve, reject) => {
       service.streamMessage('chat-123', 'Hi').subscribe({
-        next: d => deltas.push(d),
+        next: (d) => deltas.push(d),
         complete: resolve,
         error: reject,
       });
@@ -115,7 +115,7 @@ describe('ChatService', () => {
     expect(deltas).toEqual(['Hello', ' world']);
     expect(fetchSpy).toHaveBeenCalledWith(
       '/manuals/api/chats/chat-123/messages/stream',
-      expect.objectContaining({ method: 'POST' })
+      expect.objectContaining({ method: 'POST' }),
     );
     fetchSpy.mockRestore();
   });

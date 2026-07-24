@@ -1,6 +1,6 @@
 # Design System
 
-This document describes the visual design system for the Inventory Angular 21 frontend. Implementation lives in `inventory.client/src/styles.scss`.
+This document describes the visual design system for the Inventory Angular 22 frontend. Implementation lives in `inventory.client/src/styles.scss`.
 
 ---
 
