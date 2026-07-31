@@ -2,7 +2,7 @@
 
 The Inventory test suite is split across three tiers: **backend unit tests** (xUnit v3, `Inventory.Tests.Unit`), **frontend unit tests** (Vitest, `inventory.client/`), and **browser-based E2E tests** (Playwright, `Inventory.Tests.E2E`). Unit and E2E tests are physically separate projects — the Unit project has no Playwright dependency and runs its collections in parallel; the E2E project owns `PlaywrightFixture` and runs sequentially against a single Kestrel/browser instance.
 
-Unit test coding standards (MockBehavior.Strict, argument verification, SetupSequence, no control-flow in tests, etc.) are in the workspace-level [Unit Test Standards](../TESTING.md#unit-test-standards). Note for Playwright E2E tests: a `for` or `foreach` is acceptable when it is test setup (e.g. sending N chat messages to prime state) rather than an assertion branch.
+Unit test coding standards (MockBehavior.Strict, argument verification, SetupSequence, no control-flow in tests, etc.) are in the workspace-level [Unit Test Standards](../AGENTS/TESTING.md#unit-test-standards). Note for Playwright E2E tests: a `for` or `foreach` is acceptable when it is test setup (e.g. sending N chat messages to prime state) rather than an assertion branch.
 
 ## Test tiers
 
@@ -44,7 +44,7 @@ No Azure credentials needed. `InventoryWebApplicationFactory` is a minimal stati
 
 The Angular build output must exist at `inventory.client/dist/inventory.client/browser/` before running E2E tests. The test factory sets the Kestrel web root to that directory; if it is absent the server still starts but serves no static files.
 
-For the `.NET 10 SDK xUnit caveat` (why `dotnet test` doesn't work), see the workspace-level [TESTING.md](../TESTING.md).
+For the `.NET 10 SDK xUnit caveat` (why `dotnet test` doesn't work), see the workspace-level [TESTING.md](../AGENTS/TESTING.md).
 
 ### Backend Unit Tests
 
