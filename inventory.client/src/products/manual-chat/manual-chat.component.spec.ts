@@ -58,16 +58,13 @@ describe('ManualChatComponent', () => {
     const chatService = TestBed.inject(ChatService);
     const streamSpy = vi.spyOn(chatService, 'streamMessage').mockReturnValue(of());
 
-    // Act: type a message and send. No productContext is provided, so no PATCH-title call fires.
     component.input.set('Find me the manual');
     component.send();
 
-    // Assert: createChat fired first.
     const createReq = httpMock.expectOne('/manuals/api/chats');
     expect(createReq.request.method).toBe('POST');
     createReq.flush({ chatId: 'chat-xyz', title: null, createdAt: 1 });
 
-    // And stream was kicked off for the newly created chat.
     expect(streamSpy).toHaveBeenCalledWith('chat-xyz', 'Find me the manual');
     expect(component.chatId()).toBe('chat-xyz');
   });

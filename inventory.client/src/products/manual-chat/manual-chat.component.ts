@@ -57,7 +57,6 @@ export class ManualChatComponent {
   /** Returns a list of unique URLs found in the given assistant message. */
   urlsFor(content: string): string[] {
     const matches = content.match(URL_REGEX) ?? [];
-    // Strip trailing sentence/markdown punctuation that commonly abuts a URL.
     const cleaned = matches.map(u => u.replace(/[.,;:!?)>\]"']+$/, ''));
     return Array.from(new Set(cleaned));
   }
@@ -76,7 +75,6 @@ export class ManualChatComponent {
       return;
     }
 
-    // First message: create the chat, set a product-scoped title, then stream.
     this.streaming.set(true);
     this.chatService.createChat().subscribe({
       next: chat => {
@@ -84,7 +82,9 @@ export class ManualChatComponent {
         const title = this.buildInitialTitle();
         if (title) {
           this.chatService.updateChatTitle(chat.chatId, title).subscribe({
-            error: () => { /* title failure should not block the message */ },
+            error: () => {
+              // noop
+            },
           });
         }
 

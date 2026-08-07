@@ -22,7 +22,6 @@ const mockProduct: Product = {
   updatedAt: null,
 };
 
-// Raw shape returned by the Products OData API (PascalCase property names).
 const mockApiProduct = {
   Id: mockProduct.id,
   Name: mockProduct.name,
@@ -55,7 +54,6 @@ describe('ProductService', () => {
 
   afterEach(() => http.verify());
 
-  // Helper: parse query params from a URL string the way odata-query appends them.
   function params(urlWithParams: string): URLSearchParams {
     const idx = urlWithParams.indexOf('?');
     return new URLSearchParams(idx >= 0 ? urlWithParams.slice(idx + 1) : '');

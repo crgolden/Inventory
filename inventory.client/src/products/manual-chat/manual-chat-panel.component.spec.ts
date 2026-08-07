@@ -26,7 +26,6 @@ describe('ManualChatPanelComponent', () => {
     expect(toggle).toBeTruthy();
     expect(toggle.nativeElement.textContent).toContain('Find Manual');
 
-    // The expanded panel should not be in the DOM yet.
     expect(fixture.debugElement.query(By.css('.manual-chat-panel'))).toBeNull();
   });
 

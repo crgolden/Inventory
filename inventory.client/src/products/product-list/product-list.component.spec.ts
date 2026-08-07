@@ -66,10 +66,8 @@ describe('ProductListComponent', () => {
 
     fixture = TestBed.createComponent(ProductListComponent);
 
-    // detectChanges triggers ngOnInit which emits on search$ → debounceTime(300)
     fixture.detectChanges();
 
-    // Advance fake clock past the initial debounce so the product list is populated
     await vi.runAllTimersAsync();
     fixture.detectChanges();
   });

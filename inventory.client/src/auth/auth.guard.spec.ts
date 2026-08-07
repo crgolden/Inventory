@@ -23,7 +23,6 @@ describe('authGuard', () => {
       providers: [{ provide: AuthService, useValue: { isAuthenticated: signal(false) } }],
     });
 
-    // jsdom allows redefining window.location via Object.defineProperty on window
     const hrefSetter = vi.fn();
     Object.defineProperty(window, 'location', {
       value: { ...window.location, set href(v: string) { hrefSetter(v); } },

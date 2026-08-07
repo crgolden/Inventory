@@ -6,7 +6,6 @@ import { ODataResponse, Product } from './product.model';
 
 const BASE = '/products/api/odata/Products';
 
-// The Products OData API returns PascalCase property names per its EDM model.
 interface ApiProduct {
   Id: string;
   Name: string | null;

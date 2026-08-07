@@ -43,7 +43,6 @@ export class ManualChatPanelComponent implements OnInit {
   readonly isNarrow = signal(false);
 
   ngOnInit(): void {
-    // Guard against non-browser environments (SSR, jsdom without matchMedia).
     if (typeof globalThis.window === 'undefined' || typeof globalThis.matchMedia !== 'function') {
       return;
     }

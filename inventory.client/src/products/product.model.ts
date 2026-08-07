@@ -6,7 +6,7 @@ export interface Product {
   modelNumber: string | null;
   serialNumber: string | null;
 
-  // ISO 8601 datetime string, e.g. "2024-01-15T00:00:00Z"
+  /** ISO 8601 datetime string, e.g. `"2024-01-15T00:00:00Z"`. */
   purchaseDate: string | null;
 
   category: string | null;

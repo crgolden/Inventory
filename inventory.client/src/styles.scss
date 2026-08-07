@@ -1,6 +1,3 @@
-// Bootstrap variable overrides passed via @use ... with (...).
-// All Bootstrap variables use !default, so this overrides them correctly
-// regardless of which partial they are declared in.
 @use 'bootstrap/scss/bootstrap' with (
   $primary: #334155,
   $body-bg: #f8fafc,

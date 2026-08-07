@@ -24,12 +24,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
     public PlaywrightFixture()
     {
-        // AzureCliCredential's default 13s ProcessTimeout is not enough on this Windows dev
-        // machine — `az account get-access-token` spawned as a child of the test host
-        // routinely takes 20–40s. Set the timeout before the factory constructs the host
-        // so that `builder.Configuration.ToTokenCredentialAsync()` and every subsequent
-        // Key Vault call picks up the widened window. Programmatic setting avoids any
-        // ambiguity about whether shell env vars propagated through `cmd /c` wrappers.
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DefaultAzureCredentialOptions__CredentialProcessTimeout")))
         {
             Environment.SetEnvironmentVariable(
@@ -98,17 +92,10 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             }
 
             Stage("LoginAsync enter");
-            await LoginAsync(); // real OIDC against the deployed app; sets _storageStatePath
+            await LoginAsync();
             Stage("LoginAsync done");
         }
 
-        // Factory mode: always use the /bff/user mock — real OIDC login is not possible
-        // because the Kestrel test server listens on a random port that cannot be registered
-        // as a redirect URI. The real auth flow is covered by the smoke tests.
-
-        // Warm up: load /products once so the server pool and Angular hydration are ready
-        // before the first real test runs. NewProductsPageAsync already navigates to /products
-        // and waits for the Angular bootstrap to complete, so no additional waiting is needed.
         Stage("warmup NewProductsPageAsync enter");
         var warmup = await NewProductsPageAsync();
         Stage("warmup NewProductsPageAsync done");
@@ -130,12 +117,8 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             StorageStatePath = _storageStatePath
         });
 
-        // Always use a generous default timeout. Cold-start Kestrel + Angular bundle on this
-        // machine can legitimately take >30s even when everything is healthy; a tighter cap
-        // just produces false negatives.
         page.SetDefaultTimeout(60_000);
 
-        // Log every request/response so we can tell why a navigation is hanging.
         page.Request += (_, req) => Stage($"REQ {req.Method} {req.Url}");
         page.Response += (_, resp) => Stage($"RESP {resp.Status} {resp.Url}");
         page.RequestFailed += (_, req) => Stage($"FAIL {req.Method} {req.Url} err={req.Failure}");
@@ -159,7 +142,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             });
         }
 
-        // In smoke mode the real Products API is used — no mock needed.
         if (!IsSmoke)
         {
             await page.RouteAsync("**/products/api/odata/**", async route =>
@@ -189,15 +171,10 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
         await page.GotoAsync("/products", new PageGotoOptions
         {
-            // "Load" requires EVERY subresource to finish — in tests, a single hanging
-            // analytics beacon is enough to exceed the timeout. "DOMContentLoaded" is
-            // sufficient for our assertions and avoids that flakiness.
             WaitUntil = WaitUntilState.DOMContentLoaded,
             Timeout = 60_000
         });
 
-        // Wait for the product list heading to confirm Angular has bootstrapped and the
-        // auth guard has passed.
         await page.WaitForSelectorAsync("h2:has-text('My Products')", new PageWaitForSelectorOptions
         {
             Timeout = 60_000
@@ -226,20 +203,11 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
         if (!IsSmoke)
         {
-            // Return 401 so AuthService.catchError emits null → isAuthenticated = false.
             await page.RouteAsync("**/bff/user", async route =>
             {
                 await route.FulfillAsync(new RouteFulfillOptions { Status = 401 });
             });
 
-            // AppComponent.ngAfterViewInit sets an iframe with src="/bff/login?prompt=none"
-            // whenever isAuthenticated = false. Without this mock the iframe request reaches the
-            // real BFF, which tries OIDC silent login to Identity and gets "Invalid redirect_uri"
-            // (the random Kestrel test port is not registered). The hanging/errored iframe request
-            // prevents Playwright's WaitUntil=Load event from firing and causes WaitForURLAsync
-            // to time out. Intercepting the iframe with an HTML page that immediately posts the
-            // expected postMessage causes AppComponent.onMessage() to set iframeVisible=false,
-            // removing the iframe from the DOM before any assertion runs.
             await page.RouteAsync("**/bff/login**", async route =>
             {
                 await route.FulfillAsync(new RouteFulfillOptions
@@ -301,10 +269,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         }
     }
 
-    // ---------------------------------------------------------------------------------
-    // Private helpers
-    // ---------------------------------------------------------------------------------
-
     private async Task LoginAsync()
     {
         _storageStatePath = Path.GetTempFileName();
@@ -312,7 +276,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         await using var context = await _browser!.NewContextAsync(new BrowserNewContextOptions
         {
             BaseURL = BaseAddress,
-            IgnoreHTTPSErrors = true // Kestrel test server uses a self-signed certificate
+            IgnoreHTTPSErrors = true
         });
         var page = await context.NewPageAsync();
 
@@ -321,18 +285,14 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             page.SetDefaultTimeout(60_000);
         }
 
-        // Kick off the OIDC flow. BFF redirects to the Identity server login page.
         await page.GotoAsync("/bff/login?returnUrl=%2Fproducts");
 
-        // Selectors confirmed from Identity.Api/Pages/Account/Login.cshtml.
         await page.FillAsync("input[name='Input.Email']", AdminEmail!);
         await page.FillAsync("input[name='Input.Password']", AdminPassword!);
         await page.ClickAsync("button#login-submit");
 
-        // Wait for the BFF callback to complete and land on /products.
         await page.WaitForURLAsync("**/products**");
 
-        // Persist session cookies so every per-test context starts authenticated.
         await context.StorageStateAsync(new() { Path = _storageStatePath });
     }
 
@@ -403,7 +363,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
     {
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
 
-        // Parse $filter for name search
         string? nameFilter = null;
         if (query.TryGetValue("$filter", out var fv))
         {
@@ -414,7 +373,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             }
         }
 
-        // Parse $orderby (e.g. "Name asc", "Price desc")
         var orderBy = "Name";
         var orderDesc = false;
         if (query.TryGetValue("$orderby", out var obv))
@@ -431,7 +389,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             }
         }
 
-        // Parse $top and $skip
         var top = int.MaxValue;
         var skip = 0;
         if (query.TryGetValue("$top", out var tv) && int.TryParse(tv.ToString(), out var topVal))
@@ -444,7 +401,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             skip = skipVal;
         }
 
-        // Parse $count
         var includeCount = query.TryGetValue("$count", out var cv) &&
             cv.ToString().Equals("true", StringComparison.OrdinalIgnoreCase);
 
@@ -503,9 +459,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         var request = route.Request;
         var method = request.Method.ToUpperInvariant();
         var uri = new Uri(request.Url);
-        // uri.AbsolutePath → e.g. /manuals/api/chats  or  /manuals/api/chats/{id}/messages/stream
         var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        // segments: [0]="manuals", [1]="api", [2]="chats", [3]=chatId?, [4]="messages"?, [5]="stream"?
 
         if (segments.Length < 3 || segments[2] != "chats")
         {
@@ -540,38 +494,38 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         switch (method)
         {
             case "GET":
-            {
-                var chats = ChatStore.GetChats();
-                await route.FulfillAsync(new RouteFulfillOptions
                 {
-                    Status = 200,
-                    ContentType = "application/json",
-                    Body = JsonSerializer.Serialize(chats.Select(c => new
+                    var chats = ChatStore.GetChats();
+                    await route.FulfillAsync(new RouteFulfillOptions
                     {
-                        chatId = c.ChatId,
-                        title = c.Title,
-                        createdAt = c.CreatedAt
-                    }))
-                });
-                break;
-            }
+                        Status = 200,
+                        ContentType = "application/json",
+                        Body = JsonSerializer.Serialize(chats.Select(c => new
+                        {
+                            chatId = c.ChatId,
+                            title = c.Title,
+                            createdAt = c.CreatedAt
+                        }))
+                    });
+                    break;
+                }
 
             case "POST":
-            {
-                var chat = ChatStore.CreateChat();
-                await route.FulfillAsync(new RouteFulfillOptions
                 {
-                    Status = 201,
-                    ContentType = "application/json",
-                    Body = JsonSerializer.Serialize(new
+                    var chat = ChatStore.CreateChat();
+                    await route.FulfillAsync(new RouteFulfillOptions
                     {
-                        chatId = chat.ChatId,
-                        title = chat.Title,
-                        createdAt = chat.CreatedAt
-                    })
-                });
-                break;
-            }
+                        Status = 201,
+                        ContentType = "application/json",
+                        Body = JsonSerializer.Serialize(new
+                        {
+                            chatId = chat.ChatId,
+                            title = chat.Title,
+                            createdAt = chat.CreatedAt
+                        })
+                    });
+                    break;
+                }
 
             default:
                 await route.FulfillAsync(new RouteFulfillOptions { Status = 405 });
@@ -584,43 +538,43 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         switch (method)
         {
             case "GET":
-            {
-                var chat = ChatStore.GetChat(chatId);
-                if (chat is null)
                 {
-                    await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
-                    return;
-                }
-
-                await route.FulfillAsync(new RouteFulfillOptions
-                {
-                    Status = 200,
-                    ContentType = "application/json",
-                    Body = JsonSerializer.Serialize(new
+                    var chat = ChatStore.GetChat(chatId);
+                    if (chat is null)
                     {
-                        chatId = chat.ChatId,
-                        title = chat.Title,
-                        createdAt = chat.CreatedAt
-                    })
-                });
-                break;
-            }
+                        await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
+                        return;
+                    }
+
+                    await route.FulfillAsync(new RouteFulfillOptions
+                    {
+                        Status = 200,
+                        ContentType = "application/json",
+                        Body = JsonSerializer.Serialize(new
+                        {
+                            chatId = chat.ChatId,
+                            title = chat.Title,
+                            createdAt = chat.CreatedAt
+                        })
+                    });
+                    break;
+                }
 
             case "PATCH":
-            {
-                var body = request.PostData ?? "{}";
-                using var doc = JsonDocument.Parse(body);
-                var title = doc.RootElement.TryGetProperty("title", out var t) ? t.GetString() : null;
-                if (string.IsNullOrWhiteSpace(title))
                 {
-                    await route.FulfillAsync(new RouteFulfillOptions { Status = 400 });
-                    return;
-                }
+                    var body = request.PostData ?? "{}";
+                    using var doc = JsonDocument.Parse(body);
+                    var title = doc.RootElement.TryGetProperty("title", out var t) ? t.GetString() : null;
+                    if (string.IsNullOrWhiteSpace(title))
+                    {
+                        await route.FulfillAsync(new RouteFulfillOptions { Status = 400 });
+                        return;
+                    }
 
-                ChatStore.UpdateTitle(chatId, title);
-                await route.FulfillAsync(new RouteFulfillOptions { Status = 204 });
-                break;
-            }
+                    ChatStore.UpdateTitle(chatId, title);
+                    await route.FulfillAsync(new RouteFulfillOptions { Status = 204 });
+                    break;
+                }
 
             case "DELETE":
                 ChatStore.DeleteChat(chatId);
@@ -638,41 +592,41 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         switch (method)
         {
             case "GET":
-            {
-                var msgs = ChatStore.GetMessages(chatId);
-                await route.FulfillAsync(new RouteFulfillOptions
                 {
-                    Status = 200,
-                    ContentType = "application/json",
-                    Body = JsonSerializer.Serialize(msgs.Select(m => new { role = m.Role, text = m.Text }))
-                });
-                break;
-            }
-
-            case "POST":
-            {
-                var body = request.PostData ?? "{}";
-                using var doc = JsonDocument.Parse(body);
-                var input = doc.RootElement.TryGetProperty("input", out var i) ? (i.GetString() ?? string.Empty) : string.Empty;
-                var chat = ChatStore.CompleteMessage(chatId, input);
-                if (chat is null)
-                {
-                    await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
-                    return;
+                    var msgs = ChatStore.GetMessages(chatId);
+                    await route.FulfillAsync(new RouteFulfillOptions
+                    {
+                        Status = 200,
+                        ContentType = "application/json",
+                        Body = JsonSerializer.Serialize(msgs.Select(m => new { role = m.Role, text = m.Text }))
+                    });
+                    break;
                 }
 
-                await route.FulfillAsync(new RouteFulfillOptions
+            case "POST":
                 {
-                    Status = 200,
-                    ContentType = "application/json",
-                    Body = JsonSerializer.Serialize(new
+                    var body = request.PostData ?? "{}";
+                    using var doc = JsonDocument.Parse(body);
+                    var input = doc.RootElement.TryGetProperty("input", out var i) ? (i.GetString() ?? string.Empty) : string.Empty;
+                    var chat = ChatStore.CompleteMessage(chatId, input);
+                    if (chat is null)
                     {
-                        output = InMemoryChatsStore.GetMockResponse(),
-                        chatId = chat.ChatId
-                    })
-                });
-                break;
-            }
+                        await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
+                        return;
+                    }
+
+                    await route.FulfillAsync(new RouteFulfillOptions
+                    {
+                        Status = 200,
+                        ContentType = "application/json",
+                        Body = JsonSerializer.Serialize(new
+                        {
+                            output = InMemoryChatsStore.GetMockResponse(),
+                            chatId = chat.ChatId
+                        })
+                    });
+                    break;
+                }
 
             default:
                 await route.FulfillAsync(new RouteFulfillOptions { Status = 405 });
@@ -686,7 +640,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         var method = request.Method.ToUpperInvariant();
         var uri = new Uri(request.Url);
 
-        // Absolute path: /products/api/odata/Products  or  /products/api/odata/Products(guid)
         var path = uri.AbsolutePath;
         var collectionIndex = path.LastIndexOf("/Products", StringComparison.OrdinalIgnoreCase);
         if (collectionIndex < 0)
@@ -697,16 +650,13 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
         var remainder = path[(collectionIndex + "/Products".Length)..];
 
-        // remainder == "" → collection; remainder == "(guid)" → keyed entity
         if (remainder.Length == 0 || remainder == "/")
         {
-            // Parse optional $filter from query string for name search
             var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
             var filter = query.TryGetValue("$filter", out var fv) ? fv.ToString() : null;
             string? nameFilter = null;
             if (!string.IsNullOrEmpty(filter))
             {
-                // Extract the search term from: contains(tolower(Name), tolower('term'))
                 var match = ODataFilterRegex().Match(filter);
                 if (match.Success)
                 {
@@ -738,47 +688,47 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         switch (method)
         {
             case "GET":
-            {
-                var products = ProductStore.GetProducts(nameFilter);
-                await route.FulfillAsync(new RouteFulfillOptions
                 {
-                    Status = 200,
-                    ContentType = "application/json",
-                    Body = JsonSerializer.Serialize(new
+                    var products = ProductStore.GetProducts(nameFilter);
+                    await route.FulfillAsync(new RouteFulfillOptions
                     {
-                        value = products.Select(ProductToJson)
-                    })
-                });
-                break;
-            }
+                        Status = 200,
+                        ContentType = "application/json",
+                        Body = JsonSerializer.Serialize(new
+                        {
+                            value = products.Select(ProductToJson)
+                        })
+                    });
+                    break;
+                }
 
             case "POST":
-            {
-                var body = request.PostData ?? "{}";
-                using var doc = JsonDocument.Parse(body);
-                var root = doc.RootElement;
-                var product = ProductStore.Create(
-                    name: root.TryGetProperty("name", out var n) ? n.GetString() : null,
-                    price: root.TryGetProperty("price", out var pr) && pr.ValueKind == JsonValueKind.Number ? pr.GetDecimal() : null,
-                    brand: root.TryGetProperty("brand", out var br) ? br.GetString() : null,
-                    modelNumber: root.TryGetProperty("modelNumber", out var mn) ? mn.GetString() : null,
-                    serialNumber: root.TryGetProperty("serialNumber", out var sn) ? sn.GetString() : null,
-                    purchaseDate: root.TryGetProperty("purchaseDate", out var pd) ? pd.GetString() : null,
-                    category: root.TryGetProperty("category", out var cat) ? cat.GetString() : null,
-                    description: root.TryGetProperty("description", out var desc) ? desc.GetString() : null,
-                    manualUrl: root.TryGetProperty("manualUrl", out var mu) ? mu.GetString() : null);
-                await route.FulfillAsync(new RouteFulfillOptions
                 {
-                    Status = 201,
-                    ContentType = "application/json",
-                    Headers = new Dictionary<string, string>
+                    var body = request.PostData ?? "{}";
+                    using var doc = JsonDocument.Parse(body);
+                    var root = doc.RootElement;
+                    var product = ProductStore.Create(
+                        name: root.TryGetProperty("name", out var n) ? n.GetString() : null,
+                        price: root.TryGetProperty("price", out var pr) && pr.ValueKind == JsonValueKind.Number ? pr.GetDecimal() : null,
+                        brand: root.TryGetProperty("brand", out var br) ? br.GetString() : null,
+                        modelNumber: root.TryGetProperty("modelNumber", out var mn) ? mn.GetString() : null,
+                        serialNumber: root.TryGetProperty("serialNumber", out var sn) ? sn.GetString() : null,
+                        purchaseDate: root.TryGetProperty("purchaseDate", out var pd) ? pd.GetString() : null,
+                        category: root.TryGetProperty("category", out var cat) ? cat.GetString() : null,
+                        description: root.TryGetProperty("description", out var desc) ? desc.GetString() : null,
+                        manualUrl: root.TryGetProperty("manualUrl", out var mu) ? mu.GetString() : null);
+                    await route.FulfillAsync(new RouteFulfillOptions
                     {
-                        ["Location"] = $"/products/api/odata/Products({product.Id})"
-                    },
-                    Body = JsonSerializer.Serialize(ProductToJson(product))
-                });
-                break;
-            }
+                        Status = 201,
+                        ContentType = "application/json",
+                        Headers = new Dictionary<string, string>
+                        {
+                            ["Location"] = $"/products/api/odata/Products({product.Id})"
+                        },
+                        Body = JsonSerializer.Serialize(ProductToJson(product))
+                    });
+                    break;
+                }
 
             default:
                 await route.FulfillAsync(new RouteFulfillOptions { Status = 405 });
@@ -791,93 +741,93 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         switch (method)
         {
             case "GET":
-            {
-                var product = ProductStore.GetProduct(id);
-                if (product is null)
                 {
-                    await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
-                    return;
-                }
+                    var product = ProductStore.GetProduct(id);
+                    if (product is null)
+                    {
+                        await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
+                        return;
+                    }
 
-                await route.FulfillAsync(new RouteFulfillOptions
-                {
-                    Status = 200,
-                    ContentType = "application/json",
-                    Body = JsonSerializer.Serialize(ProductToJson(product))
-                });
-                break;
-            }
+                    await route.FulfillAsync(new RouteFulfillOptions
+                    {
+                        Status = 200,
+                        ContentType = "application/json",
+                        Body = JsonSerializer.Serialize(ProductToJson(product))
+                    });
+                    break;
+                }
 
             case "PUT":
-            {
-                var body = request.PostData ?? "{}";
-                using var doc = JsonDocument.Parse(body);
-                var root = doc.RootElement;
-                var existing = ProductStore.GetProduct(id);
-                if (existing is null)
                 {
-                    await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
-                    return;
-                }
+                    var body = request.PostData ?? "{}";
+                    using var doc = JsonDocument.Parse(body);
+                    var root = doc.RootElement;
+                    var existing = ProductStore.GetProduct(id);
+                    if (existing is null)
+                    {
+                        await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
+                        return;
+                    }
 
-                var replacement = new InMemoryProductsStore.ProductRecord(
-                    id,
-                    root.TryGetProperty("name", out var n) ? n.GetString() : null,
-                    root.TryGetProperty("price", out var pr) && pr.ValueKind == JsonValueKind.Number ? pr.GetDecimal() : null,
-                    root.TryGetProperty("brand", out var br) ? br.GetString() : null,
-                    root.TryGetProperty("modelNumber", out var mn) ? mn.GetString() : null,
-                    root.TryGetProperty("serialNumber", out var sn) ? sn.GetString() : null,
-                    root.TryGetProperty("purchaseDate", out var pd) ? pd.GetString() : null,
-                    root.TryGetProperty("category", out var cat) ? cat.GetString() : null,
-                    root.TryGetProperty("description", out var desc) ? desc.GetString() : null,
-                    root.TryGetProperty("manualUrl", out var mu) ? mu.GetString() : null,
-                    existing.CreatedAt,
-                    DateTimeOffset.UtcNow);
-                var updated = ProductStore.Put(id, replacement);
-                await route.FulfillAsync(new RouteFulfillOptions
-                {
-                    Status = 200,
-                    ContentType = "application/json",
-                    Body = JsonSerializer.Serialize(ProductToJson(updated!))
-                });
-                break;
-            }
+                    var replacement = new InMemoryProductsStore.ProductRecord(
+                        id,
+                        root.TryGetProperty("name", out var n) ? n.GetString() : null,
+                        root.TryGetProperty("price", out var pr) && pr.ValueKind == JsonValueKind.Number ? pr.GetDecimal() : null,
+                        root.TryGetProperty("brand", out var br) ? br.GetString() : null,
+                        root.TryGetProperty("modelNumber", out var mn) ? mn.GetString() : null,
+                        root.TryGetProperty("serialNumber", out var sn) ? sn.GetString() : null,
+                        root.TryGetProperty("purchaseDate", out var pd) ? pd.GetString() : null,
+                        root.TryGetProperty("category", out var cat) ? cat.GetString() : null,
+                        root.TryGetProperty("description", out var desc) ? desc.GetString() : null,
+                        root.TryGetProperty("manualUrl", out var mu) ? mu.GetString() : null,
+                        existing.CreatedAt,
+                        DateTimeOffset.UtcNow);
+                    var updated = ProductStore.Put(id, replacement);
+                    await route.FulfillAsync(new RouteFulfillOptions
+                    {
+                        Status = 200,
+                        ContentType = "application/json",
+                        Body = JsonSerializer.Serialize(ProductToJson(updated!))
+                    });
+                    break;
+                }
 
             case "PATCH":
-            {
-                var body = request.PostData ?? "{}";
-                using var doc = JsonDocument.Parse(body);
-                var root = doc.RootElement;
-                var updated = ProductStore.Patch(
-                    id,
-                    name: root.TryGetProperty("name", out var n) ? n.GetString() : null,
-                    price: root.TryGetProperty("price", out var pr) && pr.ValueKind == JsonValueKind.Number ? pr.GetDecimal() : null,
-                    brand: root.TryGetProperty("brand", out var br) ? br.GetString() : null,
-                    modelNumber: root.TryGetProperty("modelNumber", out var mn) ? mn.GetString() : null,
-                    serialNumber: root.TryGetProperty("serialNumber", out var sn) ? sn.GetString() : null,
-                    purchaseDate: root.TryGetProperty("purchaseDate", out var pd) ? pd.GetString() : null,
-                    category: root.TryGetProperty("category", out var cat) ? cat.GetString() : null,
-                    description: root.TryGetProperty("description", out var desc) ? desc.GetString() : null,
-                    manualUrl: root.TryGetProperty("manualUrl", out var mu) ? mu.GetString() : null);
-                if (updated is null)
                 {
-                    await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
-                    return;
+                    var body = request.PostData ?? "{}";
+                    using var doc = JsonDocument.Parse(body);
+                    var root = doc.RootElement;
+                    var updated = ProductStore.Patch(
+                        id,
+                        name: root.TryGetProperty("name", out var n) ? n.GetString() : null,
+                        price: root.TryGetProperty("price", out var pr) && pr.ValueKind == JsonValueKind.Number ? pr.GetDecimal() : null,
+                        brand: root.TryGetProperty("brand", out var br) ? br.GetString() : null,
+                        modelNumber: root.TryGetProperty("modelNumber", out var mn) ? mn.GetString() : null,
+                        serialNumber: root.TryGetProperty("serialNumber", out var sn) ? sn.GetString() : null,
+                        purchaseDate: root.TryGetProperty("purchaseDate", out var pd) ? pd.GetString() : null,
+                        category: root.TryGetProperty("category", out var cat) ? cat.GetString() : null,
+                        description: root.TryGetProperty("description", out var desc) ? desc.GetString() : null,
+                        manualUrl: root.TryGetProperty("manualUrl", out var mu) ? mu.GetString() : null);
+                    if (updated is null)
+                    {
+                        await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
+                        return;
+                    }
+
+                    await route.FulfillAsync(new RouteFulfillOptions { Status = 204 });
+                    break;
                 }
 
-                await route.FulfillAsync(new RouteFulfillOptions { Status = 204 });
-                break;
-            }
-
             case "DELETE":
-            {
-                var deleted = ProductStore.Delete(id);
-                await route.FulfillAsync(new RouteFulfillOptions
                 {
-                    Status = deleted ? 204 : 404
-                });
-                break;
-            }
+                    var deleted = ProductStore.Delete(id);
+                    await route.FulfillAsync(new RouteFulfillOptions
+                    {
+                        Status = deleted ? 204 : 404
+                    });
+                    break;
+                }
 
             default:
                 await route.FulfillAsync(new RouteFulfillOptions { Status = 405 });

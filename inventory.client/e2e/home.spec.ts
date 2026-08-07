@@ -22,7 +22,6 @@ test.describe('Home page', () => {
 
   test('nav menu shows username when authenticated', async ({ page }) => {
     await page.goto('/');
-    // Nav should not show the Login link
     await expect(page.getByRole('link', { name: /log in/i })).not.toBeVisible();
   });
 });
@@ -37,7 +36,6 @@ test.describe('Home page (unauthenticated)', () => {
 
   test('navigating to /products redirects to BFF login', async ({ page }) => {
     await page.goto('/products');
-    // The auth guard redirects via window.location.href to /bff/login
     await expect(page).toHaveURL(/bff\/login/);
   });
 });

@@ -33,8 +33,6 @@ public sealed class InventoryWebApplicationFactory : IAsyncDisposable
         var contentRoot = Path.GetFullPath(
             Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Inventory.Server"));
 
-        // Point the web root at the Angular build output so UseStaticFiles() can serve
-        // index.html and the JS/CSS bundles.
         var distPath = Path.GetFullPath(
             Path.Combine(
                 AppContext.BaseDirectory,
@@ -50,17 +48,13 @@ public sealed class InventoryWebApplicationFactory : IAsyncDisposable
         };
         var builder = WebApplication.CreateBuilder(options);
 
-        // Real Kestrel socket on a random HTTPS loopback port for Playwright.
         builder.WebHost.ConfigureKestrel(o => o.Listen(IPAddress.Loopback, 0, lo => lo.UseHttps()));
 
-        // Prevent background service exceptions from killing the host mid-test.
         builder.Services.Configure<HostOptions>(opts =>
             opts.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore);
 
         builder.Services.AddLogging(lb => lb.AddConsole());
 
-        // Inserts UseStaticFiles() early so the Angular dist output is served before
-        // MapStaticAssets() checks the (empty) build-time static web assets manifest.
         builder.Services.AddSingleton<IStartupFilter, TestStaticFilesStartupFilter>();
 
         Stage("Services configured; building app");

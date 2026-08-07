@@ -112,7 +112,6 @@ describe('CatalogListComponent', () => {
   it('clicking the active Name column toggles orderDir to desc', () => {
     const nameBtn = fixture.debugElement.queryAll(By.css('thead button'))[0];
 
-    // Component starts with Name asc — clicking toggles to desc.
     nameBtn.nativeElement.click();
     fixture.detectChanges();
 

@@ -92,7 +92,6 @@ describe('ProductFormComponent — create mode', () => {
   it('embeds the manual-chat panel (collapsed by default)', () => {
     const panel = fixture.debugElement.query(By.css('app-manual-chat-panel'));
     expect(panel).toBeTruthy();
-    // Panel starts collapsed → only the toggle button is in the DOM, not the full chat UI.
     expect(fixture.debugElement.query(By.css('button.manual-chat-toggle'))).toBeTruthy();
     expect(fixture.debugElement.query(By.css('.manual-chat-panel'))).toBeNull();
   });

@@ -62,18 +62,14 @@ public sealed class ProductManualChatTests
             await page.GotoAsync("/products/new");
             await page.WaitForURLAsync("**/products/new");
 
-            // Fill product name so productContext carries it.
             await page.FillAsync("#name", "Test Laptop");
 
-            // Open the chat panel.
             await page.ClickAsync("#manual-chat-toggle");
             await Assertions.Expect(page.Locator("#manual-chat-panel")).ToBeVisibleAsync();
 
-            // Send a message.
             await page.FillAsync("#manual-chat-input", "Where is the manual?");
             await page.ClickAsync("#manual-chat-send");
 
-            // The assistant reply (mocked) contains MockManualUrl; a "Use this URL" chip should render.
             var chip = page.Locator(".manual-chat-panel button.url-chip");
             await Assertions.Expect(chip).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
             {
@@ -128,13 +124,6 @@ public sealed class ProductManualChatTests
             await page.ClickAsync("#manual-chat-toggle");
             await Assertions.Expect(page.Locator("#manual-chat-panel")).ToBeVisibleAsync();
 
-            // Send several messages so the transcript definitely exceeds panel height
-            // (each round produces a user bubble + 4-line assistant reply + URL chip).
-            // Force bypasses Playwright's viewport check on each interaction — this loop
-            // is setup to accumulate overflow content, not to assert UI interactability.
-            // If the panel overflows the viewport, the layout assertions below are what
-            // should fail, with a clear diagnostic message, not a confusing ClickAsync
-            // timeout about the element being outside the viewport.
             for (var i = 0; i < 6; i++)
             {
                 await page.FillAsync("#manual-chat-input", $"message {i}", new PageFillOptions { Force = true });
@@ -146,8 +135,6 @@ public sealed class ProductManualChatTests
                 });
             }
 
-            // Measure the panel and the inner scrollable message list. Using scalar
-            // evaluate calls avoids any JSON deserialization ambiguity.
             var panelClientHeight = await page.EvaluateAsync<double>(
                 "() => document.getElementById('manual-chat-panel').clientHeight");
             var panelBottom = await page.EvaluateAsync<double>(
@@ -158,19 +145,16 @@ public sealed class ProductManualChatTests
             var listScrollHeight = await page.EvaluateAsync<double>(
                 "() => document.querySelector('.manual-chat-panel .message-list').scrollHeight");
 
-            // The message list must fit INSIDE the panel (no overflow past the bottom).
             Assert.True(
                 listClientHeight <= panelClientHeight,
                 $"Message list ({listClientHeight}px) must fit within panel " +
                 $"({panelClientHeight}px) — otherwise content spills past the panel's bottom edge.");
 
-            // With 6 rounds of content, the list SHOULD have overflow (scrollable).
             Assert.True(
                 listScrollHeight > listClientHeight,
                 $"Expected message-list to be scrollable after 6 messages: scrollHeight " +
                 $"({listScrollHeight}) should exceed clientHeight ({listClientHeight}).");
 
-            // The panel's bottom edge must not extend past the viewport.
             Assert.True(
                 panelBottom <= viewportHeight + 1,
                 $"Panel bottom ({panelBottom}) must not exceed viewport height ({viewportHeight}).");
@@ -206,7 +190,6 @@ public sealed class ProductManualChatTests
 
             await page.ClickAsync("#product-form-submit");
 
-            // After successful create the form navigates to /products/:id
             await page.WaitForURLAsync(url => url.Contains("/products/") && !url.Contains("/new"));
 
             var created = _fixture.ProductStore.GetProducts(null)

@@ -16,7 +16,6 @@ public sealed class ProductSmokeTests(PlaywrightFixture fixture)
         var (ctx, page) = await fixture.NewProductsPageAsync();
         await using (ctx)
         {
-            // CREATE: fill form and submit; Angular must navigate to the detail page.
             await page.ClickAsync("#new-product-link");
             await page.WaitForURLAsync("**/products/new");
             await page.FillAsync("#name", name);
@@ -25,10 +24,8 @@ public sealed class ProductSmokeTests(PlaywrightFixture fixture)
 
             var productId = page.Url.TrimEnd('/').Split('/').Last();
 
-            // READ: detail page shows the created product.
             await Assertions.Expect(page.Locator("body").First).ToContainTextAsync(name);
 
-            // UPDATE: rename the product, set a manualUrl, and confirm the detail page reflects both.
             await page.GotoAsync($"/products/{productId}/edit");
             await page.WaitForURLAsync($"**/products/{productId}/edit");
             var nameInput = page.Locator("#name");
@@ -40,7 +37,6 @@ public sealed class ProductSmokeTests(PlaywrightFixture fixture)
             await Assertions.Expect(page.Locator("body").First).ToContainTextAsync(updatedName);
             await Assertions.Expect(page.Locator("#view-manual-link")).ToBeVisibleAsync();
 
-            // LIST: product appears when searching the products list.
             await page.GotoAsync("/products");
             await page.WaitForSelectorAsync("h2:has-text('My Products')");
             await page.FillAsync("#product-search", updatedName);
@@ -49,7 +45,6 @@ public sealed class ProductSmokeTests(PlaywrightFixture fixture)
             var row = page.Locator("tbody tr").Filter(new LocatorFilterOptions { HasText = updatedName });
             await Assertions.Expect(row).ToHaveCountAsync(1);
 
-            // DELETE: remove the product — serves as both assertion and cleanup.
             await row.Locator("[id^='delete-product-']").ClickAsync();
             await row.Locator("[id^='confirm-delete-product-']").ClickAsync();
             await Assertions.Expect(row).ToHaveCountAsync(0);

@@ -11,10 +11,6 @@ public sealed class CatalogTests
 
     public CatalogTests(PlaywrightFixture fixture) => _fixture = fixture;
 
-    // -------------------------------------------------------------------------
-    // List
-    // -------------------------------------------------------------------------
-
     [Fact]
     public async Task Catalog_shows_all_seeded_products()
     {
@@ -43,10 +39,6 @@ public sealed class CatalogTests
             await Assertions.Expect(page.Locator("tbody tr")).ToHaveCountAsync(0);
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Search
-    // -------------------------------------------------------------------------
 
     [Fact]
     public async Task Catalog_search_filters_by_name()
@@ -89,10 +81,6 @@ public sealed class CatalogTests
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Sorting
-    // -------------------------------------------------------------------------
-
     [Fact]
     public async Task Catalog_sorts_by_name_descending_when_Name_header_clicked()
     {
@@ -105,20 +93,14 @@ public sealed class CatalogTests
         {
             var rows = page.Locator("tbody tr");
 
-            // Default: Name asc — Apple TV first
             await Assertions.Expect(rows.First).ToContainTextAsync("Apple TV");
 
-            // Click Name header → toggles to desc
             await page.ClickAsync("#sort-by-name");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
             await Assertions.Expect(rows.First).ToContainTextAsync("Zebra Printer");
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Detail navigation
-    // -------------------------------------------------------------------------
 
     [Fact]
     [Trait("Category", "Critical")]
@@ -132,15 +114,6 @@ public sealed class CatalogTests
         {
             await page.ClickAsync("#view-product-0");
 
-            // Use a DOM-presence assertion rather than WaitForURLAsync.
-            //
-            // WaitForURLAsync listens for a future navigation event. In CI, the resolver
-            // mock returns in ~4ms, so history.pushState can fire before WaitForURLAsync
-            // registers its listener — causing a 60-second timeout waiting for a navigation
-            // that already happened. ToBeVisibleAsync polls the DOM on every retry tick,
-            // resolving as soon as the product heading appears regardless of when pushState
-            // fired. The URL is then verified after content is confirmed, by which point the
-            // navigation has unambiguously committed.
             await Assertions.Expect(
                 page.Locator($"h2:has-text('{product.Name}')")
             ).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 60_000 });

@@ -39,7 +39,6 @@ describe('NavMenuComponent', () => {
   });
 
   it('should render signout link when authenticated', () => {
-    // Signals are automatically evaluated in template with OnPush change detection
     fixture.detectChanges();
     const signoutLink = fixture.debugElement.query(By.css('a.nav-link[href="/logout"]'));
     expect(signoutLink).toBeTruthy();
@@ -50,7 +49,6 @@ describe('NavMenuComponent', () => {
   template: '',
 })
 class DummyComponent {}
-// Define dummy routes.  Include routes for ALL paths used by routerLink in your component.
 const testRoutes: Routes = [
   { path: '', component: DummyComponent },
   { path: 'products', component: DummyComponent },
