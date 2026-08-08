@@ -16,7 +16,6 @@ env:
 
 jobs:
   build:
-    if: github.actor != 'dependabot[bot]'
     name: Build and analyze
     runs-on: windows-latest
     outputs:
@@ -27,6 +26,7 @@ jobs:
 
     steps:
       - name: Set up JDK 21
+        if: github.actor != 'dependabot[bot]'
         uses: actions/setup-java@v5
         with:
           java-version: 21
@@ -40,10 +40,11 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json', '**/*.csproj') }}
           restore-keys: ${{ runner.os }}-nuget-
 
       - name: Cache SonarQube Cloud packages
+        if: github.actor != 'dependabot[bot]'
         uses: actions/cache@v5
         with:
           path: ~\sonar\cache
@@ -52,6 +53,7 @@ jobs:
 
       - name: Cache SonarQube Cloud scanner
         id: cache-sonar-scanner
+        if: github.actor != 'dependabot[bot]'
         uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}\scanner
@@ -59,7 +61,7 @@ jobs:
           restore-keys: ${{ runner.os }}-sonar-scanner
 
       - name: Install SonarQube Cloud scanner
-        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true' && github.actor != 'dependabot[bot]'
         shell: powershell
         run: |
           New-Item -Path ${{ runner.temp }}\scanner -ItemType Directory
@@ -106,6 +108,7 @@ jobs:
         run: npm run lint
 
       - name: Begin Sonar analysis
+        if: github.actor != 'dependabot[bot]'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
@@ -128,7 +131,7 @@ jobs:
       - name: Build with dotnet
         env:
           NuGetPackageSourceCredentials_GitHub: Username=${{ github.actor }};Password=${{ secrets.PACKAGES_READ_TOKEN }}
-        run: dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci
+        run: dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci /p:RestoreLockedMode=true
 
       - name: Run unit tests with coverage
         run: |
@@ -148,6 +151,7 @@ jobs:
         run: npx vitest run --coverage
 
       - name: Fix LCOV paths for SonarQube
+        if: github.actor != 'dependabot[bot]'
         shell: powershell
         run: |
           # The Scanner for .NET (v8+) indexes inventory.client as its own module whose base dir IS
@@ -162,6 +166,7 @@ jobs:
 
       - name: Get Playwright version
         id: playwright-version
+        if: github.actor != 'dependabot[bot]'
         shell: pwsh
         run: |
           $version = (Select-Xml -Path Inventory.Tests.E2E/Inventory.Tests.E2E.csproj `
@@ -170,16 +175,18 @@ jobs:
 
       - name: Cache Playwright browsers
         id: cache-playwright
+        if: github.actor != 'dependabot[bot]'
         uses: actions/cache@v5
         with:
           path: ~\AppData\Local\ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
-        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        if: steps.cache-playwright.outputs.cache-hit != 'true' && github.actor != 'dependabot[bot]'
         run: pwsh "${{ github.workspace }}\Inventory.Tests.E2E\bin\Release\net10.0\playwright.ps1" install --with-deps chromium
 
       - name: Run E2E tests with coverage
+        if: github.actor != 'dependabot[bot]'
         env:
           ASPNETCORE_ENVIRONMENT: CI
           OidcAuthority: ${{ vars.OIDC_AUTHORITY }}
@@ -194,21 +201,21 @@ jobs:
 
       - name: Upload test results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        if: always()
+        if: always() && github.actor != 'dependabot[bot]'
         with:
           name: test-results
           path: Inventory.Tests.E2E/bin/Release/net10.0/TestResults/
 
       - name: Upload Playwright failure artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        if: always()
+        if: always() && github.actor != 'dependabot[bot]'
         with:
           name: inventory-playwright-artifacts
           path: Inventory.Tests.E2E/bin/Release/net10.0/TestResults/PlaywrightArtifacts/
           if-no-files-found: ignore
 
       - name: Report E2E results
-        if: always()
+        if: always() && github.actor != 'dependabot[bot]'
         shell: pwsh
         env:
           AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
@@ -313,6 +320,7 @@ jobs:
           path: ${{ github.workspace }}\publish
 
       - name: End Sonar analysis
+        if: github.actor != 'dependabot[bot]'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         shell: powershell
@@ -322,6 +330,7 @@ jobs:
   deploy:
     runs-on: windows-latest
     needs: build
+    if: github.event_name != 'pull_request'
     outputs:
       webapp-url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
     permissions:
