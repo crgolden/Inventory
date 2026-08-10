@@ -1,5 +1,6 @@
 namespace Inventory.Tests.E2E.Infrastructure;
 
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
@@ -17,6 +18,8 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
     private static readonly string? SmokeBaseUrl = Environment.GetEnvironmentVariable("SmokeBaseUrl");
 
     public static bool IsSmoke => SmokeBaseUrl is not null;
+
+    private readonly ConcurrentQueue<string> _serverErrors = new();
 
     private IPlaywright? _playwright;
     private IBrowser? _browser;
@@ -47,6 +50,30 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
     public InMemoryCatalogStore CatalogStore { get; }
 
     public string BaseAddress { get; private set; }
+
+    public IReadOnlyList<string> ServerErrors => [.. _serverErrors.Distinct()];
+
+    public void ThrowIfServerErrors(string stage)
+    {
+        var errors = ServerErrors;
+        if (errors.Count == 0)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"The deployed API returned server errors during {stage}:{Environment.NewLine}{string.Join(Environment.NewLine, errors)}");
+    }
+
+    public Exception DescribeFailure(Exception failure)
+    {
+        var errors = ServerErrors;
+        return errors.Count == 0
+            ? failure
+            : new InvalidOperationException(
+                $"The deployed API returned server errors, which is the likely cause of the failure below:{Environment.NewLine}{string.Join(Environment.NewLine, errors)}",
+                failure);
+    }
 
     private static void Stage(string msg) =>
         Console.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] PlaywrightFixture: {msg}");
@@ -100,6 +127,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         var warmup = await NewProductsPageAsync();
         Stage("warmup NewProductsPageAsync done");
         await using (warmup.Context) { }
+        ThrowIfServerErrors("startup warm-up");
         Stage("InitializeAsync exit");
     }
 
@@ -120,7 +148,14 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         page.SetDefaultTimeout(60_000);
 
         page.Request += (_, req) => Stage($"REQ {req.Method} {req.Url}");
-        page.Response += (_, resp) => Stage($"RESP {resp.Status} {resp.Url}");
+        page.Response += (_, resp) =>
+        {
+            Stage($"RESP {resp.Status} {resp.Url}");
+            if (IsSmoke && resp.Status >= 500)
+            {
+                _serverErrors.Enqueue($"{resp.Status} {resp.Request.Method} {resp.Url}");
+            }
+        };
         page.RequestFailed += (_, req) => Stage($"FAIL {req.Method} {req.Url} err={req.Failure}");
 
         if (_storageStatePath is null)
@@ -198,7 +233,14 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         page.SetDefaultTimeout(60_000);
 
         page.Request += (_, req) => Stage($"REQ {req.Method} {req.Url}");
-        page.Response += (_, resp) => Stage($"RESP {resp.Status} {resp.Url}");
+        page.Response += (_, resp) =>
+        {
+            Stage($"RESP {resp.Status} {resp.Url}");
+            if (IsSmoke && resp.Status >= 500)
+            {
+                _serverErrors.Enqueue($"{resp.Status} {resp.Request.Method} {resp.Url}");
+            }
+        };
         page.RequestFailed += (_, req) => Stage($"FAIL {req.Method} {req.Url} err={req.Failure}");
 
         if (!IsSmoke)
