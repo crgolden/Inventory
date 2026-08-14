@@ -77,7 +77,7 @@ export class ChatService {
                 const parsed = JSON.parse(data) as { delta: { content: string } };
                 subscriber.next(parsed.delta.content);
               } catch {
-                // ignore malformed lines
+                continue;
               }
             }
           }
