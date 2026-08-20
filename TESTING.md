@@ -273,7 +273,7 @@ CI uses the `AZURE_DEVOPS_EXT_PAT` secret and the `PLAYWRIGHT_APPINSIGHTS_CONNEC
 Provision or repair the workbook (from the Tools workspace):
 
 ```powershell
-pwsh -NoProfile -File Tools\Azure\Monitor\Ensure-PlaywrightMonitor.ps1
+pwsh -File Tools\Azure\Monitor\Ensure-PlaywrightMonitor.ps1
 ```
 
 The publish/telemetry steps run only in CI; there is no standalone local script to invoke. To inspect the logic, see the workflow YAML above. Do not run Git commands when implementing or verifying Playwright reporting changes.
