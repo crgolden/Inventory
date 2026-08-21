@@ -11,9 +11,6 @@ on:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     name: Build and analyze
@@ -81,7 +78,7 @@ jobs:
           restore-keys: ${{ runner.os }}-dotnet-tools-
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: inventory.client/.nvmrc
 
@@ -344,7 +341,7 @@ jobs:
           name: .net-app
 
       - name: Login to Azure
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5  # v2
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca  # v3.0.1
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_A918A9717FCF45BE8C2EB26C9E6DE0B9 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_EA921DF12CE349A2A30F70DF5FC7E238 }}
@@ -352,7 +349,7 @@ jobs:
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
-        uses: azure/webapps-deploy@84a80cfe7e9889f35148ed88c307e6e93bf02578  # v3
+        uses: azure/webapps-deploy@02a81bead70021f5284939794bcec79c271ab383  # v3.0.8
         with:
           app-name: 'crgolden-inventory'
           slot-name: 'Production'
