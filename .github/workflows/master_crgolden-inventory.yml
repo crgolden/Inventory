@@ -134,7 +134,7 @@ jobs:
         run: |
           dotnet coverlet Inventory.Tests.Unit\bin\Release\net10.0 `
             --target "dotnet" `
-            --targetargs "test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait Category=Unit --report-xunit-trx --report-xunit-trx-filename unit-tests.trx" `
+            --targetargs "test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait Category=Unit --report-xunit-trx --report-xunit-trx-filename unit-tests.trx --results-directory=Inventory.Tests.Unit/bin/Release/net10.0/TestResults" `
             --format opencover --output "coverage.opencover.xml" `
             --skipautoprops `
             --exclude-by-attribute GeneratedCodeAttribute `
@@ -193,7 +193,7 @@ jobs:
           InventoryClientSecret: ${{ secrets.INVENTORY_CLIENT_SECRET }}
         run: |
           dotnet-coverage collect `
-            "dotnet test --project Inventory.Tests.E2E --no-build --configuration Release -- --filter-trait Category=E2E --report-xunit-trx --report-xunit-trx-filename e2e-tests.trx" `
+            "dotnet test --project Inventory.Tests.E2E --no-build --configuration Release -- --filter-trait Category=E2E --report-xunit-trx --report-xunit-trx-filename e2e-tests.trx --results-directory=Inventory.Tests.E2E/bin/Release/net10.0/TestResults" `
             -f xml -o "coverage-e2e.xml" -s "coverage.settings.xml"
 
       - name: Upload test results
