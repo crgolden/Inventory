@@ -19,23 +19,6 @@ Bootstrap's Sass variable overrides (`$primary`, `$body-bg`, etc.) are applied t
 
 This is the approach the code uses today (see `inventory.client/src/styles.scss`), and it avoids the flat-global-scope `@import` entry point along with its Dart Sass deprecation warnings. Bootstrap Icons is likewise pulled in via `@use 'bootstrap-icons/font/bootstrap-icons'`.
 
-### Silent-login iframe
-
-`AppComponent` renders a hidden `<iframe id="bff-silent-login">` when the user is not authenticated. This iframe performs an OIDC `prompt=none` silent auth check against `/bff/login`. Without CSS it renders at the browser default 300×150px, creating visible whitespace. `app.component.css` positions it off-screen while it loads:
-
-```css
-#bff-silent-login {
-  position: fixed;
-  top: -9999px;
-  left: -9999px;
-  width: 0;
-  height: 0;
-  border: none;
-}
-```
-
-The iframe is removed from the DOM once it posts `{ source: 'bff-silent-login', isLoggedIn: … }` back to the parent window.
-
 ---
 
 ## Colour Palette

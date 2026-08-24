@@ -70,20 +70,6 @@ describe('AuthService', () => {
     expect(service.isAuthenticated()).toBe(true);
   });
 
-  it('should re-fetch on refresh', async () => {
-    const mockSession1: Session = [{ type: 'name', value: 'User1' }];
-    const mockSession2: Session = [{ type: 'name', value: 'User2' }];
-
-    const init = firstValueFrom(service.initialize());
-    httpTestingController.expectOne('bff/user').flush(mockSession1);
-    await init;
-
-    service.refresh();
-    httpTestingController.expectOne('bff/user').flush(mockSession2);
-
-    expect(service.username()).toBe('User2');
-  });
-
   it('should treat empty session array as authenticated', async () => {
     const result = firstValueFrom(service.initialize());
     httpTestingController.expectOne('bff/user').flush([]);

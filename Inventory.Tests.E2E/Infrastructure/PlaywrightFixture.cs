@@ -250,21 +250,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
                 await route.FulfillAsync(new RouteFulfillOptions { Status = 401 });
             });
 
-            await page.RouteAsync("**/bff/login**", async route =>
-            {
-                await route.FulfillAsync(new RouteFulfillOptions
-                {
-                    Status = 200,
-                    ContentType = "text/html",
-                    Body = """
-                        <!doctype html>
-                        <html><body>
-                        <script>window.parent.postMessage({ source: 'bff-silent-login', isLoggedIn: false }, '*');</script>
-                        </body></html>
-                        """
-                });
-            });
-
             await page.RouteAsync("**/catalog/api/odata/**", async route =>
             {
                 try

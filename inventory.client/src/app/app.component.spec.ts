@@ -34,8 +34,6 @@ describe('AppComponent', () => {
             isAuthenticated: signal(isAuthenticated),
             isAnonymous: signal(!isAuthenticated),
             logoutUrl: signal(null),
-            loginUrl: '/bff/login',
-            refresh: vi.fn(),
           },
         },
       ],
@@ -61,66 +59,5 @@ describe('AppComponent', () => {
     await setup(false);
     const routerOutlet = fixture.debugElement.query(By.directive(RouterOutlet));
     expect(routerOutlet).toBeTruthy();
-  });
-
-  it('shows silent login iframe when unauthenticated', async () => {
-    await setup(false);
-    expect(component.iframeVisible()).toBe(true);
-    expect(component.iframeUrl()).not.toBeNull();
-    const iframe = fixture.debugElement.query(By.css('#bff-silent-login'));
-    expect(iframe).toBeTruthy();
-  });
-
-  it('does not show silent login iframe when authenticated', async () => {
-    await setup(true);
-    expect(component.iframeVisible()).toBe(false);
-    const iframe = fixture.debugElement.query(By.css('#bff-silent-login'));
-    expect(iframe).toBeNull();
-  });
-
-  it('onMessage hides iframe and calls refresh when isLoggedIn is true', async () => {
-    await setup(false);
-    const authService = TestBed.inject(AuthService);
-    expect(component.iframeVisible()).toBe(true);
-
-    component.onMessage(
-      new MessageEvent('message', {
-        data: { source: 'bff-silent-login', isLoggedIn: true },
-      }),
-    );
-    fixture.detectChanges();
-
-    expect(component.iframeVisible()).toBe(false);
-    expect(authService.refresh).toHaveBeenCalledOnce();
-  });
-
-  it('onMessage hides iframe but does not call refresh when isLoggedIn is false', async () => {
-    await setup(false);
-    const authService = TestBed.inject(AuthService);
-
-    component.onMessage(
-      new MessageEvent('message', {
-        data: { source: 'bff-silent-login', isLoggedIn: false },
-      }),
-    );
-    fixture.detectChanges();
-
-    expect(component.iframeVisible()).toBe(false);
-    expect(authService.refresh).not.toHaveBeenCalled();
-  });
-
-  it('onMessage ignores messages from unknown sources', async () => {
-    await setup(false);
-    const authService = TestBed.inject(AuthService);
-    const visibleBefore = component.iframeVisible();
-
-    component.onMessage(
-      new MessageEvent('message', {
-        data: { source: 'something-else', isLoggedIn: true },
-      }),
-    );
-
-    expect(component.iframeVisible()).toBe(visibleBefore);
-    expect(authService.refresh).not.toHaveBeenCalled();
   });
 });

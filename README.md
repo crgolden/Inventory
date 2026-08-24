@@ -12,7 +12,7 @@ Inventory is the **end-user surface** of a five-app system. The BFF holds the OI
 
 | Repo | Role | How Inventory interacts |
 |---|---|---|
-| [Identity](https://github.com/crgolden/Identity) | OIDC Identity Provider | OIDC client — login / logout / silent refresh via Duende BFF |
+| [Identity](https://github.com/crgolden/Identity) | OIDC Identity Provider | OIDC client — login / logout via Duende BFF, which renews tokens server-side |
 | [Manuals](https://github.com/crgolden/Manuals) | Azure OpenAI chat API | BFF proxies `/manuals/api/**` with access token (scope `manuals`) |
 | [Products](https://github.com/crgolden/Products) | OData v4 product catalog API | BFF proxies `/products/api/**` with access token (scope `products`); `/catalog/api/**` proxies anonymously for the public catalog |
 | [Infrastructure](https://github.com/crgolden/Infrastructure) | Health monitoring dashboard | Polls Inventory's `/health` endpoint |

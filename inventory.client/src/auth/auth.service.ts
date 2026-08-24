@@ -40,21 +40,11 @@ export class AuthService {
     return s.find(x => x.type === 'bff:logout_url')?.value ?? null;
   });
 
-  public readonly silentLoginUrl: string = '/bff/silent-login';
-  public readonly loginUrl: string = '/bff/login';
-
-  /** Called by provideAppInitializer — triggers the first fetch and returns an
-   *  Observable that completes once the session response is received. */
   public initialize(): Observable<Session> {
     this._refresh$.next();
     return this._fetchResult$.pipe(
       map(s => s ?? []),
       take(1)
     );
-  }
-
-  /** Re-fetches the session and updates all signals. Called after silent login. */
-  public refresh(): void {
-    this._refresh$.next();
   }
 }
