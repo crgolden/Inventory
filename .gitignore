@@ -318,6 +318,18 @@ FakesAssemblies/
 .ntvs_analysis.dat
 node_modules/
 
+# Angular CLI build cache, wherever the CLI decides to put it.
+# The only existing rule was `/.angular/cache` in inventory.client/.gitignore. A leading slash
+# anchors a pattern to the directory holding the .gitignore, so it covered
+# inventory.client/.angular/cache and nothing else - while the CLI actually writes the cache to the
+# REPO ROOT when run from there. That left `.angular/` untracked in every git status and one
+# `git add -A` away from committing ~1.2 MB of build cache.
+# Unanchored and directory-scoped on purpose: this matches .angular/ at any depth, so it holds
+# whichever directory the CLI is invoked from, and covers loose files the cache subdirectory rule
+# would miss. Librarian and Churches already carry `/.angular/cache` in their ROOT .gitignore, so
+# they do not have this gap.
+.angular/
+
 # Visual Studio 6 build log
 *.plg
 

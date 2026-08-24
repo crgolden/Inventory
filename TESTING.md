@@ -301,13 +301,13 @@ dotnet coverlet Inventory.Tests.Unit\bin\Release\net10.0 `
 # E2E (VS Coverage XML) → coverage-e2e.xml, and frontend LCOV via `npx vitest run --coverage` — see CI.
 
 $env:SONAR_TOKEN = "<token>"
-sonar-scanner `
+& "$env:SystemDrive\sonar-scanner-8.0.1.6346-windows-x64\bin\sonar-scanner.bat" `
   "-Dsonar.projectKey=crgolden_Inventory" `
   "-Dsonar.organization=crgolden" `
   "-Dsonar.sources=Inventory.Server,inventory.client/src" `
   "-Dsonar.tests=Inventory.Tests.Unit,Inventory.Tests.E2E" `
-  "-Dsonar.exclusions=**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
-  "-Dsonar.coverage.exclusions=inventory.client/e2e/**,inventory.client/src/test-setup.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js" `
+  "-Dsonar.exclusions=inventory.client/aspnetcore-https.js,inventory.client/start-os.js,**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
+  "-Dsonar.coverage.exclusions=inventory.client/e2e/**,inventory.client/src/test-setup.ts" `
   "-Dsonar.test.inclusions=**/*.spec.ts" `
   "-Dsonar.cs.opencover.reportsPaths=coverage.opencover.xml" `
   "-Dsonar.cs.vscoveragexml.reportsPaths=coverage-e2e.xml" `
@@ -315,21 +315,3 @@ sonar-scanner `
 ```
 
 Required coverage files: `coverage.opencover.xml` (unit, OpenCover), `coverage-e2e.xml` (E2E, VS Coverage), `inventory.client/coverage/lcov.info`.
-
-**The `-Dsonar.exclusions` and `-Dsonar.coverage.exclusions` values above and the `Begin Sonar analysis`
-step in `.github/workflows/master_crgolden-inventory.yml` are two copies of one list and must be edited
-together.** This fleet keeps no `sonar-project.properties`; scanner arguments override scanner
-configuration files, which override the SonarCloud UI, so the flags are the only definition of the
-project's analysis scope. Note the spelling differs by scanner: the workflow runs `dotnet-sonarscanner`
-in a `begin`/`end` pair, where the same setting is `/d:sonar.coverage.exclusions="…"` — a `/d:` prefix
-and a colon, not `-D`.
-
-Sync them by fixing whichever is wrong, not by copying one into the other. The rules that decide which
-entries belong — the *"could a unit test catch a bug in this file?"* test, category globs over filename
-lists or extensions, and when a zero-match pattern may be deleted — are fleet-wide and live in
-`AGENTS/TESTING.md` § SonarCloud → Coverage exclusions. The Inventory-specific case they settle:
-`inventory.client/**/*.config.*` is one glob covering two different situations, and neither makes it dead
-config. It matches `src/app/app.config.ts`, which **does** carry an lcov record (0% today), so excluding
-it moves the coverage number. It also matches `vitest.config.ts`, `playwright.config.ts` and
-`eslint.config.js`, which sit outside vitest's `include: ['src/**/*.ts']` and therefore carry no lcov
-record at all — a zero delta that is the category glob's expected steady state, not a reason to drop it.
