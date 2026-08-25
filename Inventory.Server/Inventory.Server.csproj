@@ -42,6 +42,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Inventory.Tests.Unit" />
+  </ItemGroup>
+
+  <ItemGroup>
   	<None Include="..\.editorconfig" Link=".editorconfig" />
   </ItemGroup>
 

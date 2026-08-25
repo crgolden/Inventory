@@ -53,6 +53,17 @@ dotnet build Inventory.Tests.Unit --configuration Debug
 .\Inventory.Tests.Unit\bin\Debug\net10.0\Inventory.Tests.Unit.exe -trait "Category=Unit" -showLiveOutput
 ```
 
+Prefer `Debug` here. `Release` re-runs `ng build --configuration production` on every build because the
+`BuildAngularRelease` target has no `Inputs`/`Outputs`; the `Debug` target does, so it no-ops when the
+client is already built. That is three minutes per iteration against thirty seconds.
+
+`Logging/DuendeLicenseNoticeTests.cs` covers the Serilog exclusion that keeps Duende BFF's unlicensed
+notice out of Elasticsearch. Only one of its six tests asserts something is dropped; the other five
+assert that the four sibling events from the same logger — `ErrorValidatingLicenseKey`,
+`LicenseHasExpired`, `TrialModeWarning`, and a same-named event from any other logger — still get
+through, and those are the ones that can fail. Widening the predicate to match the logger category
+instead of the event turns four of the six red. Background: `AGENTS/Inventory.md`.
+
 ### E2E Tests (critical pre-commit subset — ~5 tests, ~10 min)
 
 A `Category=Critical` trait is applied to the 5 highest-signal E2E tests — the ones most likely to catch a real regression. Run these before every check-in instead of the full suite:

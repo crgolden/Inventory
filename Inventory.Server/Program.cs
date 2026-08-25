@@ -11,6 +11,7 @@ using Elastic.Ingest.Elasticsearch.DataStreams;
 using Elastic.Serilog.Sinks;
 using Elastic.Transport;
 using Inventory.Extensions;
+using Inventory.Logging;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -65,6 +66,7 @@ try
                 .ReadFrom.Configuration(builder.Configuration)
                 .ReadFrom.Services(serviceProvider)
                 .Enrich.WithProperty(nameof(IHostEnvironment.ApplicationName), applicationName)
+                .Filter.ByExcluding(DuendeLicenseNotice.IsNoLicenseConfiguredNotice)
                 .WriteTo.Elasticsearch(
                     [elasticsearchNode],
                     elasticsearchSinkOptions =>
