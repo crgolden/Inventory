@@ -12,6 +12,7 @@ using Elastic.Serilog.Sinks;
 using Elastic.Transport;
 using Inventory.Extensions;
 using Inventory.Logging;
+using Inventory.Telemetry;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -55,7 +56,7 @@ try
         var elasticsearchUsername = builder.Configuration.GetRequired<string>("ElasticsearchUsername");
         var elasticsearchPassword = builder.Configuration.GetRequired<string>("ElasticsearchPassword");
         builder.Services.Configure<AspNetCoreTraceInstrumentationOptions>(options =>
-            options.Filter = context => !context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase));
+            options.Filter = TracedRequests.ShouldTrace);
         builder.Logging.AddOpenTelemetry(openTelemetryLoggerOptions =>
         {
             openTelemetryLoggerOptions.IncludeFormattedMessage = true;
