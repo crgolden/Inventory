@@ -44,7 +44,7 @@ No Azure credentials needed. `InventoryWebApplicationFactory` is a minimal stati
 
 The Angular build output must exist at `inventory.client/dist/inventory.client/browser/` before running E2E tests. The test factory sets the Kestrel web root to that directory; if it is absent the server still starts but serves no static files.
 
-For the `.NET 10 SDK xUnit caveat` (why `dotnet test` doesn't work), see the workspace-level [TESTING.md](../AGENTS/TESTING.md).
+For running tests (`dotnet test` from the repo root — never the workspace root), see the workspace-level [TESTING.md](../AGENTS/TESTING.md).
 
 ### Backend Unit Tests
 
