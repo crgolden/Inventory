@@ -1,6 +1,3 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
 name: Build and deploy ASP.Net Core app to Azure Web App - crgolden-inventory
 
 on:
@@ -27,11 +24,11 @@ jobs:
         uses: actions/setup-java@v5
         with:
           java-version: 21
-          distribution: 'zulu' # Alternative distribution options are available.
+          distribution: 'zulu'
 
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          fetch-depth: 0
 
       - name: Cache NuGet packages
         uses: actions/cache@v5
@@ -151,12 +148,6 @@ jobs:
         if: github.actor != 'dependabot[bot]'
         shell: powershell
         run: |
-          # The Scanner for .NET (v8+) indexes inventory.client as its own module whose base dir IS
-          # inventory.client, so the JS coverage sensor resolves both sonar.javascript.lcov.reportPaths
-          # (coverage/lcov.info) and the lcov SF: paths relative to inventory.client — i.e. module-relative
-          # (src/...), NOT repo-relative. Do NOT prefix inventory.client/ (that double-nests and the sensor
-          # reports "No LCOV files were found"). istanbul on Windows writes backslash separators, so only
-          # normalize them to forward slashes for matching.
           (Get-Content "inventory.client/coverage/lcov.info") `
             -replace '\\', '/' |
             Set-Content "inventory.client/coverage/lcov.info"
@@ -219,12 +210,10 @@ jobs:
         shell: pwsh
         env:
           AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
-          PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING: ${{ vars.PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING }}
         run: |
           $appName     = 'Inventory'
           $suiteName   = 'E2E'
           $resultsDir  = 'Inventory.Tests.E2E/bin/Release/net10.0/TestResults'
-          $artifactDir = 'Inventory.Tests.E2E/bin/Release/net10.0/TestResults/PlaywrightArtifacts'
 
           $trx = Get-ChildItem $resultsDir -Filter *.trx | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
           if (-not $trx) {
@@ -233,11 +222,7 @@ jobs:
           }
           [xml] $xml   = Get-Content $trx.FullName
           $allResults  = @($xml.TestRun.Results.UnitTestResult)
-          $failed      = @($allResults | Where-Object { $_.outcome -ne 'Passed' })
 
-          # Azure DevOps — az devops invoke cannot disambiguate duplicate resource names in the ADO
-          # manifest (github.com/Azure/azure-devops-cli-extension/issues/1012), so use Invoke-RestMethod
-          # with explicit URLs instead.
           $testsById  = @{}
           foreach ($t in @($xml.TestRun.TestDefinitions.UnitTest)) { $testsById[$t.id] = $t }
           $adoHeaders = @{ Authorization = "Basic $([Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$env:AZURE_DEVOPS_EXT_PAT")))" }
@@ -270,31 +255,6 @@ jobs:
           Invoke-Ado PATCH "$adoBase/runs/$($run.id)?$adoVer" @{
               state = 'Completed'; completedDate = [DateTimeOffset]::UtcNow.ToString('O') } | Out-Null
           Write-Host "Published $($adoResults.Count) results to Azure DevOps run $($run.id)."
-
-          # Azure Monitor
-          $cs       = $env:PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING
-          $iKey     = ($cs -split ';' | Where-Object { $_ -like 'InstrumentationKey=*' })  -replace 'InstrumentationKey=', ''
-          $endpoint = ($cs -split ';' | Where-Object { $_ -like 'IngestionEndpoint=*' })   -replace 'IngestionEndpoint=', ''
-          $common   = @{ app = $appName; suite = $suiteName; repository = $env:GITHUB_REPOSITORY
-              branch = $env:GITHUB_REF; sha = $env:GITHUB_SHA; githubRunId = $env:GITHUB_RUN_ID
-              githubRunUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-              artifactAvailable = (Test-Path $artifactDir).ToString() }
-
-          function New-Event {
-              param([string]$Name, [hashtable]$Props, [hashtable]$Measurements)
-              @{ name = 'Microsoft.ApplicationInsights.Event'; time = [DateTimeOffset]::UtcNow.ToString('O'); iKey = $iKey
-                 data = @{ baseType = 'EventData'; baseData = @{ ver = 2; name = $Name; properties = $Props; measurements = $Measurements } } }
-          }
-
-          $durationMs = ($allResults | ForEach-Object { [TimeSpan]::Parse($_.duration).TotalMilliseconds } | Measure-Object -Sum).Sum
-          $runProps = $common.Clone(); $runProps['trxFile'] = $trx.Name; $runProps['outcome'] = if ($failed.Count) { 'Failed' } else { 'Passed' }
-          $events = @(New-Event 'PlaywrightTestRun' $runProps @{ total = $allResults.Count; failed = $failed.Count; passed = $allResults.Count - $failed.Count; durationMs = [double]$durationMs })
-          $events += $allResults | ForEach-Object {
-              $p = $common.Clone(); $p['testName'] = $_.testName; $p['outcome'] = $_.outcome; $p['failed'] = ($_.outcome -ne 'Passed').ToString()
-              New-Event 'PlaywrightTestCase' $p @{ durationMs = [double][TimeSpan]::Parse($_.duration).TotalMilliseconds }
-          }
-          Invoke-RestMethod -Method Post -Uri ($endpoint.TrimEnd('/') + '/v2/track') -ContentType 'application/json' -Body ($events | ConvertTo-Json -Depth 20) | Out-Null
-          Write-Host "Sent $($events.Count) telemetry events to Azure Monitor."
 
       - name: Upload test binaries
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -436,12 +396,10 @@ jobs:
         shell: pwsh
         env:
           AZURE_DEVOPS_EXT_PAT: ${{ secrets.AZURE_DEVOPS_EXT_PAT }}
-          PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING: ${{ vars.PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING }}
         run: |
           $appName     = 'Inventory'
           $suiteName   = 'Smoke'
           $resultsDir  = 'Inventory.Tests.E2E/bin/Release/net10.0/TestResults'
-          $artifactDir = 'Inventory.Tests.E2E/bin/Release/net10.0/TestResults/PlaywrightArtifacts'
 
           $trx = Get-ChildItem $resultsDir -Filter *.trx | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
           if (-not $trx) {
@@ -450,11 +408,7 @@ jobs:
           }
           [xml] $xml   = Get-Content $trx.FullName
           $allResults  = @($xml.TestRun.Results.UnitTestResult)
-          $failed      = @($allResults | Where-Object { $_.outcome -ne 'Passed' })
 
-          # Azure DevOps — az devops invoke cannot disambiguate duplicate resource names in the ADO
-          # manifest (github.com/Azure/azure-devops-cli-extension/issues/1012), so use Invoke-RestMethod
-          # with explicit URLs instead.
           $testsById  = @{}
           foreach ($t in @($xml.TestRun.TestDefinitions.UnitTest)) { $testsById[$t.id] = $t }
           $adoHeaders = @{ Authorization = "Basic $([Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$env:AZURE_DEVOPS_EXT_PAT")))" }
@@ -487,29 +441,4 @@ jobs:
           Invoke-Ado PATCH "$adoBase/runs/$($run.id)?$adoVer" @{
               state = 'Completed'; completedDate = [DateTimeOffset]::UtcNow.ToString('O') } | Out-Null
           Write-Host "Published $($adoResults.Count) results to Azure DevOps run $($run.id)."
-
-          # Azure Monitor
-          $cs       = $env:PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING
-          $iKey     = ($cs -split ';' | Where-Object { $_ -like 'InstrumentationKey=*' })  -replace 'InstrumentationKey=', ''
-          $endpoint = ($cs -split ';' | Where-Object { $_ -like 'IngestionEndpoint=*' })   -replace 'IngestionEndpoint=', ''
-          $common   = @{ app = $appName; suite = $suiteName; repository = $env:GITHUB_REPOSITORY
-              branch = $env:GITHUB_REF; sha = $env:GITHUB_SHA; githubRunId = $env:GITHUB_RUN_ID
-              githubRunUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-              artifactAvailable = (Test-Path $artifactDir).ToString() }
-
-          function New-Event {
-              param([string]$Name, [hashtable]$Props, [hashtable]$Measurements)
-              @{ name = 'Microsoft.ApplicationInsights.Event'; time = [DateTimeOffset]::UtcNow.ToString('O'); iKey = $iKey
-                 data = @{ baseType = 'EventData'; baseData = @{ ver = 2; name = $Name; properties = $Props; measurements = $Measurements } } }
-          }
-
-          $durationMs = ($allResults | ForEach-Object { [TimeSpan]::Parse($_.duration).TotalMilliseconds } | Measure-Object -Sum).Sum
-          $runProps = $common.Clone(); $runProps['trxFile'] = $trx.Name; $runProps['outcome'] = if ($failed.Count) { 'Failed' } else { 'Passed' }
-          $events = @(New-Event 'PlaywrightTestRun' $runProps @{ total = $allResults.Count; failed = $failed.Count; passed = $allResults.Count - $failed.Count; durationMs = [double]$durationMs })
-          $events += $allResults | ForEach-Object {
-              $p = $common.Clone(); $p['testName'] = $_.testName; $p['outcome'] = $_.outcome; $p['failed'] = ($_.outcome -ne 'Passed').ToString()
-              New-Event 'PlaywrightTestCase' $p @{ durationMs = [double][TimeSpan]::Parse($_.duration).TotalMilliseconds }
-          }
-          Invoke-RestMethod -Method Post -Uri ($endpoint.TrimEnd('/') + '/v2/track') -ContentType 'application/json' -Body ($events | ConvertTo-Json -Depth 20) | Out-Null
-          Write-Host "Sent $($events.Count) telemetry events to Azure Monitor."
 

@@ -1,4 +1,7 @@
-/* Collapsed tab: vertical pill anchored to the right edge, centered vertically */
+:host {
+  --navbar-height: 72px;
+}
+
 .manual-chat-toggle {
   position: fixed;
   top: 50%;
@@ -24,15 +27,11 @@
   letter-spacing: 0.02em;
 }
 
-/* Expanded panel — desktop: fixed side drawer. */
 .manual-chat-panel {
   position: fixed;
-  top: 72px; /* navbar height */
+  top: var(--navbar-height);
   right: 0;
   bottom: 0;
-  /* <dialog> UA stylesheet sets height: fit-content, which wins over top+bottom when not
-     overridden. height: auto lets CSS resolve the constrained height from top and bottom
-     instead, keeping the panel within the viewport as message content grows. */
   height: auto;
   width: 420px;
   max-width: 100vw;
@@ -43,7 +42,6 @@
   border-left: 1px solid #e2e8f0;
 }
 
-/* Expanded panel — mobile: full-screen overlay. */
 .manual-chat-panel.panel-narrow {
   top: 0;
   left: 0;

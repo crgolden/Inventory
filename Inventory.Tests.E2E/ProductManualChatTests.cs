@@ -70,7 +70,7 @@ public sealed class ProductManualChatTests
             await page.FillAsync("#manual-chat-input", "Where is the manual?");
             await page.ClickAsync("#manual-chat-send");
 
-            var chip = page.Locator(".manual-chat-panel button.url-chip");
+            var chip = page.Locator("[id^='url-chip-']");
             await Assertions.Expect(chip).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
             {
                 Timeout = 10_000
@@ -97,7 +97,7 @@ public sealed class ProductManualChatTests
             await page.FillAsync("#manual-chat-input", "Find the manual please");
             await page.ClickAsync("#manual-chat-send");
 
-            var chip = page.Locator(".manual-chat-panel button.url-chip").First;
+            var chip = page.Locator("[id^='url-chip-']");
             await Assertions.Expect(chip).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
             {
                 Timeout = 10_000
@@ -128,7 +128,7 @@ public sealed class ProductManualChatTests
             {
                 await page.FillAsync("#manual-chat-input", $"message {i}", new PageFillOptions { Force = true });
                 await page.ClickAsync("#manual-chat-send", new PageClickOptions { Force = true });
-                var chips = page.Locator(".manual-chat-panel button.url-chip");
+                var chips = page.Locator("[id^='url-chip-']");
                 await Assertions.Expect(chips).ToHaveCountAsync(i + 1, new LocatorAssertionsToHaveCountOptions
                 {
                     Timeout = 10_000
@@ -141,9 +141,9 @@ public sealed class ProductManualChatTests
                 "() => document.getElementById('manual-chat-panel').getBoundingClientRect().bottom");
             var viewportHeight = await page.EvaluateAsync<double>("() => window.innerHeight");
             var listClientHeight = await page.EvaluateAsync<double>(
-                "() => document.querySelector('.manual-chat-panel .message-list').clientHeight");
+                "() => document.getElementById('manual-chat-messages').clientHeight");
             var listScrollHeight = await page.EvaluateAsync<double>(
-                "() => document.querySelector('.manual-chat-panel .message-list').scrollHeight");
+                "() => document.getElementById('manual-chat-messages').scrollHeight");
 
             Assert.True(
                 listClientHeight <= panelClientHeight,
@@ -179,7 +179,7 @@ public sealed class ProductManualChatTests
             await page.FillAsync("#manual-chat-input", "Manual link?");
             await page.ClickAsync("#manual-chat-send");
 
-            var chip = page.Locator(".manual-chat-panel button.url-chip").First;
+            var chip = page.Locator("[id^='url-chip-']");
             await Assertions.Expect(chip).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
             {
                 Timeout = 10_000
@@ -190,7 +190,7 @@ public sealed class ProductManualChatTests
 
             await page.ClickAsync("#product-form-submit");
 
-            await page.WaitForURLAsync(url => url.Contains("/products/") && !url.Contains("/new"));
+            await page.WaitForURLAsync(url => url.Contains("/products/", StringComparison.Ordinal) && !url.Contains("/new", StringComparison.Ordinal));
 
             var created = _fixture.ProductStore.GetProducts(null)
                 .FirstOrDefault(p => p.Name == "Chip Persist Product");

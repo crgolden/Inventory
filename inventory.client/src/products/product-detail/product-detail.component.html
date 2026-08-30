@@ -1,7 +1,7 @@
 @if (product(); as p) {
   <div class="container py-4" style="max-width: 640px;">
     <div class="d-flex justify-content-between align-items-start mb-4">
-      <h2 class="mb-0">{{ p.name }}</h2>
+      <h2 id="product-detail-heading" class="mb-0">{{ p.name }}</h2>
       <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/products']">&larr; Back</a>
     </div>
 
@@ -56,7 +56,7 @@
       @if (p.manualUrl) {
         <a id="view-manual-link" class="btn btn-primary" [href]="p.manualUrl" target="_blank" rel="noopener">View Manual</a>
       }
-      <a class="btn btn-outline-primary" [routerLink]="['/products', p.id, 'edit']">
+      <a id="edit-product-link" class="btn btn-outline-primary" [routerLink]="['/products', p.id, 'edit']">
         {{ p.manualUrl ? 'Edit' : 'Find Manual' }}
       </a>
     </div>

@@ -21,10 +21,9 @@ public sealed class ProductCrudTests
         var (ctx, page) = await _fixture.NewProductsPageAsync();
         await using (ctx)
         {
-            var rows = page.Locator("tbody tr");
-            await Assertions.Expect(rows).ToHaveCountAsync(2);
+            await Assertions.Expect(page.Locator("[id^='product-row-']")).ToHaveCountAsync(2);
 
-            await Assertions.Expect(rows.Filter(new LocatorFilterOptions { HasText = "LG OLED C3" })).ToHaveCountAsync(1);
+            await Assertions.Expect(page.Locator("#products-table")).ToContainTextAsync("LG OLED C3");
         }
     }
 
@@ -36,8 +35,8 @@ public sealed class ProductCrudTests
         var (ctx, page) = await _fixture.NewProductsPageAsync();
         await using (ctx)
         {
-            await Assertions.Expect(page.Locator(".empty-state")).ToBeVisibleAsync();
-            await Assertions.Expect(page.Locator("tbody tr")).ToHaveCountAsync(0);
+            await Assertions.Expect(page.Locator("#products-empty-state")).ToBeVisibleAsync();
+            await Assertions.Expect(page.Locator("[id^='product-row-']")).ToHaveCountAsync(0);
         }
     }
 
@@ -57,9 +56,8 @@ public sealed class ProductCrudTests
             await Task.Delay(400, TestContext.Current.CancellationToken);
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-            var rows = page.Locator("tbody tr");
-            await Assertions.Expect(rows).ToHaveCountAsync(1);
-            await Assertions.Expect(rows.First).ToContainTextAsync("Dyson Vacuum");
+            await Assertions.Expect(page.Locator("[id^='product-row-']")).ToHaveCountAsync(1);
+            await Assertions.Expect(page.Locator("#product-row-0")).ToContainTextAsync("Dyson Vacuum");
         }
     }
 
@@ -78,7 +76,7 @@ public sealed class ProductCrudTests
             await Task.Delay(400, TestContext.Current.CancellationToken);
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-            await Assertions.Expect(page.Locator(".empty-state")).ToContainTextAsync("zzznomatch");
+            await Assertions.Expect(page.Locator("#products-empty-state")).ToContainTextAsync("zzznomatch");
         }
     }
 
@@ -100,10 +98,9 @@ public sealed class ProductCrudTests
 
             await page.ClickAsync("#product-form-submit");
 
-            await page.WaitForURLAsync(url => url.Contains("/products/") && !url.Contains("/new"));
+            await page.WaitForURLAsync(url => url.Contains("/products/", StringComparison.Ordinal) && !url.Contains("/new", StringComparison.Ordinal));
 
-            var pageText = await page.InnerTextAsync("body");
-            Assert.Contains("My Laptop", pageText);
+            await Assertions.Expect(page.Locator("#product-detail-heading")).ToHaveTextAsync("My Laptop");
         }
     }
 
@@ -128,8 +125,7 @@ public sealed class ProductCrudTests
 
             await Assertions.Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex($@"/products/{product.Id}$"));
 
-            var pageText = await page.InnerTextAsync("body");
-            Assert.Contains("Updated Name", pageText);
+            await Assertions.Expect(page.Locator("#product-detail-heading")).ToHaveTextAsync("Updated Name");
         }
     }
 
@@ -148,8 +144,7 @@ public sealed class ProductCrudTests
 
             await page.ClickAsync("#confirm-delete-product-0");
 
-            var rows = page.Locator("tbody tr");
-            await Assertions.Expect(rows).ToHaveCountAsync(1);
+            await Assertions.Expect(page.Locator("[id^='product-row-']")).ToHaveCountAsync(1);
         }
     }
 
@@ -164,7 +159,7 @@ public sealed class ProductCrudTests
             await page.GotoAsync("/products/00000000-0000-0000-0000-000000000000");
 
             await page.WaitForURLAsync("**/products/not-found");
-            await Assertions.Expect(page.Locator("h2")).ToContainTextAsync("Product Not Found");
+            await Assertions.Expect(page.Locator("#product-not-found-heading")).ToContainTextAsync("Product Not Found");
         }
     }
 }

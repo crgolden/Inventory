@@ -23,11 +23,12 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
     private IPlaywright? _playwright;
     private IBrowser? _browser;
+    private string? _baseAddress;
     private string? _storageStatePath;
 
     public PlaywrightFixture()
     {
-        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DefaultAzureCredentialOptions__CredentialProcessTimeout")))
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DefaultAzureCredentialOptions__CredentialProcessTimeout")))
         {
             Environment.SetEnvironmentVariable(
                 "DefaultAzureCredentialOptions__CredentialProcessTimeout",
@@ -38,7 +39,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         ChatStore = new InMemoryChatsStore();
         ProductStore = new InMemoryProductsStore();
         CatalogStore = new InMemoryCatalogStore();
-        BaseAddress = string.Empty;
     }
 
     public InventoryWebApplicationFactory? Factory { get; }
@@ -49,7 +49,8 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
     public InMemoryCatalogStore CatalogStore { get; }
 
-    public string BaseAddress { get; private set; }
+    public string BaseAddress =>
+        _baseAddress ?? throw new InvalidOperationException("BaseAddress is not available until InitializeAsync has run.");
 
     public IReadOnlyList<string> ServerErrors => [.. _serverErrors.Distinct()];
 
@@ -81,17 +82,22 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         Stage("InitializeAsync enter");
-        if (SmokeBaseUrl is not null)
+        if (SmokeBaseUrl is { } smokeBaseUrl)
         {
-            BaseAddress = SmokeBaseUrl.TrimEnd('/');
+            _baseAddress = smokeBaseUrl.TrimEnd('/');
             Stage($"smoke mode base={BaseAddress}");
+        }
+        else if (Factory is { } factory)
+        {
+            Stage("Factory.StartAsync() enter");
+            await factory.StartAsync();
+            _baseAddress = factory.ServerAddress;
+            Stage($"Factory.StartAsync() done base={BaseAddress}");
         }
         else
         {
-            Stage("Factory.StartAsync() enter");
-            await Factory!.StartAsync();
-            BaseAddress = Factory.ServerAddress;
-            Stage($"Factory.StartAsync() done base={BaseAddress}");
+            throw new InvalidOperationException(
+                "Neither SmokeBaseUrl nor an InventoryWebApplicationFactory is available.");
         }
 
         Stage("playwright install chromium enter");
@@ -113,11 +119,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
         if (SmokeBaseUrl is not null)
         {
-            if (AdminEmail is null || AdminPassword is null)
-            {
-                throw new InvalidOperationException("AdminEmail and AdminPassword must be set when SmokeBaseUrl is configured.");
-            }
-
             Stage("LoginAsync enter");
             await LoginAsync();
             Stage("LoginAsync done");
@@ -210,7 +211,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             Timeout = 60_000
         });
 
-        await page.WaitForSelectorAsync("h2:has-text('My Products')", new PageWaitForSelectorOptions
+        await page.WaitForSelectorAsync("#products-heading", new PageWaitForSelectorOptions
         {
             Timeout = 60_000
         });
@@ -284,7 +285,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             Timeout = 60_000
         });
 
-        await page.WaitForSelectorAsync("h2:has-text('Product Catalog')", new PageWaitForSelectorOptions
+        await page.WaitForSelectorAsync("#catalog-heading", new PageWaitForSelectorOptions
         {
             Timeout = 60_000
         });
@@ -313,9 +314,16 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
     private async Task LoginAsync()
     {
+        var adminEmail = AdminEmail
+            ?? throw new InvalidOperationException("AdminEmail must be set when SmokeBaseUrl is configured.");
+        var adminPassword = AdminPassword
+            ?? throw new InvalidOperationException("AdminPassword must be set when SmokeBaseUrl is configured.");
+        var browser = _browser
+            ?? throw new InvalidOperationException("Browser is not initialized. Ensure InitializeAsync has been awaited.");
+
         _storageStatePath = Path.GetTempFileName();
 
-        await using var context = await _browser!.NewContextAsync(new BrowserNewContextOptions
+        await using var context = await browser.NewContextAsync(new BrowserNewContextOptions
         {
             BaseURL = BaseAddress,
             IgnoreHTTPSErrors = true
@@ -329,9 +337,9 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
         await page.GotoAsync("/bff/login?returnUrl=%2Fproducts");
 
-        await page.FillAsync("input[name='Input.Email']", AdminEmail!);
-        await page.FillAsync("input[name='Input.Password']", AdminPassword!);
-        await page.ClickAsync("button#login-submit");
+        await page.FillAsync("input[name='Input.Email']", adminEmail);
+        await page.FillAsync("input[name='Input.Password']", adminPassword);
+        await page.ClickAsync("#login-submit");
 
         await page.WaitForURLAsync("**/products**");
 
@@ -697,7 +705,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
             var filter = query.TryGetValue("$filter", out var fv) ? fv.ToString() : null;
             string? nameFilter = null;
-            if (!string.IsNullOrEmpty(filter))
+            if (!string.IsNullOrWhiteSpace(filter))
             {
                 var match = ODataFilterRegex().Match(filter);
                 if (match.Success)
@@ -825,12 +833,14 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
                         root.TryGetProperty("manualUrl", out var mu) ? mu.GetString() : null,
                         existing.CreatedAt,
                         DateTimeOffset.UtcNow);
-                    var updated = ProductStore.Put(id, replacement);
+                    var updated = ProductStore.Put(id, replacement)
+                        ?? throw new InvalidOperationException(
+                            $"Product '{id}' was read but could not be replaced in the in-memory store.");
                     await route.FulfillAsync(new RouteFulfillOptions
                     {
                         Status = 200,
                         ContentType = "application/json",
-                        Body = JsonSerializer.Serialize(ProductToJson(updated!))
+                        Body = JsonSerializer.Serialize(ProductToJson(updated))
                     });
                     break;
                 }

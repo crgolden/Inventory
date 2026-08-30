@@ -1,13 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/**
- * E2E tests require credentials via environment variables:
- *   E2E_USERNAME  — Identity server login username
- *   E2E_PASSWORD  — Identity server login password
- *
- * The servers are started automatically via webServer when not already running.
- * For local dev with servers already running, set SKIP_WEBSERVER=1 to skip startup.
- */
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,

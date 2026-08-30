@@ -11,20 +11,6 @@ import {
 import { ManualChatComponent } from './manual-chat.component';
 import { ProductContext } from './chat.model';
 
-/**
- * Retractable side panel that hosts {@link ManualChatComponent}.
- *
- * Layout:
- *  - Collapsed: a fixed-position "Find Manual" tab anchored to the right edge
- *    of the viewport.
- *  - Expanded on wide screens (≥ 768px): a sidebar that slides in next to the
- *    product form.
- *  - Expanded on narrow screens (< 768px): a full-screen overlay so the form
- *    is never cramped.
- *
- * The panel is only instantiated while the user is on `/products/new` or
- * `/products/:id/edit`. When collapsed, no `ChatService` calls are issued.
- */
 @Component({
   selector: 'app-manual-chat-panel',
   imports: [ManualChatComponent],

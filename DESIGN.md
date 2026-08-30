@@ -211,4 +211,10 @@ The manual chat panel uses a fixed-position flex architecture. These rules are i
 | `writing-mode: vertical-rl` | `manual-chat-panel.component.css` | Vertical toggle label |
 | `@keyframes blink` + `.typing-cursor` | `manual-chat.component.css` | Typing animation |
 
-The panel switches to full-screen overlay at `< 768px` via `window.matchMedia('(max-width: 767px)')` in `ManualChatPanelComponent.ngOnInit()`. The `.panel-narrow` class is applied via `[class.panel-narrow]="isNarrow()"` in the template.
+The panel switches to full-screen overlay at `< 768px` via `window.matchMedia('(max-width: 767px)')` in `ManualChatPanelComponent.ngOnInit()`. The `.panel-narrow` class is applied via `[class.panel-narrow]="isNarrow()"` in the template. Collapsed, the panel is a vertical pill fixed to the right edge and centred; expanded, it is a right-hand drawer on wide screens and a full-screen overlay on narrow ones. While collapsed it issues no `ChatService` calls.
+
+Three of those rules are frozen for reasons the declarations themselves do not show:
+
+- **`.manual-chat-panel { height: auto }` is load-bearing, not a default.** The `<dialog>` user-agent stylesheet sets `height: fit-content`, which wins over `top` + `bottom` unless it is overridden. With `fit-content` the drawer grows past the viewport as messages arrive; with `auto`, CSS resolves the height from `top` and `bottom` and the panel stays inside the viewport.
+- **`min-height: 0` on `:host` and `.manual-chat` is what makes the message list scroll.** A flex item's default `min-height: auto` refuses to shrink below its content, so without these the host takes its intrinsic content height and `.message-list` overflows the panel instead of scrolling inside it.
+- **`.manual-chat-panel { top: var(--navbar-height) }`** offsets the drawer below the fixed navbar. The value lives in `manual-chat-panel.component.css` as a custom property so the number is named rather than repeated as a bare `72px`.

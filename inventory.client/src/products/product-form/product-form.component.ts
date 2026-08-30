@@ -39,11 +39,6 @@ export class ProductFormComponent implements OnInit {
     manualUrl: [null as string | null],
   });
 
-  /**
-   * Snapshot of the form fields the manual-chat panel cares about. Updated
-   * whenever the form value changes so the chat always has fresh context
-   * (e.g. if the user fills in the brand first, then opens the panel).
-   */
   private readonly formSignal = signal(this.form.getRawValue());
 
   readonly productContext = computed<ProductContext>(() => {
@@ -75,10 +70,6 @@ export class ProductFormComponent implements OnInit {
     }
   }
 
-  /**
-   * Called when the user clicks a "Use this URL" chip inside the manual-chat
-   * panel. Patches the form control and marks it dirty so save works as usual.
-   */
   onManualUrlSelected(url: string): void {
     this.form.controls.manualUrl.setValue(url);
     this.form.controls.manualUrl.markAsDirty();

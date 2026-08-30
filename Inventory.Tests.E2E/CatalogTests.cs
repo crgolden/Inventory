@@ -21,9 +21,8 @@ public sealed class CatalogTests
         var (ctx, page) = await _fixture.NewCatalogPageAsync();
         await using (ctx)
         {
-            var rows = page.Locator("tbody tr");
-            await Assertions.Expect(rows).ToHaveCountAsync(2);
-            await Assertions.Expect(rows.Filter(new LocatorFilterOptions { HasText = "LG OLED TV" })).ToHaveCountAsync(1);
+            await Assertions.Expect(page.Locator("[id^='catalog-row-']")).ToHaveCountAsync(2);
+            await Assertions.Expect(page.Locator("#catalog-table")).ToContainTextAsync("LG OLED TV");
         }
     }
 
@@ -35,8 +34,8 @@ public sealed class CatalogTests
         var (ctx, page) = await _fixture.NewCatalogPageAsync();
         await using (ctx)
         {
-            await Assertions.Expect(page.Locator(".empty-state")).ToBeVisibleAsync();
-            await Assertions.Expect(page.Locator("tbody tr")).ToHaveCountAsync(0);
+            await Assertions.Expect(page.Locator("#catalog-empty-state")).ToBeVisibleAsync();
+            await Assertions.Expect(page.Locator("[id^='catalog-row-']")).ToHaveCountAsync(0);
         }
     }
 
@@ -56,9 +55,8 @@ public sealed class CatalogTests
             await Task.Delay(400, TestContext.Current.CancellationToken);
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-            var rows = page.Locator("tbody tr");
-            await Assertions.Expect(rows).ToHaveCountAsync(1);
-            await Assertions.Expect(rows.First).ToContainTextAsync("Dyson Vacuum");
+            await Assertions.Expect(page.Locator("[id^='catalog-row-']")).ToHaveCountAsync(1);
+            await Assertions.Expect(page.Locator("#catalog-row-0")).ToContainTextAsync("Dyson Vacuum");
         }
     }
 
@@ -77,7 +75,7 @@ public sealed class CatalogTests
             await Task.Delay(400, TestContext.Current.CancellationToken);
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-            await Assertions.Expect(page.Locator(".empty-state")).ToContainTextAsync("zzznomatch");
+            await Assertions.Expect(page.Locator("#catalog-empty-state")).ToContainTextAsync("zzznomatch");
         }
     }
 
@@ -91,14 +89,14 @@ public sealed class CatalogTests
         var (ctx, page) = await _fixture.NewCatalogPageAsync();
         await using (ctx)
         {
-            var rows = page.Locator("tbody tr");
+            var firstRow = page.Locator("#catalog-row-0");
 
-            await Assertions.Expect(rows.First).ToContainTextAsync("Apple TV");
+            await Assertions.Expect(firstRow).ToContainTextAsync("Apple TV");
 
             await page.ClickAsync("#sort-by-name");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-            await Assertions.Expect(rows.First).ToContainTextAsync("Zebra Printer");
+            await Assertions.Expect(firstRow).ToContainTextAsync("Zebra Printer");
         }
     }
 
@@ -107,7 +105,8 @@ public sealed class CatalogTests
     public async Task Catalog_navigates_to_detail_page_when_View_clicked()
     {
         _fixture.CatalogStore.Clear();
-        var product = _fixture.CatalogStore.Create("Sony OLED TV", brand: "Sony");
+        var productName = $"Sony OLED TV {Guid.NewGuid():N}";
+        var product = _fixture.CatalogStore.Create(productName, brand: "Sony");
 
         var (ctx, page) = await _fixture.NewCatalogPageAsync();
         await using (ctx)
@@ -115,10 +114,10 @@ public sealed class CatalogTests
             await page.ClickAsync("#view-product-0");
 
             await Assertions.Expect(
-                page.Locator($"h2:has-text('{product.Name}')")
-            ).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 60_000 });
+                page.Locator("#catalog-detail-heading")
+            ).ToHaveTextAsync(productName, new LocatorAssertionsToHaveTextOptions { Timeout = 60_000 });
 
-            Assert.Contains($"/catalog/{product.Id}", page.Url);
+            Assert.Contains($"/catalog/{product.Id}", page.Url, StringComparison.Ordinal);
         }
     }
 
@@ -133,9 +132,9 @@ public sealed class CatalogTests
             await page.GotoAsync("/catalog/00000000-0000-0000-0000-000000000000");
 
             await Assertions.Expect(
-                page.Locator("h2:has-text('Product Not Found')")
+                page.Locator("#catalog-not-found-heading")
             ).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 60_000 });
-            Assert.Contains("/catalog/not-found", page.Url);
+            Assert.Contains("/catalog/not-found", page.Url, StringComparison.Ordinal);
         }
     }
 }

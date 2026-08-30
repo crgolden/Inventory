@@ -1,4 +1,3 @@
-// This script sets up HTTPS for the application using the ASP.NET Core HTTPS certificate
 const fs = require('node:fs');
 const spawn = require('node:child_process').spawn;
 const path = require('node:path');

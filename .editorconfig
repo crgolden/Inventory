@@ -258,3 +258,19 @@ dotnet_diagnostic.sa1413.severity = none
 dotnet_diagnostic.sa1600.severity = none
 dotnet_diagnostic.sa1602.severity = none
 dotnet_diagnostic.sa1633.severity = none
+
+dotnet_diagnostic.CA1054.severity = warning
+dotnet_diagnostic.CA1055.severity = warning
+dotnet_diagnostic.CA1056.severity = warning
+dotnet_diagnostic.CA1307.severity = warning
+dotnet_diagnostic.CA1309.severity = warning
+dotnet_diagnostic.CA1310.severity = warning
+dotnet_diagnostic.CA1862.severity = warning
+dotnet_diagnostic.CA1308.severity = none  # kept aligned with Inventory.Server, where the only site is the OTel deployment.environment attribute, a lowercase wire value
+
+# CA1054/CA1056: these are in-memory test doubles whose ManualUrl mirrors the Products OData
+# contract, which another repo owns; changing the type here would stop the double matching the
+# service it stands in for.
+[Inventory.Tests.E2E/Infrastructure/**.cs]
+dotnet_diagnostic.CA1054.severity = none
+dotnet_diagnostic.CA1056.severity = none

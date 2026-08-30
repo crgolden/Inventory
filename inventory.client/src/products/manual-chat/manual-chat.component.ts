@@ -12,27 +12,8 @@ import { ChatService } from './chat.service';
 import { ChatMessage, ProductContext } from './chat.model';
 import { MarkdownPipe } from './markdown.pipe';
 
-/**
- * Matches HTTP(S) URLs in assistant replies. Intentionally stops at whitespace
- * and closing punctuation so that markdown/paren-wrapped links still extract
- * cleanly.
- */
 const URL_REGEX = /\bhttps?:\/\/[^\s)>\]"']+/g;
 
-/**
- * Embedded single-chat variant of the Manuals chat feature. Lives inside
- * {@link ManualChatPanelComponent} and is only instantiated when the user
- * opens the panel from the product create/edit form.
- *
- * Differences from the former standalone ChatComponent:
- *  - No multi-chat sidebar — this component owns exactly one chat for the
- *    lifetime of the product form session.
- *  - On the first user message, creates the chat in the Manuals API and
- *    sets its title to something like "Manual: {name} ({brand} {model})"
- *    so the user can find the research trail later.
- *  - Scans every assistant reply for URLs and emits them as
- *    {@link manualUrlSelected} events when the user clicks a chip.
- */
 @Component({
   selector: 'app-manual-chat',
   imports: [FormsModule, MarkdownPipe],
@@ -54,7 +35,6 @@ export class ManualChatComponent {
 
   readonly hasMessages = computed(() => this.messages().length > 0);
 
-  /** Returns a list of unique URLs found in the given assistant message. */
   urlsFor(content: string): string[] {
     const matches = content.match(URL_REGEX) ?? [];
     const cleaned = matches.map(u => u.replace(/[.,;:!?)>\]"']+$/, ''));
@@ -82,9 +62,7 @@ export class ManualChatComponent {
         const title = this.buildInitialTitle();
         if (title) {
           this.chatService.updateChatTitle(chat.chatId, title).subscribe({
-            error: () => {
-              // noop
-            },
+            error: () => undefined,
           });
         }
 

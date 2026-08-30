@@ -1,15 +1,15 @@
 <section class="py-5 text-center hero-section">
   <div class="container">
-    <h1 class="display-5 fw-bold">Your Complete Product Inventory</h1>
+    <h1 id="home-heading" class="display-5 fw-bold">Your Complete Product Inventory</h1>
     <p class="lead mb-4">
       Keep track of everything you own — so you're ready for anything.
     </p>
     <div class="d-flex gap-3 justify-content-center flex-wrap">
-      <a class="btn btn-outline-primary btn-lg" [routerLink]="['/catalog']">Browse Catalog</a>
+      <a id="browse-catalog-link" class="btn btn-outline-primary btn-lg" [routerLink]="['/catalog']">Browse Catalog</a>
       @if (authService.isAuthenticated()) {
-        <a class="btn btn-primary btn-lg" [routerLink]="['/products']">View My Products</a>
+        <a id="my-products-link" class="btn btn-primary btn-lg" [routerLink]="['/products']">View My Products</a>
       } @else {
-        <a class="btn btn-primary btn-lg" href="/bff/login">Get Started &mdash; Log In</a>
+        <a id="home-login-link" class="btn btn-primary btn-lg" href="/bff/login">Get Started &mdash; Log In</a>
       }
     </div>
   </div>
@@ -21,7 +21,7 @@
     <div class="row row-cols-1 row-cols-md-3 g-4">
       @for (benefit of benefits; track benefit.title) {
         <div class="col">
-          <div class="card h-100 shadow-sm">
+          <div [attr.id]="'benefit-card-' + $index" class="card h-100 shadow-sm">
             <div class="card-body">
               <div class="icon-well mb-3 mx-auto">
                 <i [class]="'bi ' + benefit.icon + ' fs-4'"></i>

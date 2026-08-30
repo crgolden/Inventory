@@ -18,7 +18,7 @@ internal static class TracedRequests
 
         var value = path.Value;
 
-        if (string.IsNullOrEmpty(value))
+        if (string.IsNullOrWhiteSpace(value))
         {
             return true;
         }

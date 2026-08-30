@@ -1,6 +1,3 @@
-/* Fill the flex parent (panel-body) so the inner message-list has a bounded height
-   to scroll within. Without this, the host element has intrinsic (content) height and
-   .message-list grows past the panel instead of scrolling. */
 :host {
   display: flex;
   flex: 1 1 auto;
@@ -9,7 +6,7 @@
 }
 
 .manual-chat {
-  min-height: 0; /* allow child .message-list to scroll inside the flex parent */
+  min-height: 0;
 }
 
 .message-list {
@@ -45,7 +42,6 @@
   padding: 0.15rem 0.55rem;
 }
 
-/* Markdown rendered inside assistant bubbles */
 .markdown-content {
   font-size: inherit;
   line-height: inherit;

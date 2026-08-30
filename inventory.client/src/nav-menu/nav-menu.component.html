@@ -24,28 +24,28 @@
               routerLinkActive="link-active"
               [routerLinkActiveOptions]="{ exact: true }"
           >
-            <a class="nav-link" [routerLink]="['/']">Home</a>
+            <a id="nav-home" class="nav-link" [routerLink]="['/']">Home</a>
           </li>
 
           <li class="nav-item"
               routerLinkActive="link-active">
-            <a class="nav-link" [routerLink]="['/catalog']">Catalog</a>
+            <a id="nav-catalog" class="nav-link" [routerLink]="['/catalog']">Catalog</a>
           </li>
 
           @if (isAuthenticated()) {
             <li class="nav-item"
                 routerLinkActive="link-active">
-              <a class="nav-link" [routerLink]="['/products']">My Products</a>
+              <a id="nav-products" class="nav-link" [routerLink]="['/products']">My Products</a>
             </li>
           } @else {
             <li class="nav-item">
-              <a class="nav-link" href="/bff/login">Login</a>
+              <a id="nav-login" class="nav-link" href="/bff/login">Login</a>
             </li>
           }
 
           @if (isAuthenticated()) {
             <li class="nav-item">
-              <a class="nav-link" [href]="logoutUrl()">Signout</a>
+              <a id="nav-signout" class="nav-link" [href]="logoutUrl()">Signout</a>
             </li>
           }
         </ul>

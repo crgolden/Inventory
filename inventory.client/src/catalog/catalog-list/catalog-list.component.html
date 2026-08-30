@@ -1,6 +1,6 @@
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">Product Catalog</h2>
+    <h2 id="catalog-heading" class="mb-0">Product Catalog</h2>
   </div>
 
   <div class="mb-3">
@@ -17,7 +17,7 @@
   @if (loading()) {
     <div class="text-muted">Loading&hellip;</div>
   } @else if (items().length === 0) {
-    <div class="empty-state text-center py-5">
+    <div id="catalog-empty-state" class="empty-state text-center py-5">
       @if (searchTerm()) {
         <i class="bi bi-search fs-1 text-secondary mb-3 d-block"></i>
         <h5>No products match</h5>
@@ -29,7 +29,7 @@
     </div>
   } @else {
     <div class="table-responsive">
-      <table class="table table-hover align-middle">
+      <table id="catalog-table" class="table table-hover align-middle">
         <thead class="table-light">
           <tr>
             <th>
@@ -61,8 +61,8 @@
         </thead>
         <tbody>
           @for (item of items(); track item.id) {
-            <tr>
-              <td>{{ item.name ?? '—' }}</td>
+            <tr [attr.id]="'catalog-row-' + $index">
+              <td [attr.id]="'catalog-name-' + $index">{{ item.name ?? '—' }}</td>
               <td>{{ item.brand ?? '—' }}</td>
               <td>{{ item.category ?? '—' }}</td>
               <td>{{ item.price !== null ? ('$' + item.price) : '—' }}</td>

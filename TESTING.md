@@ -191,6 +191,48 @@ The fixture always uses a Playwright route mock for `/bff/user`, regardless of w
 
 Each per-test context is then created with `StorageStatePath` set to this file, so every test starts with a real BFF session — the full OIDC flow, BFF session ticket, and auth guard are exercised.
 
+### Selector ids
+
+The fleet rule — select by `id`, never by class, position, XPath or copy — is in
+[AGENTS/TESTING.md](../AGENTS/TESTING.md#e2e-selector-strategy--select-by-id-never-by-position) and
+[AGENTS/CODE-STYLE.md](../AGENTS/CODE-STYLE.md) rule 10. This is Inventory's own id table, which both
+Playwright suites (`Inventory.Tests.E2E` in C# and `inventory.client/e2e` in TypeScript) select against.
+
+| Element | `id` |
+|---|---|
+| Home hero heading | `home-heading` |
+| Home hero CTAs | `browse-catalog-link`, `my-products-link`, `home-login-link` |
+| Home benefit cards | `benefit-card-{index}` |
+| Nav links | `nav-home`, `nav-catalog`, `nav-products`, `nav-login`, `nav-signout` |
+| My-Products heading / empty state / table | `products-heading`, `products-empty-state`, `products-table` |
+| My-Products row, name cell, actions | `product-row-{index}`, `product-name-{index}`, `view-product-{index}`, `edit-product-{index}`, `delete-product-{index}`, `confirm-delete-product-{index}` |
+| Catalog heading / empty state / table | `catalog-heading`, `catalog-empty-state`, `catalog-table` |
+| Catalog row, name cell, View link | `catalog-row-{index}`, `catalog-name-{index}`, `view-product-{index}` |
+| Detail headings | `product-detail-heading`, `catalog-detail-heading` |
+| Not-found headings | `product-not-found-heading`, `catalog-not-found-heading` |
+| Detail page actions | `view-manual-link`, `edit-product-link` |
+| Product form fields and submit | `name`, `brand`, `price`, `modelNumber`, `serialNumber`, `purchaseDate`, `category`, `description`, `manualUrl`, `product-form-submit` |
+| Manual finder | `manual-chat-toggle`, `manual-chat-panel`, `manual-chat-close`, `manual-chat-messages`, `manual-chat-input`, `manual-chat-send`, `url-chip-{messageIndex}-{urlIndex}` |
+
+Two consequences worth stating, because both replaced a selector that had gone wrong:
+
+- **A value inside a container is asserted on the container.** `expect(page.locator('#products-table')).toContainText(name)` selects by id and puts the copy in the assertion, where `getByRole('cell', { name })` and `Filter(new LocatorFilterOptions { HasText = … })` put it in the selector. Where a single field is the subject, the field has its own id and the assertion is `ToHaveTextAsync`, which is exact.
+- **A set is selected by id prefix**, never by tag: `[id^='product-row-']` in place of `tbody tr`, `[id^='url-chip-']` in place of `.manual-chat-panel button.url-chip`. `url-chip` ids carry **both** loop indices because the chips loop is nested inside the messages loop, so the inner `$index` alone would repeat across messages.
+
+`url-chip-{messageIndex}-{urlIndex}` needs the `@for (msg of messages(); track $index; let messageIndex = $index)` alias in
+`manual-chat.component.html`; without the alias the inner loop's `$index` shadows the outer one.
+
+### TypeScript Playwright suite (`inventory.client/e2e`)
+
+**This suite is not run by CI** — the workflow's only frontend test step is `npx vitest run --coverage`. It also needs
+`E2E_USERNAME` / `E2E_PASSWORD` for `auth.setup.ts`, which drives a **real** OIDC login against the Identity server and
+saves the session to `e2e/.auth/user.json` for the authenticated projects to reuse. `playwright.config.ts` starts both
+servers itself (`dotnet run --project ../Inventory.Server` and `npm start`) unless `SKIP_WEBSERVER=1` is set, which is
+the switch to use when they are already running locally. The setup selects Identity's own
+login form by id (`#Input_Email`, `#Input_Password`, `#login-submit`), which is what Razor's `asp-for="Input.Email"`
+emits. It previously used `getByLabel('Username')`, and Identity's label reads **"Email"** — a copy-bound selector that
+matched nothing, which is the defect rule 10 exists to catch.
+
 ### Manuals API mocking
 
 All `/manuals/api/**` requests are intercepted by Playwright before they reach the BFF proxy, backed by `InMemoryChatsStore` — a thread-safe in-memory store that mirrors the Manuals service data model. Each test calls `fixture.ChatStore.Clear()` before `NewProductsPageAsync()` to ensure a clean state.
@@ -279,7 +321,13 @@ CI also publishes the same TRX outcomes to Azure DevOps and Azure Monitor:
 | Azure DevOps | `https://dev.azure.com/crgolden/`, project `Inventory` — published inline by the CI workflow |
 | Azure Monitor | Shared Application Insights `crgolden` — `PlaywrightTestRun`/`PlaywrightTestCase` customEvents posted inline by the CI workflow |
 
-CI uses the `AZURE_DEVOPS_EXT_PAT` secret and the `PLAYWRIGHT_APPINSIGHTS_CONNECTION_STRING` variable (set both in the repo's Actions settings). The publish + telemetry logic is inline in the "Publish Playwright results" steps of `.github/workflows/master_crgolden-inventory.yml` — there are no standalone scripts.
+CI uses the `AZURE_DEVOPS_EXT_PAT` secret (set it in the repo's Actions settings). The publish logic is inline in the "Report E2E results" and "Report smoke results" steps of `.github/workflows/master_crgolden-inventory.yml` — there are no standalone scripts.
+
+Three workflow decisions that are not obvious from reading the YAML:
+
+- **The ADO publish calls `Invoke-RestMethod` against explicit URLs rather than `az devops invoke`.** The CLI extension cannot disambiguate duplicate resource names in the ADO manifest ([azure-devops-cli-extension#1012](https://github.com/Azure/azure-devops-cli-extension/issues/1012)), so the runs/results/attachments endpoints are addressed directly.
+- **`actions/checkout` sets `fetch-depth: 0` for SonarCloud, not for the build.** A shallow clone costs Sonar the history it uses to attribute issues to changesets and to compute new-code metrics.
+- **The "Fix LCOV paths for SonarQube" step only rewrites `\` to `/`; it must not prefix `inventory.client/`.** The Scanner for .NET (v8+) indexes `inventory.client` as its own module whose base directory *is* `inventory.client`, so the JS coverage sensor resolves both `sonar.javascript.lcov.reportPaths` (`coverage/lcov.info`) and the LCOV `SF:` paths module-relative (`src/…`), never repo-relative. Adding the prefix double-nests the path and the sensor reports "No LCOV files were found". The separator rewrite is needed because istanbul emits backslashes on Windows runners.
 
 Provision or repair the workbook (from the Tools workspace):
 

@@ -1,13 +1,13 @@
 <div class="manual-chat d-flex flex-column flex-grow-1">
 
-  <div class="flex-grow-1 overflow-auto p-3 message-list">
+  <div id="manual-chat-messages" class="flex-grow-1 overflow-auto p-3 message-list">
     @if (!hasMessages()) {
       <p class="text-muted small text-center mt-4">
         Ask me to find a user manual for this product.
         I&rsquo;ll reply with links you can save directly to the form.
       </p>
     }
-    @for (msg of messages(); track $index) {
+    @for (msg of messages(); track $index; let messageIndex = $index) {
       <div class="d-flex mb-3"
         [class.justify-content-end]="msg.role === 'user'"
         [class.justify-content-start]="msg.role === 'assistant'">
@@ -23,6 +23,7 @@
                 <div class="url-chips d-flex flex-wrap gap-2 mt-2">
                   @for (url of urls; track url) {
                     <button
+                      [attr.id]="'url-chip-' + messageIndex + '-' + $index"
                       type="button"
                       class="btn btn-sm btn-outline-primary url-chip"
                       (click)="selectUrl(url)"

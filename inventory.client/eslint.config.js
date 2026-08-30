@@ -28,10 +28,6 @@ module.exports = tseslint.config(
       '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'app', style: 'camelCase' }],
       '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'app', style: 'kebab-case' }],
       '@typescript-eslint/unbound-method': ['error', { ignoreStatic: true }],
-      // AGENTS/COMMENTS.md: no narrative comments. This catches trailing comments; standalone
-      // full-line narrative comments aren't matchable by ESLint's built-in rule set (comments
-      // aren't part of the AST no-restricted-syntax selects against) — the fleet-wide catalog
-      // script (Tools/CommentAudit/Get-CommentCatalog.ps1) is the actual content-based gate.
       'no-inline-comments': 'error',
     },
   },
