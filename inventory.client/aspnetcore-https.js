@@ -22,8 +22,40 @@ if (!fs.existsSync(baseFolder)) {
     fs.mkdirSync(baseFolder, { recursive: true });
 }
 
+function resolveAbsoluteDotnetPathWithoutSearchingPath() {
+  const exe = process.platform === 'win32' ? 'dotnet.exe' : 'dotnet';
+  const knownInstallRootsByPlatform = [
+    process.env.DOTNET_ROOT,
+    process.platform === 'win32' ? path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'dotnet') : null,
+    process.platform === 'win32' ? path.join(process.env.LOCALAPPDATA ?? '', 'Microsoft', 'dotnet') : null,
+    '/usr/local/share/dotnet',
+    '/opt/homebrew/share/dotnet',
+    '/usr/share/dotnet',
+    '/usr/lib/dotnet',
+    '/usr/bin',
+  ];
+
+  for (const root of knownInstallRootsByPlatform) {
+    if (!root) {
+      continue;
+    }
+    const candidate = path.join(root, exe);
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 if (!fs.existsSync(certFilePath) || !fs.existsSync(keyFilePath)) {
-  spawn('dotnet', [
+  const dotnetPath = resolveAbsoluteDotnetPathWithoutSearchingPath();
+  if (!dotnetPath) {
+    console.error('Could not locate the .NET SDK. Install it, or set DOTNET_ROOT to its directory.');
+    process.exit(-1);
+  }
+
+  spawn(dotnetPath, [
     'dev-certs',
     'https',
     '--export-path',
