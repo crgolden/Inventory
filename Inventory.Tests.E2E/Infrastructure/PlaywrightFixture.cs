@@ -362,9 +362,9 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
         var remainder = path[(collectionIndex + "/Products".Length)..];
 
-        if (remainder.Length == 0 || remainder == "/")
+        if (remainder.Length == 0 || string.Equals(remainder, "/", StringComparison.Ordinal))
         {
-            if (method == "GET")
+            if (string.Equals(method, "GET", StringComparison.Ordinal))
             {
                 await HandleCatalogCollectionAsync(route, uri);
             }
@@ -382,7 +382,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
                 return;
             }
 
-            if (method == "GET")
+            if (string.Equals(method, "GET", StringComparison.Ordinal))
             {
                 var product = CatalogStore.GetProduct(id);
                 if (product is null)
@@ -511,15 +511,15 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         var uri = new Uri(request.Url);
         var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
-        if (segments.Length < 3 || segments[2] != "chats")
+        if (segments.Length < 3 || !string.Equals(segments[2], "chats", StringComparison.Ordinal))
         {
             await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
             return;
         }
 
         var chatId = segments.Length >= 4 ? segments[3] : null;
-        var isMessages = segments.Length >= 5 && segments[4] == "messages";
-        var isStream = segments.Length >= 6 && segments[5] == "stream";
+        var isMessages = segments.Length >= 5 && string.Equals(segments[4], "messages", StringComparison.Ordinal);
+        var isStream = segments.Length >= 6 && string.Equals(segments[5], "stream", StringComparison.Ordinal);
 
         if (chatId is null)
         {
@@ -700,7 +700,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
         var remainder = path[(collectionIndex + "/Products".Length)..];
 
-        if (remainder.Length == 0 || remainder == "/")
+        if (remainder.Length == 0 || string.Equals(remainder, "/", StringComparison.Ordinal))
         {
             var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
             var filter = query.TryGetValue("$filter", out var fv) ? fv.ToString() : null;

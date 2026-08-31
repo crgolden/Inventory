@@ -164,6 +164,7 @@ public sealed class ProductManualChatTests
     [Fact]
     public async Task Submitting_form_after_chip_click_persists_manual_url_on_product()
     {
+        const string productName = "Chip Persist Product";
         _fixture.ProductStore.Clear();
         _fixture.ChatStore.Clear();
 
@@ -173,7 +174,7 @@ public sealed class ProductManualChatTests
             await page.GotoAsync("/products/new");
             await page.WaitForURLAsync("**/products/new");
 
-            await page.FillAsync("#name", "Chip Persist Product");
+            await page.FillAsync("#name", productName);
             await page.ClickAsync("#manual-chat-toggle");
 
             await page.FillAsync("#manual-chat-input", "Manual link?");
@@ -193,9 +194,9 @@ public sealed class ProductManualChatTests
             await page.WaitForURLAsync(url => url.Contains("/products/", StringComparison.Ordinal) && !url.Contains("/new", StringComparison.Ordinal));
 
             var created = _fixture.ProductStore.GetProducts(null)
-                .FirstOrDefault(p => p.Name == "Chip Persist Product");
+                .FirstOrDefault(p => string.Equals(p.Name, productName, StringComparison.Ordinal));
             Assert.NotNull(created);
-            Assert.Equal(InMemoryChatsStore.MockManualUrl, created!.ManualUrl);
+            Assert.Equal(InMemoryChatsStore.MockManualUrl, created.ManualUrl);
         }
     }
 }
