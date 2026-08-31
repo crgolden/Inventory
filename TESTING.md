@@ -314,28 +314,14 @@ CI uploads these artifacts separately from TRX:
 | Build E2E | `inventory-playwright-artifacts` |
 | Post-deploy smoke | `inventory-smoke-playwright-artifacts` |
 
-CI also publishes the same TRX outcomes to Azure DevOps and Azure Monitor:
+GitHub Actions artifacts are the only reporting destination. The workflow steps that used to mirror the same TRX outcomes to Azure DevOps test runs and Azure Monitor custom events are retired and removed.
 
-| Target | Configuration |
-|---|---|
-| Azure DevOps | `https://dev.azure.com/crgolden/`, project `Inventory` — published inline by the CI workflow |
-| Azure Monitor | Shared Application Insights `crgolden` — `PlaywrightTestRun`/`PlaywrightTestCase` customEvents posted inline by the CI workflow |
+Two workflow decisions that are not obvious from reading the YAML:
 
-CI uses the `AZURE_DEVOPS_EXT_PAT` secret (set it in the repo's Actions settings). The publish logic is inline in the "Report E2E results" and "Report smoke results" steps of `.github/workflows/master_crgolden-inventory.yml` — there are no standalone scripts.
-
-Three workflow decisions that are not obvious from reading the YAML:
-
-- **The ADO publish calls `Invoke-RestMethod` against explicit URLs rather than `az devops invoke`.** The CLI extension cannot disambiguate duplicate resource names in the ADO manifest ([azure-devops-cli-extension#1012](https://github.com/Azure/azure-devops-cli-extension/issues/1012)), so the runs/results/attachments endpoints are addressed directly.
 - **`actions/checkout` sets `fetch-depth: 0` for SonarCloud, not for the build.** A shallow clone costs Sonar the history it uses to attribute issues to changesets and to compute new-code metrics.
 - **The "Fix LCOV paths for SonarQube" step only rewrites `\` to `/`; it must not prefix `inventory.client/`.** The Scanner for .NET (v8+) indexes `inventory.client` as its own module whose base directory *is* `inventory.client`, so the JS coverage sensor resolves both `sonar.javascript.lcov.reportPaths` (`coverage/lcov.info`) and the LCOV `SF:` paths module-relative (`src/…`), never repo-relative. Adding the prefix double-nests the path and the sensor reports "No LCOV files were found". The separator rewrite is needed because istanbul emits backslashes on Windows runners.
 
-Provision or repair the workbook (from the Tools workspace):
-
-```powershell
-pwsh -File Tools\Azure\Monitor\Ensure-PlaywrightMonitor.ps1
-```
-
-The publish/telemetry steps run only in CI; there is no standalone local script to invoke. To inspect the logic, see the workflow YAML above. Do not run Git commands when implementing or verifying Playwright reporting changes.
+Do not run Git commands when implementing or verifying Playwright reporting changes.
 
 ---
 
