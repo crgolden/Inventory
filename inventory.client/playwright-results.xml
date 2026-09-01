@@ -1,0 +1,6 @@
+<testsuites id="" name="" tests="1" failures="0" skipped="0" errors="0" time="35.600708">
+<testsuite name="synthetic\orphan-check.spec.ts" timestamp="2026-09-01T16:50:08.866Z" hostname="synthetic" tests="1" failures="0" skipped="0" time="13.224" errors="0">
+<testcase name="Synthetic orphan check › no synthetic products remain in production" classname="synthetic\orphan-check.spec.ts" time="13.224">
+</testcase>
+</testsuite>
+</testsuites>

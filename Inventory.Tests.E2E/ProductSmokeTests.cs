@@ -52,9 +52,11 @@ public sealed class ProductSmokeTests(PlaywrightFixture fixture)
 
         await page.GotoAsync("/products");
         await page.WaitForSelectorAsync("#products-heading");
-        await page.FillAsync("#product-search", updatedName);
-        await Task.Delay(400, TestContext.Current.CancellationToken);
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        await Assertions.Expect(page.Locator("#products-table")).ToContainTextAsync(updatedName);
+        await page.RunAndWaitForResponseAsync(
+            () => page.FillAsync("#product-search", updatedName),
+            response => response.Url.Contains("$filter=", StringComparison.Ordinal));
+
         var rows = page.Locator("[id^='product-row-']");
         await Assertions.Expect(rows).ToHaveCountAsync(1);
         await Assertions.Expect(page.Locator("#product-name-0")).ToHaveTextAsync(updatedName);

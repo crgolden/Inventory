@@ -49,11 +49,9 @@ public sealed class CatalogTests
         var (ctx, page) = await _fixture.NewCatalogPageAsync();
         await using (ctx)
         {
-            var searchInput = page.Locator("#catalog-search");
-            await searchInput.FillAsync("dyson");
-
-            await Task.Delay(400, TestContext.Current.CancellationToken);
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await page.RunAndWaitForResponseAsync(
+                () => page.FillAsync("#catalog-search", "dyson"),
+                response => response.Url.Contains("$filter=", StringComparison.Ordinal));
 
             await Assertions.Expect(page.Locator("[id^='catalog-row-']")).ToHaveCountAsync(1);
             await Assertions.Expect(page.Locator("#catalog-row-0")).ToContainTextAsync("Dyson Vacuum");
@@ -69,11 +67,9 @@ public sealed class CatalogTests
         var (ctx, page) = await _fixture.NewCatalogPageAsync();
         await using (ctx)
         {
-            var searchInput = page.Locator("#catalog-search");
-            await searchInput.FillAsync("zzznomatch");
-
-            await Task.Delay(400, TestContext.Current.CancellationToken);
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await page.RunAndWaitForResponseAsync(
+                () => page.FillAsync("#catalog-search", "zzznomatch"),
+                response => response.Url.Contains("$filter=", StringComparison.Ordinal));
 
             await Assertions.Expect(page.Locator("#catalog-empty-state")).ToContainTextAsync("zzznomatch");
         }
@@ -93,8 +89,9 @@ public sealed class CatalogTests
 
             await Assertions.Expect(firstRow).ToContainTextAsync("Apple TV");
 
-            await page.ClickAsync("#sort-by-name");
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await page.RunAndWaitForResponseAsync(
+                () => page.ClickAsync("#sort-by-name"),
+                response => response.Url.Contains("$orderby=", StringComparison.Ordinal));
 
             await Assertions.Expect(firstRow).ToContainTextAsync("Zebra Printer");
         }

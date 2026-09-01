@@ -7,6 +7,9 @@ using Microsoft.Playwright;
 
 public sealed partial class PlaywrightFixture : IAsyncLifetime
 {
+    internal const string SyntheticMarkerHeaderName = "X-Synthetic-Marker";
+    internal const string IdentityOrigin = "https://crgolden-identity.azurewebsites.net";
+
     private static readonly bool CI =
         bool.TryParse(Environment.GetEnvironmentVariable("CI"), out var isCi) && isCi;
 
@@ -16,6 +19,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
     private static readonly string? AdminEmail = Environment.GetEnvironmentVariable("AdminEmail");
     private static readonly string? AdminPassword = Environment.GetEnvironmentVariable("AdminPassword");
     private static readonly string? SmokeBaseUrl = Environment.GetEnvironmentVariable("SmokeBaseUrl");
+    private static readonly string? SyntheticMarker = Environment.GetEnvironmentVariable("ReCAPTCHASyntheticMarkerSecret");
 
     public static bool IsSmoke => SmokeBaseUrl is not null;
 
@@ -211,7 +215,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             Timeout = 60_000
         });
 
-        await page.WaitForSelectorAsync("#products-heading", new PageWaitForSelectorOptions
+        await page.WaitForSelectorAsync("#products-empty-state, #products-table", new PageWaitForSelectorOptions
         {
             Timeout = 60_000
         });
@@ -285,7 +289,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             Timeout = 60_000
         });
 
-        await page.WaitForSelectorAsync("#catalog-heading", new PageWaitForSelectorOptions
+        await page.WaitForSelectorAsync("#catalog-empty-state, #catalog-table", new PageWaitForSelectorOptions
         {
             Timeout = 60_000
         });
@@ -318,6 +322,8 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             ?? throw new InvalidOperationException("AdminEmail must be set when SmokeBaseUrl is configured.");
         var adminPassword = AdminPassword
             ?? throw new InvalidOperationException("AdminPassword must be set when SmokeBaseUrl is configured.");
+        var syntheticMarker = SyntheticMarker
+            ?? throw new InvalidOperationException("ReCAPTCHASyntheticMarkerSecret must be set when SmokeBaseUrl is configured. The login account gets monitor-only reCAPTCHA enforcement only when the request carries the synthetic marker.");
         var browser = _browser
             ?? throw new InvalidOperationException("Browser is not initialized. Ensure InitializeAsync has been awaited.");
 
@@ -327,6 +333,14 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         {
             BaseURL = BaseAddress,
             IgnoreHTTPSErrors = true
+        });
+        await context.RouteAsync($"{IdentityOrigin}/**", route =>
+        {
+            var headers = new Dictionary<string, string>(route.Request.Headers)
+            {
+                [SyntheticMarkerHeaderName] = syntheticMarker
+            };
+            return route.ContinueAsync(new RouteContinueOptions { Headers = headers });
         });
         var page = await context.NewPageAsync();
 

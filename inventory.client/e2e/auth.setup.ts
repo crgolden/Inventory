@@ -13,8 +13,8 @@ setup('authenticate through the BFF and save the session cookie', async ({ page 
 
   await page.goto('/bff/login?returnUrl=/');
 
-  await page.locator('#Input_Email').fill(username);
-  await page.locator('#Input_Password').fill(password);
+  await page.locator("input[name='Input.Email']").fill(username);
+  await page.locator("input[name='Input.Password']").fill(password);
   await page.locator('#login-submit').click();
 
   await page.waitForURL('https://localhost:50212/**');

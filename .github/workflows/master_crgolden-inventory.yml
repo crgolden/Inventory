@@ -17,6 +17,8 @@ jobs:
     permissions:
       id-token: write #This is required for requesting the JWT (needed for Azure OIDC in E2E tests)
       contents: read #This is required for actions/checkout
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN }}
 
     steps:
       - name: Set up JDK 21
@@ -78,6 +80,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: inventory.client/.nvmrc
+          registry-url: https://npm.pkg.github.com
 
       - name: Cache npm packages
         uses: actions/cache@v5
@@ -88,6 +91,8 @@ jobs:
 
       - name: Install npm dependencies
         working-directory: inventory.client
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN }}
         run: npm ci
 
       - name: Install dotnet-coverage
@@ -318,6 +323,7 @@ jobs:
           SmokeBaseUrl: ${{ needs.deploy.outputs.webapp-url }}
           AdminEmail: ${{ secrets.TEST_USERNAME }}
           AdminPassword: ${{ secrets.TEST_PASSWORD }}
+          ReCAPTCHASyntheticMarkerSecret: ${{ secrets.SYNTHETIC_MARKER_SECRET }}
         run: |
           $resultsDir = "${{ github.workspace }}\Inventory.Tests.E2E\bin\Release\net10.0\TestResults"
           New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null

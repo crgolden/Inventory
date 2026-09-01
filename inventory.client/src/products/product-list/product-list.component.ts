@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 import { debounceTime, distinctUntilChanged, Subject, switchMap } from 'rxjs';
@@ -16,6 +16,7 @@ export class ProductListComponent implements OnInit {
 
   private readonly titleService = inject(Title);
   private readonly productService = inject(ProductService);
+  private readonly route = inject(ActivatedRoute);
 
   readonly products = signal<Product[]>([]);
   readonly confirmingDeleteId = signal<string | null>(null);
@@ -26,6 +27,7 @@ export class ProductListComponent implements OnInit {
 
   ngOnInit(): void {
     this.titleService.setTitle('Inventory | My Products');
+    this.products.set(this.route.snapshot.data['products'] as Product[]);
 
     this.search$.pipe(
       debounceTime(300),
@@ -38,8 +40,6 @@ export class ProductListComponent implements OnInit {
       this.products.set(p);
       this.loading.set(false);
     });
-
-    this.search$.next('');
   }
 
   onSearch(term: string): void {

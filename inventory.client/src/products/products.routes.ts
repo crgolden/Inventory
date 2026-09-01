@@ -1,9 +1,11 @@
 import { Routes } from '@angular/router';
 import { productResolver } from './product.resolver';
+import { productListResolver } from './product-list.resolver';
 
 export const productRoutes: Routes = [
   {
     path: '',
+    resolve: { products: productListResolver },
     loadComponent: () =>
       import('./product-list/product-list.component').then(m => m.ProductListComponent),
   },

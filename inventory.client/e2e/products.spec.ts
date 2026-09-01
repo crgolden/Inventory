@@ -46,7 +46,7 @@ test.describe('Products', () => {
       await page.goto('/products/new');
       await page.locator('#name').fill(productName);
       await page.locator('#product-form-submit').click();
-      await page.waitForURL('/products');
+      await page.waitForURL(/\/products\/[^/]+$/);
     });
 
     test.afterEach(async ({ page }) => {

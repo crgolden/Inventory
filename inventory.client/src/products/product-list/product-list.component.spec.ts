@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ProductListComponent } from './product-list.component';
 import { ProductService } from '../product.service';
 import { By } from '@angular/platform-browser';
-import { provideRouter, Routes } from '@angular/router';
+import { ActivatedRoute, provideRouter, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { of } from 'rxjs';
 import { Product } from '../product.model';
@@ -61,7 +61,14 @@ describe('ProductListComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [ProductListComponent],
-      providers: [{ provide: ProductService, useValue: mockService }, provideRouter(testRoutes)],
+      providers: [
+        { provide: ProductService, useValue: mockService },
+        provideRouter(testRoutes),
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { data: { products: mockProducts } } },
+        },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ProductListComponent);

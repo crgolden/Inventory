@@ -204,7 +204,7 @@ Playwright suites (`Inventory.Tests.E2E` in C# and `inventory.client/e2e` in Typ
 | Home hero CTAs | `browse-catalog-link`, `my-products-link`, `home-login-link` |
 | Home benefit cards | `benefit-card-{index}` |
 | Nav links | `nav-home`, `nav-catalog`, `nav-products`, `nav-login`, `nav-signout` |
-| My-Products heading / empty state / table | `products-heading`, `products-empty-state`, `products-table` |
+| My-Products heading / empty state / table / search | `products-heading`, `products-empty-state`, `products-table`, `product-search` |
 | My-Products row, name cell, actions | `product-row-{index}`, `product-name-{index}`, `view-product-{index}`, `edit-product-{index}`, `delete-product-{index}`, `confirm-delete-product-{index}` |
 | Catalog heading / empty state / table | `catalog-heading`, `catalog-empty-state`, `catalog-table` |
 | Catalog row, name cell, View link | `catalog-row-{index}`, `catalog-name-{index}`, `view-product-{index}` |
@@ -224,14 +224,67 @@ Two consequences worth stating, because both replaced a selector that had gone w
 
 ### TypeScript Playwright suite (`inventory.client/e2e`)
 
-**This suite is not run by CI** — the workflow's only frontend test step is `npx vitest run --coverage`. It also needs
+**This suite is not run by push/PR CI** — the deploy workflow's only frontend test step is `npx vitest run --coverage`. Its
+`synthetic` project does run on a schedule (see **Synthetic walker** below), which makes the scheduled walk this suite's
+recurring exercise against rot. It also needs
 `E2E_USERNAME` / `E2E_PASSWORD` for `auth.setup.ts`, which drives a **real** OIDC login against the Identity server and
 saves the session to `e2e/.auth/user.json` for the authenticated projects to reuse. `playwright.config.ts` starts both
 servers itself (`dotnet run --project ../Inventory.Server` and `npm start`) unless `SKIP_WEBSERVER=1` is set, which is
 the switch to use when they are already running locally. The setup selects Identity's own
-login form by id (`#Input_Email`, `#Input_Password`, `#login-submit`), which is what Razor's `asp-for="Input.Email"`
-emits. It previously used `getByLabel('Username')`, and Identity's label reads **"Email"** — a copy-bound selector that
-matched nothing, which is the defect rule 10 exists to catch.
+login form with `input[name='Input.Email']` / `input[name='Input.Password']` + `#login-submit` — the fleet rule-10
+exception for model-bound inputs (`AGENTS/TESTING.md`): Razor derives `name` and `id` from the same property path, so
+the name selector is the one that doesn't add a second thing to update on rename. It previously used
+`getByLabel('Username')`, and Identity's label reads **"Email"** — a copy-bound selector that matched nothing, which is
+the defect rule 10 exists to catch.
+
+### Synthetic walker
+
+`e2e/synthetic/walker.spec.ts` performs a **seeded random walk of the deployed app**: one real login through Identity
+(`/bff/login?returnUrl=…`), a sweep that deletes any leftover `Synthetic Walker Product` rows from a crashed prior run,
+then a weighted random sequence of actions — catalog and product browsing plus **scoped writes**: product
+create→edit→delete cycles under names `` `Synthetic Walker Product <seed>-<n>` ``, with a second sweep at run end so a
+normal run leaves zero rows. Edits never touch the `#name` prefix, or the orphan becomes unfindable. The manual-finder
+chat (`#manual-chat-send`) is deliberately excluded — it calls Azure OpenAI. It runs on a schedule from
+`.github/workflows/synthetic.yml` (twice daily, plus `workflow_dispatch` with a `seed` input) and is **never a merge
+gate**. Tests skip unless `SmokeBaseUrl` is set — the config's fleet-standard switch that also disables `webServer` and
+points `baseURL` at the deployed app.
+
+Environment contract:
+
+| Variable | Meaning |
+|---|---|
+| `SmokeBaseUrl` | Deployed app URL; disables `webServer`, overrides `baseURL` |
+| `SYNTHETIC_SEED` | **Required** decimal uint32; the whole walk derives from it |
+| `SYNTHETIC_STEPS` | Optional step budget override (default 40) |
+| `TEST_USERNAME` / `TEST_PASSWORD` | Identity test account; the email must be in Identity's `ReCAPTCHATestEmails` |
+| `SYNTHETIC_MARKER` | Must equal Identity's `ReCAPTCHASyntheticMarkerSecret`; sent as `X-Synthetic-Marker` on Identity-origin requests (redirect hops can carry it to this app's own origin; never to third parties) |
+
+Replay a failed walk with the seed from the job summary / failure message:
+
+```powershell
+$env:SYNTHETIC_SEED = '<seed>'; $env:SmokeBaseUrl = 'https://crgolden-inventory.azurewebsites.net'; npm run e2e:synthetic
+```
+
+Same seed ⇒ same RNG decisions given the same action availability; divergence caused by live-data drift is expected —
+the guarantee is the decision sequence.
+
+- **The seed is a run parameter, not unit-test data.** CODE-STYLE.md rule 11 is scoped to unit tests; do not "fix" the
+  walker by making the seed unrepeatable.
+- **The engine comes from `@crgolden/modules/synthetic-walker`** (the Modules repo). Installing it needs GitHub
+  Packages auth — CI uses the `PACKAGES_READ_TOKEN` secret; locally a `read:packages` PAT in your user `~/.npmrc`.
+  A 401 on the `@crgolden` scope during `npm ci` means the token is missing. This binds the **.NET build too**:
+  `inventory.client.esproj` runs `npm install` from inside `dotnet build`, so the CI build job carries
+  `NODE_AUTH_TOKEN` at job level, and a local `dotnet build` of the solution fails on the `@crgolden` scope
+  without the PAT (`-p:BuildProjectReferences=false` compiles a test project against existing outputs).
+- **The smoke and walker login account must be in Identity's `ReCAPTCHATestEmails`.** Since Identity's monitor-only
+  enforcement replaced the old email exemptions, both the C# smoke fixture and the walker send the
+  `X-Synthetic-Marker` header (env `ReCAPTCHASyntheticMarkerSecret` / `SYNTHETIC_MARKER`) on Identity-origin
+  requests; a "Request could not be verified." rejection at login means the marker or the membership is missing.
+- Walker traffic is identifiable by the User-Agent suffix `crgolden-synthetic/1.0`; the secret marker header goes to
+  Identity-origin requests and, via redirect propagation, this app's own origin — never to third-party hosts
+  (verified from a trace network log).
+- **GitHub disables scheduled workflows after 60 days without repo activity in public repos**; a push, a
+  `workflow_dispatch`, or the Actions UI re-enables it. Schedules fire from `master` only.
 
 ### Manuals API mocking
 

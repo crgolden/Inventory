@@ -50,11 +50,9 @@ public sealed class ProductCrudTests
         var (ctx, page) = await _fixture.NewProductsPageAsync();
         await using (ctx)
         {
-            var searchInput = page.Locator("#product-search");
-            await searchInput.FillAsync("dyson");
-
-            await Task.Delay(400, TestContext.Current.CancellationToken);
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await page.RunAndWaitForResponseAsync(
+                () => page.FillAsync("#product-search", "dyson"),
+                response => response.Url.Contains("$filter=", StringComparison.Ordinal));
 
             await Assertions.Expect(page.Locator("[id^='product-row-']")).ToHaveCountAsync(1);
             await Assertions.Expect(page.Locator("#product-row-0")).ToContainTextAsync("Dyson Vacuum");
@@ -70,11 +68,9 @@ public sealed class ProductCrudTests
         var (ctx, page) = await _fixture.NewProductsPageAsync();
         await using (ctx)
         {
-            var searchInput = page.Locator("#product-search");
-            await searchInput.FillAsync("zzznomatch");
-
-            await Task.Delay(400, TestContext.Current.CancellationToken);
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            await page.RunAndWaitForResponseAsync(
+                () => page.FillAsync("#product-search", "zzznomatch"),
+                response => response.Url.Contains("$filter=", StringComparison.Ordinal));
 
             await Assertions.Expect(page.Locator("#products-empty-state")).ToContainTextAsync("zzznomatch");
         }
