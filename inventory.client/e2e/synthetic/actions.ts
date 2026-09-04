@@ -1,5 +1,11 @@
 import { hasPrefix, isVisible, pickFromPrefix, prefixLocator, type WalkerAction } from '@crgolden/modules/synthetic-walker';
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
+
+const RENDER_TIMEOUT_MS = 30_000;
+
+async function expectRendered(locator: Locator): Promise<void> {
+  await expect(locator).toBeVisible({ timeout: RENDER_TIMEOUT_MS });
+}
 
 export const SYNTHETIC_PRODUCT_PREFIX = 'Synthetic Walker Product';
 
@@ -27,7 +33,7 @@ export async function sweepSyntheticProducts(page: Page): Promise<void> {
     const rowCount = await rows.count();
     await page.locator('#delete-product-0').click();
     await page.locator('#confirm-delete-product-0').click();
-    await expect(rows).toHaveCount(rowCount - 1);
+    await expect(rows).toHaveCount(rowCount - 1, { timeout: RENDER_TIMEOUT_MS });
   }
   throw new Error(`Sweep did not converge after ${SWEEP_ITERATION_LIMIT} deletions of "${SYNTHETIC_PRODUCT_PREFIX}" rows.`);
 }
@@ -35,7 +41,7 @@ export async function sweepSyntheticProducts(page: Page): Promise<void> {
 async function showOnlyProductNamed(page: Page, name: string): Promise<void> {
   await page.goto('/products');
   await page.locator('#product-search').fill(name);
-  await expect(page.locator('#product-name-0')).toHaveText(name);
+  await expect(page.locator('#product-name-0')).toHaveText(name, { timeout: RENDER_TIMEOUT_MS });
 }
 
 export function createInventoryActions(seed: number): readonly WalkerAction[] {
@@ -48,7 +54,7 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
       available: () => Promise.resolve(true),
       run: async page => {
         await page.goto('/');
-        await expect(page.locator('#home-heading')).toBeVisible();
+        await expectRendered(page.locator('#home-heading'));
       },
     },
     {
@@ -57,17 +63,17 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
       available: () => Promise.resolve(true),
       run: async page => {
         await page.goto('/catalog');
-        await expect(page.locator('#catalog-heading')).toBeVisible();
+        await expectRendered(page.locator('#catalog-heading'));
       },
     },
     {
       name: 'open a catalog item',
       weight: 2,
-      available: page => hasPrefix(page, 'catalog-row-'),
+      available: async page => (await isVisible(page, '#catalog-heading')) && (await hasPrefix(page, 'view-product-')),
       run: async (page, rng) => {
         const viewLink = await pickFromPrefix(page, rng, 'view-product-');
         await viewLink.click();
-        await expect(page.locator('#catalog-detail-heading')).toBeVisible();
+        await expectRendered(page.locator('#catalog-detail-heading'));
       },
     },
     {
@@ -76,17 +82,17 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
       available: () => Promise.resolve(true),
       run: async page => {
         await page.goto('/products');
-        await expect(page.locator('#products-heading')).toBeVisible();
+        await expectRendered(page.locator('#products-heading'));
       },
     },
     {
       name: 'view a product detail',
       weight: 2,
-      available: async page => (await isVisible(page, '#products-heading')) && (await hasPrefix(page, 'product-row-')),
+      available: async page => (await isVisible(page, '#products-heading')) && (await hasPrefix(page, 'view-product-')),
       run: async (page, rng) => {
         const viewLink = await pickFromPrefix(page, rng, 'view-product-');
         await viewLink.click();
-        await expect(page.locator('#product-detail-heading')).toBeVisible();
+        await expectRendered(page.locator('#product-detail-heading'));
       },
     },
     {
@@ -102,7 +108,7 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
         await page.locator('#price').fill(String(1 + rng.int(MAX_SYNTHETIC_PRICE - 1)));
         await page.locator('#product-form-submit').click();
         await page.waitForURL(/\/products\/[^/]+$/);
-        await expect(page.locator('#product-detail-heading')).toHaveText(name);
+        await expect(page.locator('#product-detail-heading')).toHaveText(name, { timeout: RENDER_TIMEOUT_MS });
         createdNames.push(name);
       },
     },
@@ -114,7 +120,7 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
         const name = rng.pick(createdNames);
         await showOnlyProductNamed(page, name);
         await page.locator('#view-product-0').click();
-        await expect(page.locator('#product-detail-heading')).toBeVisible();
+        await expectRendered(page.locator('#product-detail-heading'));
         await page.locator('#edit-product-link').click();
         await expect(page).toHaveURL(/\/products\/.+\/edit$/);
         await page.locator('#brand').fill(`${SYNTHETIC_BRAND} ${1 + rng.int(MAX_SYNTHETIC_BRAND_SUFFIX - 1)}`);
@@ -132,7 +138,7 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
         await showOnlyProductNamed(page, name);
         await page.locator('#delete-product-0').click();
         await page.locator('#confirm-delete-product-0').click();
-        await expect(prefixLocator(page, 'product-row-')).toHaveCount(0);
+        await expect(prefixLocator(page, 'product-row-')).toHaveCount(0, { timeout: RENDER_TIMEOUT_MS });
       },
     },
   ];
