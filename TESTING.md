@@ -11,9 +11,12 @@ Unit test coding standards (MockBehavior.Strict, argument verification, SetupSeq
 | Backend unit | `Category=Unit` | `Inventory.Tests.Unit` | No | No | Every push/PR |
 | Frontend unit | Vitest | `inventory.client` | No | No | Every push/PR |
 | E2E (regression) | `Category=E2E` | `Inventory.Tests.E2E` | No — test server is a static-file-only Kestrel host; all API routes are Playwright mocks | Yes (for static files) | Every push/PR |
-| E2E (smoke) | `Category=Smoke` | `Inventory.Tests.E2E` | No — targets the deployed app directly | No | Post-deploy only |
+| Synthetic walker | Playwright (`--project=synthetic`) | `inventory.client/e2e/synthetic` | No — targets the deployed app directly | No | Scheduled only, never a merge gate |
 
-Smoke tests carry only `[Trait("Category", "Smoke")]` — they are **not** also tagged `E2E`, so the `Category=E2E` filter does not pick them up. They compile into the same binary as the regression E2E tests but run in a different mode: when `SmokeBaseUrl` is set, `PlaywrightFixture` skips `InventoryWebApplicationFactory` entirely and points Playwright straight at that URL. CI sets `SmokeBaseUrl` to the Azure App Service URL emitted by the deploy step.
+**The `Category=Smoke` tier no longer exists.** It was a stopgap until synthetic walkers existed; once they did it
+was duplicate coverage — the same product CRUD lifecycle, against the same deployed app, under the same account —
+that additionally needed a reCAPTCHA exemption to log in and had no sweep for the rows it left behind. It was
+deleted fleet-wide, along with `PlaywrightFixture`'s deployed-target mode. The walker replaces it.
 
 ---
 
@@ -101,34 +104,6 @@ dotnet build Inventory.Tests.E2E --configuration Debug
 .\Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe -trait "Category=E2E" -showLiveOutput
 ```
 
-### E2E tests (smoke subset only)
-
-Smoke tests require a running Inventory BFF and a real OIDC login. `InventoryWebApplicationFactory` is not started — Playwright talks directly to the target URL.
-
-Run via the committed helper script, which reads `AdminEmail` and `AdminPassword` from User Secrets (ID `5480cab8-b41b-4dae-8c41-dbc2c01a15e0`) so credentials never need to be set as OS environment variables.
-
-**Local (default):** targets the deployed `https://crgolden-inventory.azurewebsites.net`. The deployed Identity server must be configured with reCAPTCHA test keys (in Key Vault) so headless Playwright passes the reCAPTCHA v3 check.
-
-```powershell
-# From Inventory/
-.\Invoke-SmokeTests.ps1
-```
-
-**Against a different target:**
-
-```powershell
-.\Invoke-SmokeTests.ps1 -BaseUrl https://your-inventory-app.azurewebsites.net
-```
-
-To add credentials to User Secrets if not already present:
-
-```powershell
-dotnet user-secrets --project Inventory.Server set AdminEmail "<your-email>"
-dotnet user-secrets --project Inventory.Server set AdminPassword "<your-password>"
-```
-
-Credentials are required whenever `SmokeBaseUrl` is set — the fixture will throw if `AdminEmail` or `AdminPassword` is absent.
-
 ### Run all tests in sequence
 
 ```powershell
@@ -143,9 +118,8 @@ cd inventory.client && npx vitest run --coverage
 
 ## E2E test infrastructure
 
-`PlaywrightFixture` operates in two modes depending on whether `SmokeBaseUrl` is set:
+`PlaywrightFixture` has a single mode: it starts the in-process host and points Playwright at it.
 
-**Local / regression mode** (`SmokeBaseUrl` absent — used by `Category=E2E`):
 ```
 PlaywrightFixture (IAsyncLifetime)
   └── InventoryWebApplicationFactory (custom WebApplication host — NOT WebApplicationFactory<Program>)
@@ -156,22 +130,18 @@ PlaywrightFixture (IAsyncLifetime)
               All API calls (/bff/**, /products/api/**, /manuals/api/**, /catalog/api/**) are Playwright mocks
 ```
 
-**Smoke / post-deploy mode** (`SmokeBaseUrl` set — used by `Category=Smoke` in CI):
-```
-PlaywrightFixture (IAsyncLifetime)
-  └── (no InventoryWebApplicationFactory)
-  BaseAddress = SmokeBaseUrl  ← Playwright browser talks directly to the deployed app
-```
-
-In local/regression mode, all API requests are intercepted by Playwright route mocks. In smoke mode, real API calls reach the deployed app.
+Every API request is intercepted by a Playwright route mock; nothing reaches a deployed service.
+**The second mode this fixture used to carry — pointing at a deployed URL and performing a real OIDC
+login — was deleted with the smoke tier.** The deployed app is now exercised by the scheduled
+synthetic walker instead, which lives in the TypeScript suite. Removing that branch also removed
+`LoginAsync`, the storage-state plumbing, the `AdminEmail`/`AdminPassword` env reads, the
+`X-Synthetic-Marker` injection, and a 500-response collector that could no longer fire.
 
 ### Authentication
 
-Authentication behaviour differs between factory mode and smoke mode:
-
-**Factory mode** (`SmokeBaseUrl` absent — `Category=E2E` and local smoke runs):
-
-The fixture always uses a Playwright route mock for `/bff/user`, regardless of whether `AdminEmail` / `AdminPassword` are set. Real OIDC login is not attempted because the Kestrel test server listens on a random port that cannot be pre-registered as a redirect URI in the Identity server. The mock returns a synthetic user:
+The fixture always uses a Playwright route mock for `/bff/user`. Real OIDC login is not attempted,
+because the Kestrel test server listens on a random port that cannot be pre-registered as a redirect
+URI in the Identity server. The mock returns a synthetic user:
 
 ```
 { type: "sub",   value: "e2e-user-id" }
@@ -180,16 +150,9 @@ The fixture always uses a Playwright route mock for `/bff/user`, regardless of w
 { type: "sid",   value: "e2e-session" }
 ```
 
-**Smoke mode** (`SmokeBaseUrl` set — `Category=Smoke` in CI):
-
-`PlaywrightFixture.LoginAsync` performs a real OIDC login against the Identity server during fixture initialization. `AdminEmail` and `AdminPassword` are required; their absence causes a hard failure (`InvalidOperationException`).
-
-1. Navigates to `/bff/login?returnUrl=%2Fproducts` — starts the Duende BFF OIDC challenge.
-2. Fills the Identity server login form (`Input.Email` / `Input.Password`) and submits.
-3. Waits for the BFF callback to redirect back to `/products`.
-4. Saves the authenticated browser storage state (cookies) to a temp file.
-
-Each per-test context is then created with `StorageStatePath` set to this file, so every test starts with a real BFF session — the full OIDC flow, BFF session ticket, and auth guard are exercised.
+**The real OIDC exchange is therefore covered only by the synthetic walker**, which signs in through
+the deployed Identity with a passkey. A break in the PKCE flow surfaces there and nowhere else in
+this repo.
 
 ### Selector ids
 
@@ -246,23 +209,27 @@ create→edit→delete cycles under names `` `Synthetic Walker Product <seed>-<n
 normal run leaves zero rows. Edits never touch the `#name` prefix, or the orphan becomes unfindable. The manual-finder
 chat (`#manual-chat-send`) is deliberately excluded — it calls Azure OpenAI. It runs on a schedule from
 `.github/workflows/synthetic.yml` (twice daily, plus `workflow_dispatch` with a `seed` input) and is **never a merge
-gate**. Tests skip unless `SmokeBaseUrl` is set — the config's fleet-standard switch that also disables `webServer` and
+gate**. Tests skip unless `WalkerBaseUrl` is set — the config's fleet-standard switch that also disables `webServer` and
 points `baseURL` at the deployed app.
+
+**This walker is also what replaced the post-deploy smoke tier**, which was deleted fleet-wide. Smoke ran the same
+product CRUD lifecycle against the same deployed app under the same account, but needed a reCAPTCHA exemption to log
+in and had no sweep; the walker covers it without either.
 
 Environment contract:
 
 | Variable | Meaning |
 |---|---|
-| `SmokeBaseUrl` | Deployed app URL; disables `webServer`, overrides `baseURL` |
+| `WalkerBaseUrl` | Deployed app URL; disables `webServer`, overrides `baseURL` |
 | `SYNTHETIC_SEED` | **Required** decimal uint32; the whole walk derives from it |
 | `SYNTHETIC_STEPS` | Optional step budget override (default 40) |
-| `TEST_USERNAME` / `TEST_PASSWORD` | Identity test account; the email must be in Identity's `ReCAPTCHATestEmails` |
-| `SYNTHETIC_MARKER` | Must equal Identity's `ReCAPTCHASyntheticMarkerSecret`; sent as `X-Synthetic-Marker` on Identity-origin requests (redirect hops can carry it to this app's own origin; never to third parties) |
+| `EMAIL1` | Identity account the walker signs in as |
+| `PASSKEY_CREDENTIAL1` | That account's passkey, as the five-field JSON Playwright's virtual authenticator returns |
 
 Replay a failed walk with the seed from the job summary / failure message:
 
 ```powershell
-$env:SYNTHETIC_SEED = '<seed>'; $env:SmokeBaseUrl = 'https://crgolden-inventory.azurewebsites.net'; npm run e2e:synthetic
+$env:SYNTHETIC_SEED = '<seed>'; $env:WalkerBaseUrl = 'https://crgolden-inventory.azurewebsites.net'; npm run e2e:synthetic
 ```
 
 Same seed ⇒ same RNG decisions given the same action availability; divergence caused by live-data drift is expected —
@@ -276,13 +243,15 @@ the guarantee is the decision sequence.
   `inventory.client.esproj` runs `npm install` from inside `dotnet build`, so the CI build job carries
   `NODE_AUTH_TOKEN` at job level, and a local `dotnet build` of the solution fails on the `@crgolden` scope
   without the PAT (`-p:BuildProjectReferences=false` compiles a test project against existing outputs).
-- **The smoke and walker login account must be in Identity's `ReCAPTCHATestEmails`.** Since Identity's monitor-only
-  enforcement replaced the old email exemptions, both the C# smoke fixture and the walker send the
-  `X-Synthetic-Marker` header (env `ReCAPTCHASyntheticMarkerSecret` / `SYNTHETIC_MARKER`) on Identity-origin
-  requests; a "Request could not be verified." rejection at login means the marker or the membership is missing.
-- Walker traffic is identifiable by the User-Agent suffix `crgolden-synthetic/1.0`; the secret marker header goes to
-  Identity-origin requests and, via redirect propagation, this app's own origin — never to third-party hosts
-  (verified from a trace network log).
+- **The walker signs in with a passkey, not a password.** Identity evaluates the passkey branch *before* the
+  CAPTCHA, so this is a first-class production auth path rather than an exemption — there is no marker header,
+  no email allowlist, and no test-only code in Identity's authentication handler. No password is stored in CI.
+  A login failure here means the credential in `PASSKEY_CREDENTIAL1` has been revoked, rotated, or drifted from
+  what Identity stores; the walker dashboard shows that as `succeeded="false"` bars rather than as silence.
+  Accounts and the enrollment runbook: `Tools/Identity/AGENTS.md` (private repo).
+- Walker traffic is identifiable by the User-Agent suffix `crgolden-synthetic/1.0`, and **that suffix is a
+  contract** — five Tempo dashboard panels and Identity's `identity.login.passkey_signins` counter both key on
+  it. It is an observability dimension only: no authentication or authorization decision reads it.
 - **GitHub disables scheduled workflows after 60 days without repo activity in public repos**; a push, a
   `workflow_dispatch`, or the Actions UI re-enables it. Schedules fire from `master` only.
 
@@ -327,29 +296,22 @@ Covers the embedded `ManualChatPanelComponent` on `/products/new`. All `/manuals
 5. Cache + install Playwright Chromium
 6. E2E tests with coverage (`dotnet-coverage collect … --filter-trait Category=E2E`)
 7. Upload TRX artifacts (`Inventory.Tests.E2E/bin/Release/net10.0/TestResults/`)
-8. Upload test binaries artifact (`Inventory.Tests.E2E/bin/Release/net10.0/`) — consumed by the smoke job
-9. Publish app + SonarCloud analysis
+8. Publish app + SonarCloud analysis
 
-### Smoke job (post-deploy, `main` only)
-
-Runs after the deploy job. Downloads the pre-built `test-binaries` artifact from the build job (no source checkout, no rebuild). Sets `SmokeBaseUrl` to the deployed Azure App Service URL emitted by the deploy step, and `AdminEmail` / `AdminPassword` for real OIDC login. All `/manuals/api/**` calls are still intercepted by Playwright route mocks — no real Manuals service is contacted. No Azure CLI login is needed (no Key Vault, no `InventoryWebApplicationFactory`).
-
-1. Download `test-binaries` artifact
-2. Set `SmokeBaseUrl`, `AdminEmail`, `AdminPassword`
-3. Cache + install Playwright Chromium
-4. Run `-trait "Category=Smoke"` (subset of E2E) via the compiled exe; write TRX via `-trx`
-5. Upload TRX artifacts
+There is no post-deploy job. The deployed app is exercised by the scheduled **synthetic walker**
+(`.github/workflows/synthetic.yml`), which runs from the TypeScript suite and signs in through Identity with a
+passkey. The `test-binaries` artifact that existed only to feed the old smoke job went with it.
 
 ### Playwright browser cache
 
-Both the build and smoke jobs cache the Playwright Chromium binary keyed on the hash of `Inventory.Tests.E2E/Inventory.Tests.E2E.csproj`. The cache is stored at `~\AppData\Local\ms-playwright` on Windows runners.
+The build job caches the Playwright Chromium binary keyed on the hash of `Inventory.Tests.E2E/Inventory.Tests.E2E.csproj`. The cache is stored at `~\AppData\Local\ms-playwright` on Windows runners.
 
 ### Playwright reporting
 
-`Inventory.Tests.E2E` records Playwright diagnostics for every E2E/smoke browser context, then keeps them only when the xUnit test fails. Retained failure folders are written under:
+`Inventory.Tests.E2E` records Playwright diagnostics for every E2E browser context, then keeps them only when the xUnit test fails. Retained failure folders are written under:
 
 ```text
-Inventory.Tests.E2E/bin/<Configuration>/net10.0/TestResults/PlaywrightArtifacts/<E2E|Smoke>/<test-name>/<context-id>/
+Inventory.Tests.E2E/bin/<Configuration>/net10.0/TestResults/PlaywrightArtifacts/E2E/<test-name>/<context-id>/
 ```
 
 Each retained folder contains:
@@ -365,7 +327,7 @@ CI uploads these artifacts separately from TRX:
 | Job | Artifact |
 |---|---|
 | Build E2E | `inventory-playwright-artifacts` |
-| Post-deploy smoke | `inventory-smoke-playwright-artifacts` |
+| Synthetic walker | `synthetic-playwright-report`, `synthetic-playwright-artifacts` |
 
 GitHub Actions artifacts are the only reporting destination. The workflow steps that used to mirror the same TRX outcomes to Azure DevOps test runs and Azure Monitor custom events are retired and removed.
 

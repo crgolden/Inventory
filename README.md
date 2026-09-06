@@ -4,6 +4,8 @@
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=crgolden_Inventory&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=crgolden_Inventory)
 
+[![Synthetic walker](https://github.com/crgolden/Inventory/actions/workflows/synthetic.yml/badge.svg)](https://github.com/crgolden/Inventory/actions/workflows/synthetic.yml)
+
 A full-stack single-page application built with **Angular 22** and **ASP.NET Core 10**, using the [Backend-for-Frontend (BFF)](https://www.duendesoftware.com/products/bff) security pattern to handle OIDC authentication on the server side.
 
 ## Sibling Applications
@@ -163,7 +165,7 @@ The Angular dev server proxies `/bff` and other API paths to `https://localhost:
 Inventory.Server/     # ASP.NET Core 10 BFF — OIDC session, API proxy, data protection
 inventory.client/     # Angular 22 SPA — signals, BFF session, chat and product UI
 Inventory.Tests.Unit/ # xUnit v3 — backend unit tests (Moq)
-Inventory.Tests.E2E/  # xUnit v3 — E2E/smoke tests (Playwright/Chromium)
+Inventory.Tests.E2E/  # xUnit v3 — E2E tests (Playwright/Chromium)
 ```
 
 ## Commands

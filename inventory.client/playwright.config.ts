@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const smokeBaseUrl = process.env['SmokeBaseUrl']?.replace(/\/$/, '');
+const walkerBaseUrl = process.env['WalkerBaseUrl']?.replace(/\/$/, '');
 
 export default defineConfig({
   testDir: './e2e',
@@ -11,12 +11,12 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }], ['junit', { outputFile: 'playwright-results.xml' }]],
 
   use: {
-    baseURL: smokeBaseUrl ?? 'https://localhost:50212',
+    baseURL: walkerBaseUrl ?? 'https://localhost:50212',
     ignoreHTTPSErrors: true,
     trace: 'on-first-retry',
   },
 
-  webServer: (smokeBaseUrl || process.env['SKIP_WEBSERVER']) ? [] : [
+  webServer: (walkerBaseUrl || process.env['SKIP_WEBSERVER']) ? [] : [
     {
       command: 'dotnet run --project ../Inventory.Server',
       url: 'https://localhost:7150/healthz',

@@ -1,34 +1,17 @@
 namespace Inventory.Tests.E2E.Infrastructure;
 
-using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 public sealed partial class PlaywrightFixture : IAsyncLifetime
 {
-    internal const string SyntheticMarkerHeaderName = "X-Synthetic-Marker";
-    internal const string IdentityOrigin = "https://crgolden-identity.azurewebsites.net";
-
-    private static readonly bool CI =
-        bool.TryParse(Environment.GetEnvironmentVariable("CI"), out var isCi) && isCi;
-
     private static readonly bool Headless =
         !string.Equals(Environment.GetEnvironmentVariable("PLAYWRIGHT_HEADED"), "1", StringComparison.OrdinalIgnoreCase);
-
-    private static readonly string? AdminEmail = Environment.GetEnvironmentVariable("AdminEmail");
-    private static readonly string? AdminPassword = Environment.GetEnvironmentVariable("AdminPassword");
-    private static readonly string? SmokeBaseUrl = Environment.GetEnvironmentVariable("SmokeBaseUrl");
-    private static readonly string? SyntheticMarker = Environment.GetEnvironmentVariable("ReCAPTCHASyntheticMarkerSecret");
-
-    public static bool IsSmoke => SmokeBaseUrl is not null;
-
-    private readonly ConcurrentQueue<string> _serverErrors = new();
 
     private IPlaywright? _playwright;
     private IBrowser? _browser;
     private string? _baseAddress;
-    private string? _storageStatePath;
 
     public PlaywrightFixture()
     {
@@ -39,13 +22,13 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
                 "00:03:00");
         }
 
-        Factory = SmokeBaseUrl is null ? new InventoryWebApplicationFactory() : null;
+        Factory = new InventoryWebApplicationFactory();
         ChatStore = new InMemoryChatsStore();
         ProductStore = new InMemoryProductsStore();
         CatalogStore = new InMemoryCatalogStore();
     }
 
-    public InventoryWebApplicationFactory? Factory { get; }
+    public InventoryWebApplicationFactory Factory { get; }
 
     public InMemoryChatsStore ChatStore { get; }
 
@@ -56,53 +39,16 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
     public string BaseAddress =>
         _baseAddress ?? throw new InvalidOperationException("BaseAddress is not available until InitializeAsync has run.");
 
-    public IReadOnlyList<string> ServerErrors => [.. _serverErrors.Distinct()];
-
-    public void ThrowIfServerErrors(string stage)
-    {
-        var errors = ServerErrors;
-        if (errors.Count == 0)
-        {
-            return;
-        }
-
-        throw new InvalidOperationException(
-            $"The deployed API returned server errors during {stage}:{Environment.NewLine}{string.Join(Environment.NewLine, errors)}");
-    }
-
-    public Exception DescribeFailure(Exception failure)
-    {
-        var errors = ServerErrors;
-        return errors.Count == 0
-            ? failure
-            : new InvalidOperationException(
-                $"The deployed API returned server errors, which is the likely cause of the failure below:{Environment.NewLine}{string.Join(Environment.NewLine, errors)}",
-                failure);
-    }
-
     private static void Stage(string msg) =>
         Console.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] PlaywrightFixture: {msg}");
 
     public async ValueTask InitializeAsync()
     {
         Stage("InitializeAsync enter");
-        if (SmokeBaseUrl is { } smokeBaseUrl)
-        {
-            _baseAddress = smokeBaseUrl.TrimEnd('/');
-            Stage($"smoke mode base={BaseAddress}");
-        }
-        else if (Factory is { } factory)
-        {
-            Stage("Factory.StartAsync() enter");
-            await factory.StartAsync();
-            _baseAddress = factory.ServerAddress;
-            Stage($"Factory.StartAsync() done base={BaseAddress}");
-        }
-        else
-        {
-            throw new InvalidOperationException(
-                "Neither SmokeBaseUrl nor an InventoryWebApplicationFactory is available.");
-        }
+        Stage("Factory.StartAsync() enter");
+        await Factory.StartAsync();
+        _baseAddress = Factory.ServerAddress;
+        Stage($"Factory.StartAsync() done base={BaseAddress}");
 
         Stage("playwright install chromium enter");
         var exitCode = Microsoft.Playwright.Program.Main(["install", "chromium"]);
@@ -121,18 +67,10 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         });
         Stage("Chromium.LaunchAsync done");
 
-        if (SmokeBaseUrl is not null)
-        {
-            Stage("LoginAsync enter");
-            await LoginAsync();
-            Stage("LoginAsync done");
-        }
-
         Stage("warmup NewProductsPageAsync enter");
         var warmup = await NewProductsPageAsync();
         Stage("warmup NewProductsPageAsync done");
         await using (warmup.Context) { }
-        ThrowIfServerErrors("startup warm-up");
         Stage("InitializeAsync exit");
     }
 
@@ -143,11 +81,10 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             throw new InvalidOperationException("Browser is not initialized. Ensure InitializeAsync has been awaited.");
         }
 
-        var (session, page) = await PlaywrightArtifactRecorder.CreateSessionAsync(_browser, "Inventory", IsSmoke ? "Smoke" : "E2E", new BrowserNewContextOptions
+        var (session, page) = await PlaywrightArtifactRecorder.CreateSessionAsync(_browser, "Inventory", "E2E", new BrowserNewContextOptions
         {
             BaseURL = BaseAddress,
-            IgnoreHTTPSErrors = true,
-            StorageStatePath = _storageStatePath
+            IgnoreHTTPSErrors = true
         });
 
         page.SetDefaultTimeout(60_000);
@@ -156,58 +93,48 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         page.Response += (_, resp) =>
         {
             Stage($"RESP {resp.Status} {resp.Url}");
-            if (IsSmoke && resp.Status >= 500)
-            {
-                _serverErrors.Enqueue($"{resp.Status} {resp.Request.Method} {resp.Url}");
-            }
         };
         page.RequestFailed += (_, req) => Stage($"FAIL {req.Method} {req.Url} err={req.Failure}");
 
-        if (_storageStatePath is null)
+        await page.RouteAsync("**/bff/user", async route =>
         {
-            await page.RouteAsync("**/bff/user", async route =>
+            await route.FulfillAsync(new RouteFulfillOptions
             {
-                await route.FulfillAsync(new RouteFulfillOptions
+                Status = 200,
+                ContentType = "application/json",
+                Body = JsonSerializer.Serialize(new object[]
                 {
-                    Status = 200,
-                    ContentType = "application/json",
-                    Body = JsonSerializer.Serialize(new object[]
-                    {
-                        new { type = "sub", value = "e2e-user-id" },
-                        new { type = "name", value = "E2E Test User" },
-                        new { type = "email", value = "e2e@test.invalid" },
-                        new { type = "sid", value = "e2e-session" },
-                    })
-                });
+                    new { type = "sub", value = "e2e-user-id" },
+                    new { type = "name", value = "E2E Test User" },
+                    new { type = "email", value = "e2e@test.invalid" },
+                    new { type = "sid", value = "e2e-session" },
+                })
             });
-        }
+        });
 
-        if (!IsSmoke)
+        await page.RouteAsync("**/products/api/odata/**", async route =>
         {
-            await page.RouteAsync("**/products/api/odata/**", async route =>
+            try
             {
-                try
-                {
-                    await DispatchProductsRouteAsync(route);
-                }
-                catch
-                {
-                    await route.FulfillAsync(new RouteFulfillOptions { Status = 500 });
-                }
-            });
+                await DispatchProductsRouteAsync(route);
+            }
+            catch
+            {
+                await route.FulfillAsync(new RouteFulfillOptions { Status = 500 });
+            }
+        });
 
-            await page.RouteAsync("**/manuals/api/**", async route =>
+        await page.RouteAsync("**/manuals/api/**", async route =>
+        {
+            try
             {
-                try
-                {
-                    await DispatchManualsRouteAsync(route);
-                }
-                catch
-                {
-                    await route.FulfillAsync(new RouteFulfillOptions { Status = 500 });
-                }
-            });
-        }
+                await DispatchManualsRouteAsync(route);
+            }
+            catch
+            {
+                await route.FulfillAsync(new RouteFulfillOptions { Status = 500 });
+            }
+        });
 
         await page.GotoAsync("/products", new PageGotoOptions
         {
@@ -230,7 +157,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             throw new InvalidOperationException("Browser is not initialized. Ensure InitializeAsync has been awaited.");
         }
 
-        var (session, page) = await PlaywrightArtifactRecorder.CreateSessionAsync(_browser, "Inventory", IsSmoke ? "Smoke" : "E2E", new BrowserNewContextOptions
+        var (session, page) = await PlaywrightArtifactRecorder.CreateSessionAsync(_browser, "Inventory", "E2E", new BrowserNewContextOptions
         {
             BaseURL = BaseAddress,
             IgnoreHTTPSErrors = true,
@@ -241,47 +168,40 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         page.Response += (_, resp) =>
         {
             Stage($"RESP {resp.Status} {resp.Url}");
-            if (IsSmoke && resp.Status >= 500)
-            {
-                _serverErrors.Enqueue($"{resp.Status} {resp.Request.Method} {resp.Url}");
-            }
         };
         page.RequestFailed += (_, req) => Stage($"FAIL {req.Method} {req.Url} err={req.Failure}");
 
-        if (!IsSmoke)
+        await page.RouteAsync("**/bff/user", async route =>
         {
-            await page.RouteAsync("**/bff/user", async route =>
-            {
-                await route.FulfillAsync(new RouteFulfillOptions { Status = 401 });
-            });
+            await route.FulfillAsync(new RouteFulfillOptions { Status = 401 });
+        });
 
-            await page.RouteAsync("**/bff/login**", async route =>
+        await page.RouteAsync("**/bff/login**", async route =>
+        {
+            await route.FulfillAsync(new RouteFulfillOptions
             {
-                await route.FulfillAsync(new RouteFulfillOptions
-                {
-                    Status = 200,
-                    ContentType = "text/html",
-                    Body = """
-                        <!doctype html>
-                        <html><body>
-                        <script>window.parent.postMessage({ source: 'bff-silent-login', isLoggedIn: false }, '*');</script>
-                        </body></html>
-                        """
-                });
+                Status = 200,
+                ContentType = "text/html",
+                Body = """
+                    <!doctype html>
+                    <html><body>
+                    <script>window.parent.postMessage({ source: 'bff-silent-login', isLoggedIn: false }, '*');</script>
+                    </body></html>
+                    """
             });
+        });
 
-            await page.RouteAsync("**/catalog/api/odata/**", async route =>
+        await page.RouteAsync("**/catalog/api/odata/**", async route =>
+        {
+            try
             {
-                try
-                {
-                    await DispatchCatalogRouteAsync(route);
-                }
-                catch
-                {
-                    await route.FulfillAsync(new RouteFulfillOptions { Status = 500 });
-                }
-            });
-        }
+                await DispatchCatalogRouteAsync(route);
+            }
+            catch
+            {
+                await route.FulfillAsync(new RouteFulfillOptions { Status = 500 });
+            }
+        });
 
         await page.GotoAsync("/catalog", new PageGotoOptions
         {
@@ -305,59 +225,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         }
 
         _playwright?.Dispose();
-        if (Factory is not null)
-        {
-            await Factory.DisposeAsync();
-        }
-
-        if (_storageStatePath is not null && File.Exists(_storageStatePath))
-        {
-            File.Delete(_storageStatePath);
-        }
-    }
-
-    private async Task LoginAsync()
-    {
-        var adminEmail = AdminEmail
-            ?? throw new InvalidOperationException("AdminEmail must be set when SmokeBaseUrl is configured.");
-        var adminPassword = AdminPassword
-            ?? throw new InvalidOperationException("AdminPassword must be set when SmokeBaseUrl is configured.");
-        var syntheticMarker = SyntheticMarker
-            ?? throw new InvalidOperationException("ReCAPTCHASyntheticMarkerSecret must be set when SmokeBaseUrl is configured. The login account gets monitor-only reCAPTCHA enforcement only when the request carries the synthetic marker.");
-        var browser = _browser
-            ?? throw new InvalidOperationException("Browser is not initialized. Ensure InitializeAsync has been awaited.");
-
-        _storageStatePath = Path.GetTempFileName();
-
-        await using var context = await browser.NewContextAsync(new BrowserNewContextOptions
-        {
-            BaseURL = BaseAddress,
-            IgnoreHTTPSErrors = true
-        });
-        await context.RouteAsync($"{IdentityOrigin}/**", route =>
-        {
-            var headers = new Dictionary<string, string>(route.Request.Headers)
-            {
-                [SyntheticMarkerHeaderName] = syntheticMarker
-            };
-            return route.ContinueAsync(new RouteContinueOptions { Headers = headers });
-        });
-        var page = await context.NewPageAsync();
-
-        if (CI)
-        {
-            page.SetDefaultTimeout(60_000);
-        }
-
-        await page.GotoAsync("/bff/login?returnUrl=%2Fproducts");
-
-        await page.FillAsync("input[name='Input.Email']", adminEmail);
-        await page.FillAsync("input[name='Input.Password']", adminPassword);
-        await page.ClickAsync("#login-submit");
-
-        await page.WaitForURLAsync("**/products**");
-
-        await context.StorageStateAsync(new() { Path = _storageStatePath });
+        await Factory.DisposeAsync();
     }
 
     private async Task DispatchCatalogRouteAsync(IRoute route)
