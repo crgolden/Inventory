@@ -8,7 +8,12 @@ import { ProductService } from './product.service';
 export const productResolver: ResolveFn<Product> = route => {
   const productService = inject(ProductService);
   const router = inject(Router);
-  const id = route.paramMap.get('id')!;
+  const id = route.paramMap.get('id');
+
+  if (id === null) {
+    void router.navigate(['/products/not-found']);
+    return EMPTY;
+  }
 
   return productService.getById(id).pipe(
     catchError((err: HttpErrorResponse) => {

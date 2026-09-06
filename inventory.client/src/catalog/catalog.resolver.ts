@@ -8,7 +8,12 @@ import { CatalogService } from './catalog.service';
 export const catalogResolver: ResolveFn<Product> = route => {
   const catalogService = inject(CatalogService);
   const router = inject(Router);
-  const id = route.paramMap.get('id')!;
+  const id = route.paramMap.get('id');
+
+  if (id === null) {
+    void router.navigate(['/catalog/not-found']);
+    return EMPTY;
+  }
 
   return catalogService.getById(id).pipe(
     catchError((err: HttpErrorResponse) => {
