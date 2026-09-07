@@ -10,7 +10,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { productResolver } from './product.resolver';
 import { ProductService } from './product.service';
-import { Product } from './product.model';
+import { InventoryItemView } from './inventory-item.model';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
@@ -20,22 +20,24 @@ const testRoutes = [
   { path: 'products/not-found', component: DummyComponent },
 ];
 
-const mockProduct: Product = {
+const mockProduct: InventoryItemView = {
   id: 'aaaaaaaa-0000-0000-0000-000000000001',
+  catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000001',
   name: 'LG TV',
-  price: 1299.99,
   brand: 'LG',
   modelNumber: 'OLED65C3',
+  category: null,
+  manualUrl: null,
+  msrpPrice: 1499.99,
   serialNumber: null,
   purchaseDate: null,
-  category: null,
+  pricePaid: 1299.99,
   description: null,
-  manualUrl: null,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: null,
 };
 
-function makeSnapshot(id: string): ActivatedRouteSnapshot {
+function makeSnapshot(id: string | null): ActivatedRouteSnapshot {
   return {
     paramMap: { get: (key: string) => (key === 'id' ? id : null) },
   } as unknown as ActivatedRouteSnapshot;
@@ -52,10 +54,50 @@ describe('productResolver', () => {
 
     const result$ = TestBed.runInInjectionContext(() =>
       productResolver(makeSnapshot(mockProduct.id), {} as RouterStateSnapshot),
-    ) as Observable<Product>;
+    ) as Observable<InventoryItemView>;
 
     const product = await firstValueFrom(result$);
     expect(product).toEqual(mockProduct);
+  });
+
+  it('navigates to /products/not-found without calling the service when the route has no id', async () => {
+    const getById = vi.fn();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ProductService, useValue: { getById } },
+        provideRouter(testRoutes),
+      ],
+    });
+
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const result$ = TestBed.runInInjectionContext(() =>
+      productResolver(makeSnapshot(null), {} as RouterStateSnapshot),
+    ) as Observable<InventoryItemView>;
+
+    await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
+    expect(getById).not.toHaveBeenCalled();
+    expect(navigateSpy).toHaveBeenCalledWith(['/products/not-found']);
+  });
+
+  it('navigates to /products/not-found when the id is absent from the owner-scoped projection', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ProductService, useValue: { getById: () => of(null) } },
+        provideRouter(testRoutes),
+      ],
+    });
+
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const result$ = TestBed.runInInjectionContext(() =>
+      productResolver(makeSnapshot('someone-elses-id'), {} as RouterStateSnapshot),
+    ) as Observable<InventoryItemView>;
+
+    await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
+    expect(navigateSpy).toHaveBeenCalledWith(['/products/not-found']);
   });
 
   it('navigates to /products/not-found when getById returns 404', async () => {
@@ -77,7 +119,7 @@ describe('productResolver', () => {
 
     const result$ = TestBed.runInInjectionContext(() =>
       productResolver(makeSnapshot('missing-id'), {} as RouterStateSnapshot),
-    ) as Observable<Product>;
+    ) as Observable<InventoryItemView>;
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
     expect(navigateSpy).toHaveBeenCalledWith(['/products/not-found']);
@@ -102,7 +144,7 @@ describe('productResolver', () => {
 
     const result$ = TestBed.runInInjectionContext(() =>
       productResolver(makeSnapshot('any-id'), {} as RouterStateSnapshot),
-    ) as Observable<Product>;
+    ) as Observable<InventoryItemView>;
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
     expect(navigateSpy).toHaveBeenCalledWith(['/products']);

@@ -51,9 +51,9 @@
               </button>
             </th>
             <th>
-              <button class="btn btn-link p-0 text-dark text-decoration-none fw-semibold" (click)="sortBy('Price')">
-                Price
-                @if (orderBy() === 'Price') { {{ orderDir() === 'asc' ? '▲' : '▼' }} }
+              <button id="sort-by-msrp-price" class="btn btn-link p-0 text-dark text-decoration-none fw-semibold" (click)="sortBy('MsrpPrice')">
+                List Price
+                @if (orderBy() === 'MsrpPrice') { {{ orderDir() === 'asc' ? '▲' : '▼' }} }
               </button>
             </th>
             <th></th>
@@ -65,7 +65,7 @@
               <td [attr.id]="'catalog-name-' + $index">{{ item.name ?? '—' }}</td>
               <td>{{ item.brand ?? '—' }}</td>
               <td>{{ item.category ?? '—' }}</td>
-              <td>{{ item.price !== null ? ('$' + item.price) : '—' }}</td>
+              <td>{{ item.msrpPrice !== null ? ('$' + item.msrpPrice) : '—' }}</td>
               <td class="text-end">
                 <a [attr.id]="'view-product-' + $index" class="btn btn-sm btn-outline-primary" [routerLink]="['/catalog', item.id]">View</a>
               </td>

@@ -6,9 +6,6 @@ using Microsoft.AspNetCore.Http;
 [Trait("Category", "Unit")]
 public sealed class TracedRequestsTests
 {
-    // Drawn from the SUT's own list rather than a hand-picked sample of it: the previous three literals
-    // covered 3 of the 12 extensions production declares, so adding a thirteenth would have shipped
-    // untested. Sourcing the theory here means the coverage follows the production array automatically.
     public static TheoryData<string> DeclaredStaticAssetExtensions() =>
         [.. TracedRequests.StaticAssetExtensions];
 

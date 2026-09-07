@@ -91,7 +91,7 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             });
         });
 
-        await page.RouteAsync("**/products/api/odata/**", async route =>
+        await page.RouteAsync("**/products/api/**", async route =>
         {
             try
             {
@@ -207,14 +207,14 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         var uri = new Uri(request.Url);
 
         var path = uri.AbsolutePath;
-        var collectionIndex = path.LastIndexOf("/Products", StringComparison.OrdinalIgnoreCase);
+        var collectionIndex = path.LastIndexOf("/CatalogProducts", StringComparison.OrdinalIgnoreCase);
         if (collectionIndex < 0)
         {
             await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
             return;
         }
 
-        var remainder = path[(collectionIndex + "/Products".Length)..];
+        var remainder = path[(collectionIndex + "/CatalogProducts".Length)..];
 
         if (remainder.Length == 0 || string.Equals(remainder, "/", StringComparison.Ordinal))
         {
@@ -313,8 +313,8 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
         IEnumerable<InMemoryCatalogStore.CatalogRecord> ordered = orderBy switch
         {
-            "Price" when !orderDesc => allProducts.OrderBy(p => p.Price),
-            "Price" => allProducts.OrderByDescending(p => p.Price),
+            "MsrpPrice" when !orderDesc => allProducts.OrderBy(p => p.MsrpPrice),
+            "MsrpPrice" => allProducts.OrderByDescending(p => p.MsrpPrice),
             "Brand" when !orderDesc => allProducts.OrderBy(p => p.Brand, StringComparer.Ordinal),
             "Brand" => allProducts.OrderByDescending(p => p.Brand, StringComparer.Ordinal),
             "Category" when !orderDesc => allProducts.OrderBy(p => p.Category, StringComparer.Ordinal),
@@ -346,14 +346,11 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
     {
         Id = p.Id,
         Name = p.Name,
-        Price = p.Price,
         Brand = p.Brand,
-        ModelNumber = (string?)null,
-        SerialNumber = (string?)null,
-        PurchaseDate = (string?)null,
+        ModelNumber = p.ModelNumber,
         Category = p.Category,
-        Description = (string?)null,
         ManualUrl = p.ManualUrl,
+        MsrpPrice = p.MsrpPrice,
         CreatedAt = p.CreatedAt,
         UpdatedAt = (DateTimeOffset?)null,
     };
@@ -543,93 +540,86 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         var request = route.Request;
         var method = request.Method.ToUpperInvariant();
         var uri = new Uri(request.Url);
-
         var path = uri.AbsolutePath;
-        var collectionIndex = path.LastIndexOf("/Products", StringComparison.OrdinalIgnoreCase);
-        if (collectionIndex < 0)
+
+        if (path.EndsWith("/inventory/items", StringComparison.OrdinalIgnoreCase))
         {
-            await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
+            await HandleInventoryItemsAsync(route, method, uri, request);
             return;
         }
 
-        var remainder = path[(collectionIndex + "/Products".Length)..];
-
-        if (remainder.Length == 0 || string.Equals(remainder, "/", StringComparison.Ordinal))
+        var entityKey = KeyedEntityId(path, "/odata/InventoryItems");
+        if (entityKey is Guid itemId)
         {
-            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
-            var filter = query.TryGetValue("$filter", out var fv) ? fv.ToString() : null;
-            string? nameFilter = null;
-            if (!string.IsNullOrWhiteSpace(filter))
-            {
-                var match = ODataFilterRegex().Match(filter);
-                if (match.Success)
-                {
-                    nameFilter = match.Groups[1].Value;
-                }
-            }
+            await HandleSingleInventoryItemAsync(route, method, itemId, request);
+            return;
+        }
 
-            await HandleProductsCollectionAsync(route, method, nameFilter, request);
-        }
-        else if (remainder.StartsWith('(') && remainder.EndsWith(')'))
+        var catalogKey = KeyedEntityId(path, "/odata/CatalogProducts");
+        if (catalogKey is Guid catalogProductId)
         {
-            var idStr = remainder[1..^1];
-            if (!Guid.TryParse(idStr, out var id))
-            {
-                await route.FulfillAsync(new RouteFulfillOptions { Status = 400 });
-                return;
-            }
+            await HandleSingleCatalogProductAsync(route, method, catalogProductId, request);
+            return;
+        }
 
-            await HandleSingleProductAsync(route, method, id, request);
-        }
-        else
-        {
-            await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
-        }
+        await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
     }
 
-    private async Task HandleProductsCollectionAsync(IRoute route, string method, string? nameFilter, IRequest request)
+    private static Guid? KeyedEntityId(string path, string setPath)
+    {
+        var index = path.LastIndexOf(setPath, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+        {
+            return null;
+        }
+
+        var remainder = path[(index + setPath.Length)..];
+        if (!remainder.StartsWith('(') || !remainder.EndsWith(')'))
+        {
+            return null;
+        }
+
+        return Guid.TryParse(remainder[1..^1], out var id) ? id : null;
+    }
+
+    private async Task HandleInventoryItemsAsync(IRoute route, string method, Uri uri, IRequest request)
     {
         switch (method)
         {
             case "GET":
                 {
-                    var products = ProductStore.GetProducts(nameFilter);
+                    var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+                    var search = query.TryGetValue("search", out var sv) ? sv.ToString() : null;
                     await route.FulfillAsync(new RouteFulfillOptions
                     {
                         Status = 200,
                         ContentType = "application/json",
-                        Body = JsonSerializer.Serialize(new
-                        {
-                            value = products.Select(ProductToJson)
-                        })
+                        Body = JsonSerializer.Serialize(
+                            ProductStore.GetProducts(search).Select(InventoryItemViewToJson))
                     });
                     break;
                 }
 
             case "POST":
                 {
-                    var body = request.PostData ?? "{}";
-                    using var doc = JsonDocument.Parse(body);
+                    using var doc = JsonDocument.Parse(request.PostData ?? "{}");
                     var root = doc.RootElement;
                     var product = ProductStore.Create(
-                        name: root.TryGetProperty("name", out var n) ? n.GetString() : null,
-                        price: root.TryGetProperty("price", out var pr) && pr.ValueKind == JsonValueKind.Number ? pr.GetDecimal() : null,
-                        brand: root.TryGetProperty("brand", out var br) ? br.GetString() : null,
-                        modelNumber: root.TryGetProperty("modelNumber", out var mn) ? mn.GetString() : null,
-                        serialNumber: root.TryGetProperty("serialNumber", out var sn) ? sn.GetString() : null,
-                        purchaseDate: root.TryGetProperty("purchaseDate", out var pd) ? pd.GetString() : null,
-                        category: root.TryGetProperty("category", out var cat) ? cat.GetString() : null,
-                        description: root.TryGetProperty("description", out var desc) ? desc.GetString() : null,
-                        manualUrl: root.TryGetProperty("manualUrl", out var mu) ? mu.GetString() : null);
+                        name: ReadString(root, "name"),
+                        price: ReadDecimal(root, "pricePaid"),
+                        brand: ReadString(root, "brand"),
+                        modelNumber: ReadString(root, "modelNumber"),
+                        serialNumber: ReadString(root, "serialNumber"),
+                        purchaseDate: ReadString(root, "purchaseDate"),
+                        category: ReadString(root, "category"),
+                        description: ReadString(root, "description"),
+                        manualUrl: ReadString(root, "manualUrl"),
+                        msrpPrice: ReadDecimal(root, "msrpPrice"));
                     await route.FulfillAsync(new RouteFulfillOptions
                     {
                         Status = 201,
                         ContentType = "application/json",
-                        Headers = new Dictionary<string, string>
-                        {
-                            ["Location"] = $"/products/api/odata/Products({product.Id})"
-                        },
-                        Body = JsonSerializer.Serialize(ProductToJson(product))
+                        Body = JsonSerializer.Serialize(InventoryItemViewToJson(product))
                     });
                     break;
                 }
@@ -640,100 +630,33 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         }
     }
 
-    private async Task HandleSingleProductAsync(IRoute route, string method, Guid id, IRequest request)
+    private async Task HandleSingleInventoryItemAsync(IRoute route, string method, Guid id, IRequest request)
     {
         switch (method)
         {
-            case "GET":
-                {
-                    var product = ProductStore.GetProduct(id);
-                    if (product is null)
-                    {
-                        await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
-                        return;
-                    }
-
-                    await route.FulfillAsync(new RouteFulfillOptions
-                    {
-                        Status = 200,
-                        ContentType = "application/json",
-                        Body = JsonSerializer.Serialize(ProductToJson(product))
-                    });
-                    break;
-                }
-
-            case "PUT":
-                {
-                    var body = request.PostData ?? "{}";
-                    using var doc = JsonDocument.Parse(body);
-                    var root = doc.RootElement;
-                    var existing = ProductStore.GetProduct(id);
-                    if (existing is null)
-                    {
-                        await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
-                        return;
-                    }
-
-                    var replacement = new InMemoryProductsStore.ProductRecord(
-                        id,
-                        root.TryGetProperty("name", out var n) ? n.GetString() : null,
-                        root.TryGetProperty("price", out var pr) && pr.ValueKind == JsonValueKind.Number ? pr.GetDecimal() : null,
-                        root.TryGetProperty("brand", out var br) ? br.GetString() : null,
-                        root.TryGetProperty("modelNumber", out var mn) ? mn.GetString() : null,
-                        root.TryGetProperty("serialNumber", out var sn) ? sn.GetString() : null,
-                        root.TryGetProperty("purchaseDate", out var pd) ? pd.GetString() : null,
-                        root.TryGetProperty("category", out var cat) ? cat.GetString() : null,
-                        root.TryGetProperty("description", out var desc) ? desc.GetString() : null,
-                        root.TryGetProperty("manualUrl", out var mu) ? mu.GetString() : null,
-                        existing.CreatedAt,
-                        DateTimeOffset.UtcNow);
-                    var updated = ProductStore.Put(id, replacement)
-                        ?? throw new InvalidOperationException(
-                            $"Product '{id}' was read but could not be replaced in the in-memory store.");
-                    await route.FulfillAsync(new RouteFulfillOptions
-                    {
-                        Status = 200,
-                        ContentType = "application/json",
-                        Body = JsonSerializer.Serialize(ProductToJson(updated))
-                    });
-                    break;
-                }
-
             case "PATCH":
                 {
-                    var body = request.PostData ?? "{}";
-                    using var doc = JsonDocument.Parse(body);
+                    using var doc = JsonDocument.Parse(request.PostData ?? "{}");
                     var root = doc.RootElement;
-                    var updated = ProductStore.Patch(
+                    var updated = ProductStore.PatchItem(
                         id,
-                        name: root.TryGetProperty("name", out var n) ? n.GetString() : null,
-                        price: root.TryGetProperty("price", out var pr) && pr.ValueKind == JsonValueKind.Number ? pr.GetDecimal() : null,
-                        brand: root.TryGetProperty("brand", out var br) ? br.GetString() : null,
-                        modelNumber: root.TryGetProperty("modelNumber", out var mn) ? mn.GetString() : null,
-                        serialNumber: root.TryGetProperty("serialNumber", out var sn) ? sn.GetString() : null,
-                        purchaseDate: root.TryGetProperty("purchaseDate", out var pd) ? pd.GetString() : null,
-                        category: root.TryGetProperty("category", out var cat) ? cat.GetString() : null,
-                        description: root.TryGetProperty("description", out var desc) ? desc.GetString() : null,
-                        manualUrl: root.TryGetProperty("manualUrl", out var mu) ? mu.GetString() : null);
-                    if (updated is null)
+                        serialNumber: ReadString(root, "serialNumber"),
+                        purchaseDate: ReadString(root, "purchaseDate"),
+                        pricePaid: ReadDecimal(root, "pricePaid"),
+                        description: ReadString(root, "description"));
+                    await route.FulfillAsync(new RouteFulfillOptions
                     {
-                        await route.FulfillAsync(new RouteFulfillOptions { Status = 404 });
-                        return;
-                    }
-
-                    await route.FulfillAsync(new RouteFulfillOptions { Status = 204 });
+                        Status = updated is null ? 404 : 204
+                    });
                     break;
                 }
 
             case "DELETE":
+                await route.FulfillAsync(new RouteFulfillOptions
                 {
-                    var deleted = ProductStore.Delete(id);
-                    await route.FulfillAsync(new RouteFulfillOptions
-                    {
-                        Status = deleted ? 204 : 404
-                    });
-                    break;
-                }
+                    Status = ProductStore.Delete(id) ? 204 : 404
+                });
+                break;
 
             default:
                 await route.FulfillAsync(new RouteFulfillOptions { Status = 405 });
@@ -741,20 +664,54 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         }
     }
 
-    private static object ProductToJson(InMemoryProductsStore.ProductRecord p) => new
+    private async Task HandleSingleCatalogProductAsync(IRoute route, string method, Guid id, IRequest request)
     {
-        Id = p.Id,
-        Name = p.Name,
-        Price = p.Price,
-        Brand = p.Brand,
-        ModelNumber = p.ModelNumber,
-        SerialNumber = p.SerialNumber,
-        PurchaseDate = p.PurchaseDate,
-        Category = p.Category,
-        Description = p.Description,
-        ManualUrl = p.ManualUrl,
-        CreatedAt = p.CreatedAt,
-        UpdatedAt = p.UpdatedAt,
+        if (!string.Equals(method, "PATCH", StringComparison.Ordinal))
+        {
+            await route.FulfillAsync(new RouteFulfillOptions { Status = 405 });
+            return;
+        }
+
+        using var doc = JsonDocument.Parse(request.PostData ?? "{}");
+        var root = doc.RootElement;
+        var updated = ProductStore.PatchCatalogProduct(
+            id,
+            name: ReadString(root, "name"),
+            brand: ReadString(root, "brand"),
+            modelNumber: ReadString(root, "modelNumber"),
+            category: ReadString(root, "category"),
+            manualUrl: ReadString(root, "manualUrl"),
+            msrpPrice: ReadDecimal(root, "msrpPrice"));
+        await route.FulfillAsync(new RouteFulfillOptions
+        {
+            Status = updated is null ? 404 : 204
+        });
+    }
+
+    private static string? ReadString(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var value) ? value.GetString() : null;
+
+    private static decimal? ReadDecimal(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number
+            ? value.GetDecimal()
+            : null;
+
+    private static object InventoryItemViewToJson(InMemoryProductsStore.ProductRecord p) => new
+    {
+        id = p.Id,
+        catalogProductId = p.CatalogProductId,
+        name = p.Name,
+        brand = p.Brand,
+        modelNumber = p.ModelNumber,
+        category = p.Category,
+        manualUrl = p.ManualUrl,
+        msrpPrice = p.MsrpPrice,
+        serialNumber = p.SerialNumber,
+        purchaseDate = p.PurchaseDate,
+        pricePaid = p.PricePaid,
+        description = p.Description,
+        createdAt = p.CreatedAt,
+        updatedAt = p.UpdatedAt,
     };
 
     private async Task HandleStreamAsync(IRoute route, string chatId, IRequest request)

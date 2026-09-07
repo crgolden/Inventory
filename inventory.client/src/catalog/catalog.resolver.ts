@@ -2,10 +2,10 @@ import { inject } from '@angular/core';
 import { ResolveFn, Router } from '@angular/router';
 import { catchError, EMPTY } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Product } from '../products/product.model';
+import { CatalogProduct } from './catalog-product.model';
 import { CatalogService } from './catalog.service';
 
-export const catalogResolver: ResolveFn<Product> = route => {
+export const catalogResolver: ResolveFn<CatalogProduct> = route => {
   const catalogService = inject(CatalogService);
   const router = inject(Router);
   const id = route.paramMap.get('id');

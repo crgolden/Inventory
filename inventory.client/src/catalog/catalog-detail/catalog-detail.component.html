@@ -19,28 +19,16 @@
             <span class="float-end text-muted">{{ p.modelNumber }}</span>
           </li>
         }
-        @if (p.serialNumber) {
-          <li class="list-group-item">
-            <span class="fw-semibold">Serial Number</span>
-            <span class="float-end text-muted">{{ p.serialNumber }}</span>
-          </li>
-        }
         @if (p.category) {
           <li class="list-group-item">
             <span class="fw-semibold">Category</span>
             <span class="float-end text-muted">{{ p.category }}</span>
           </li>
         }
-        @if (p.purchaseDate) {
+        @if (p.msrpPrice !== null) {
           <li class="list-group-item">
-            <span class="fw-semibold">Purchase Date</span>
-            <span class="float-end text-muted">{{ p.purchaseDate }}</span>
-          </li>
-        }
-        @if (p.description) {
-          <li class="list-group-item">
-            <span class="fw-semibold">Description</span>
-            <p class="mb-0 mt-1 text-muted">{{ p.description }}</p>
+            <span class="fw-semibold">List Price</span>
+            <span class="float-end text-muted">{{ '$' + p.msrpPrice }}</span>
           </li>
         }
         @if (p.manualUrl) {

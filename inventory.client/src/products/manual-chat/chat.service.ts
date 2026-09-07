@@ -3,6 +3,22 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Chat, ChatHistoryMessage, ChatResponse } from './chat.model';
 
+interface StreamDelta {
+  delta: { content: string };
+}
+
+function isStreamDelta(value: unknown): value is StreamDelta {
+  if (typeof value !== 'object' || value === null || !('delta' in value)) {
+    return false;
+  }
+
+  const delta = (value as { delta: unknown }).delta;
+  return typeof delta === 'object'
+    && delta !== null
+    && 'content' in delta
+    && typeof (delta as { content: unknown }).content === 'string';
+}
+
 @Injectable({ providedIn: 'root' })
 export class ChatService {
 
@@ -78,12 +94,24 @@ export class ChatService {
                 subscriber.complete();
                 return;
               }
+              let parsed: unknown;
               try {
-                const parsed = JSON.parse(data) as { delta: { content: string } };
-                subscriber.next(parsed.delta.content);
+                parsed = JSON.parse(data);
               } catch {
-                continue;
+                subscriber.error(
+                  new Error(`The manual stream sent a frame that is not JSON: ${data}`)
+                );
+                return;
               }
+
+              if (!isStreamDelta(parsed)) {
+                subscriber.error(
+                  new Error(`The manual stream sent a frame carrying no delta.content: ${data}`)
+                );
+                return;
+              }
+
+              subscriber.next(parsed.delta.content);
             }
           }
 

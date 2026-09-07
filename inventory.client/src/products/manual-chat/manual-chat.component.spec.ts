@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { By } from '@angular/platform-browser';
 import { ManualChatComponent } from './manual-chat.component';
 import { ChatService } from './chat.service';
-import { of } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 describe('ManualChatComponent', () => {
   let fixture: ComponentFixture<ManualChatComponent>;
@@ -97,5 +97,53 @@ describe('ManualChatComponent', () => {
 
     expect(last.role).toBe('assistant');
     expect(last.content).toBe('Hello world');
+  });
+
+  it('a failed stream stops the spinner and tells the user, rather than going quiet', () => {
+    const chatService = TestBed.inject(ChatService);
+    vi.spyOn(chatService, 'streamMessage').mockReturnValue(
+      throwError(() => new Error('The manual stream sent a frame that is not JSON: {oops')),
+    );
+
+    component.chatId.set('chat-1');
+    component.input.set('Hi');
+    component.send();
+    fixture.detectChanges();
+
+    expect(component.streaming()).toBe(false);
+    const alert = fixture.debugElement.query(By.css('#manual-chat-error'));
+    expect(alert.nativeElement.textContent).toContain('stopped unexpectedly');
+  });
+
+  it('a failed chat creation tells the user instead of leaving the send button disabled forever', () => {
+    component.input.set('Find me the manual');
+    component.send();
+
+    httpMock
+      .expectOne('/manuals/api/chats')
+      .flush(null, { status: 503, statusText: 'Service Unavailable' });
+    fixture.detectChanges();
+
+    expect(component.streaming()).toBe(false);
+    const alert = fixture.debugElement.query(By.css('#manual-chat-error'));
+    expect(alert.nativeElement.textContent).toContain('Could not start a chat');
+  });
+
+  it('destroying the component tears the stream down instead of writing to a dead view', () => {
+    const chatService = TestBed.inject(ChatService);
+    const stream$ = new Subject<string>();
+    vi.spyOn(chatService, 'streamMessage').mockReturnValue(stream$.asObservable());
+
+    component.chatId.set('chat-1');
+    component.input.set('Hi');
+    component.send();
+    stream$.next('Hello');
+
+    const before = component.messages().at(-1)?.content;
+    fixture.destroy();
+    stream$.next(' world');
+
+    expect(before).toBe('Hello');
+    expect(component.messages().at(-1)?.content).toBe('Hello');
   });
 });

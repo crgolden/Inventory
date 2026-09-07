@@ -3,26 +3,31 @@ import { CatalogDetailComponent } from './catalog-detail.component';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes, ActivatedRoute } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
-import { Product } from '../../products/product.model';
+import { CatalogProduct } from '../catalog-product.model';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes: Routes = [{ path: 'catalog', component: DummyComponent }];
 
-const mockProduct: Product = {
+const mockProduct: CatalogProduct = {
   id: 'aaaaaaaa-0000-0000-0000-000000000001',
   name: 'Sony TV',
-  price: 999.99,
   brand: 'Sony',
   modelNumber: 'XR55A80K',
-  serialNumber: 'SN-SONY-001',
-  purchaseDate: '2023-11-24T14:30:00Z',
   category: 'Electronics',
-  description: null,
   manualUrl: null,
+  msrpPrice: 999.99,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: null,
+};
+
+const ownerPrivateFields = {
+  ownerId: 'PRIVATE-OWNER-DO-NOT-RENDER',
+  serialNumber: 'PRIVATE-SERIAL-DO-NOT-RENDER',
+  purchaseDate: 'PRIVATE-PURCHASE-DATE-DO-NOT-RENDER',
+  pricePaid: 'PRIVATE-PRICE-PAID-DO-NOT-RENDER',
+  description: 'PRIVATE-DESCRIPTION-DO-NOT-RENDER',
 };
 
 describe('CatalogDetailComponent', () => {
@@ -54,11 +59,12 @@ describe('CatalogDetailComponent', () => {
     expect(h2.nativeElement.textContent).toContain('Sony TV');
   });
 
-  it('renders brand, model number, and serial number', () => {
+  it('renders the universal catalog facts', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Sony');
     expect(text).toContain('XR55A80K');
-    expect(text).toContain('SN-SONY-001');
+    expect(text).toContain('Electronics');
+    expect(text).toContain('999.99');
   });
 
   it('shows a Back to Catalog link', () => {
@@ -79,10 +85,43 @@ describe('CatalogDetailComponent', () => {
   });
 });
 
+describe('CatalogDetailComponent — resolved data carrying owner-private fields', () => {
+  let fixture: ComponentFixture<CatalogDetailComponent>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [CatalogDetailComponent],
+      providers: [
+        provideRouter(testRoutes),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              paramMap: { get: () => mockProduct.id },
+              data: { product: { ...mockProduct, ...ownerPrivateFields } },
+            },
+          },
+        },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(CatalogDetailComponent);
+    fixture.detectChanges();
+  });
+
+  it('renders none of them, so the public page cannot leak another owner', () => {
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('XR55A80K');
+    for (const value of Object.values(ownerPrivateFields)) {
+      expect(text).not.toContain(value);
+    }
+  });
+});
+
 describe('CatalogDetailComponent — with manualUrl', () => {
   let fixture: ComponentFixture<CatalogDetailComponent>;
 
-  const productWithManual: Product = {
+  const productWithManual: CatalogProduct = {
     ...mockProduct,
     manualUrl: 'https://example.com/sony-tv-manual.pdf',
   };

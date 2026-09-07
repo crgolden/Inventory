@@ -6,7 +6,7 @@ import { ActivatedRoute, provideRouter, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Product } from '../product.model';
+import { InventoryItemView } from '../inventory-item.model';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
@@ -17,32 +17,36 @@ const testRoutes: Routes = [
   { path: 'products/:id/edit', component: DummyComponent },
 ];
 
-const mockProducts: Product[] = [
+const mockProducts: InventoryItemView[] = [
   {
     id: 'aaaaaaaa-0000-0000-0000-000000000001',
+    catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000001',
     name: 'TV',
-    price: 999.99,
     brand: 'LG',
     modelNumber: null,
+    category: 'Electronics',
+    manualUrl: null,
+    msrpPrice: 1099.99,
     serialNumber: null,
     purchaseDate: null,
-    category: 'Electronics',
+    pricePaid: 999.99,
     description: null,
-    manualUrl: null,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: null,
   },
   {
     id: 'aaaaaaaa-0000-0000-0000-000000000002',
+    catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000002',
     name: 'Vacuum',
-    price: null,
     brand: 'Dyson',
     modelNumber: null,
+    category: 'Home',
+    manualUrl: null,
+    msrpPrice: null,
     serialNumber: null,
     purchaseDate: null,
-    category: 'Home',
+    pricePaid: null,
     description: null,
-    manualUrl: null,
     createdAt: '2024-01-02T00:00:00Z',
     updatedAt: null,
   },

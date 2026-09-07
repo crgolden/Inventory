@@ -52,7 +52,7 @@ public sealed class ProductCrudTests
         {
             await page.RunAndWaitForResponseAsync(
                 () => page.FillAsync("#product-search", "dyson"),
-                response => response.Url.Contains("$filter=", StringComparison.Ordinal));
+                response => response.Url.Contains("search=", StringComparison.Ordinal));
 
             await Assertions.Expect(page.Locator("[id^='product-row-']")).ToHaveCountAsync(1);
             await Assertions.Expect(page.Locator("#product-row-0")).ToContainTextAsync("Dyson Vacuum");
@@ -70,7 +70,7 @@ public sealed class ProductCrudTests
         {
             await page.RunAndWaitForResponseAsync(
                 () => page.FillAsync("#product-search", "zzznomatch"),
-                response => response.Url.Contains("$filter=", StringComparison.Ordinal));
+                response => response.Url.Contains("search=", StringComparison.Ordinal));
 
             await Assertions.Expect(page.Locator("#products-empty-state")).ToContainTextAsync("zzznomatch");
         }
@@ -90,7 +90,8 @@ public sealed class ProductCrudTests
 
             await page.FillAsync("#name", "My Laptop");
             await page.FillAsync("#brand", "Dell");
-            await page.FillAsync("#price", "999");
+            await page.FillAsync("#modelNumber", "XPS-15");
+            await page.FillAsync("#pricePaid", "999");
 
             await page.ClickAsync("#product-form-submit");
 
@@ -105,7 +106,7 @@ public sealed class ProductCrudTests
     public async Task Edit_product_updates_name_and_returns_to_detail()
     {
         _fixture.ProductStore.Clear();
-        var product = _fixture.ProductStore.Create("Original Name", brand: "ACME");
+        var product = _fixture.ProductStore.Create("Original Name", brand: "ACME", modelNumber: "ACME-1");
 
         var (ctx, page) = await _fixture.NewProductsPageAsync();
         await using (ctx)

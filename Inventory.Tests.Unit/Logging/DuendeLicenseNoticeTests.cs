@@ -11,11 +11,6 @@ using Serilog.Events;
 [Trait("Category", "Unit")]
 public sealed class DuendeLicenseNoticeTests
 {
-    // The source context and the dropped event's name are read at RUNTIME by the filter, so production
-    // owns them and this test borrows - a rename must break the build, not this assertion. The three
-    // event names below are the opposite case: production never reads them, they exist only to prove
-    // the filter leaves its siblings alone, so the test owns and pins them. The numeric EventIds are
-    // Duende's own constants, fixed outside this repo.
     private const string LicenseValidatorSourceContext = DuendeLicenseNotice.LicenseValidatorSourceContext;
     private const string DroppedEventName = DuendeLicenseNotice.NoLicenseConfiguredEventName;
     private const int NoValidLicenseEventId = 767400809;

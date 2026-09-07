@@ -29,8 +29,6 @@ public sealed class ConfigurationExtensionsTests
 
         var ex = Assert.Throws<InvalidOperationException>(() => config.GetRequired<string>(missingKey));
 
-        // The message format is the contract this test exists to pin, so the literal stays; only the key
-        // is generated, which is what proves the key is interpolated rather than coincidentally present.
         Assert.Equal($"Invalid '{missingKey}'.", ex.Message);
     }
 

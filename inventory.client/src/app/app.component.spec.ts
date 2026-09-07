@@ -85,6 +85,7 @@ describe('AppComponent', () => {
 
     component.onMessage(
       new MessageEvent('message', {
+        origin: globalThis.location.origin,
         data: { source: 'bff-silent-login', isLoggedIn: true },
       }),
     );
@@ -94,12 +95,29 @@ describe('AppComponent', () => {
     expect(authService.refresh).toHaveBeenCalledOnce();
   });
 
+  it('onMessage ignores a spoofed silent-login result from another origin', async () => {
+    await setup(false);
+    const authService = TestBed.inject(AuthService);
+
+    component.onMessage(
+      new MessageEvent('message', {
+        origin: 'https://attacker.example',
+        data: { source: 'bff-silent-login', isLoggedIn: true },
+      }),
+    );
+    fixture.detectChanges();
+
+    expect(component.iframeVisible()).toBe(true);
+    expect(authService.refresh).not.toHaveBeenCalled();
+  });
+
   it('onMessage hides iframe but does not call refresh when isLoggedIn is false', async () => {
     await setup(false);
     const authService = TestBed.inject(AuthService);
 
     component.onMessage(
       new MessageEvent('message', {
+        origin: globalThis.location.origin,
         data: { source: 'bff-silent-login', isLoggedIn: false },
       }),
     );

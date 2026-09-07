@@ -2,11 +2,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   input,
   output,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ChatService } from './chat.service';
 import { ChatMessage, ProductContext } from './chat.model';
@@ -24,6 +26,7 @@ const URL_REGEX = /\bhttps?:\/\/[^\s)>\]"']+/g;
 export class ManualChatComponent {
 
   private readonly chatService = inject(ChatService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly productContext = input<ProductContext | null>(null);
   readonly manualUrlSelected = output<string>();
@@ -32,6 +35,7 @@ export class ManualChatComponent {
   readonly input = signal('');
   readonly streaming = signal(false);
   readonly chatId = signal<string | null>(null);
+  readonly error = signal<string | null>(null);
 
   readonly hasMessages = computed(() => this.messages().length > 0);
 
@@ -56,20 +60,33 @@ export class ManualChatComponent {
     }
 
     this.streaming.set(true);
-    this.chatService.createChat().subscribe({
+    this.error.set(null);
+    this.chatService.createChat().pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
       next: chat => {
         this.chatId.set(chat.chatId);
-        const title = this.buildInitialTitle();
-        if (title) {
-          this.chatService.updateChatTitle(chat.chatId, title).subscribe({
-            error: () => undefined,
-          });
-        }
-
+        this.setInitialTitle(chat.chatId);
         this.streaming.set(false);
         this.dispatch(chat.chatId, text);
       },
-      error: () => this.streaming.set(false),
+      error: () => {
+        this.streaming.set(false);
+        this.error.set('Could not start a chat. Please try again.');
+      },
+    });
+  }
+
+  private setInitialTitle(chatId: string): void {
+    const title = this.buildInitialTitle();
+    if (!title) {
+      return;
+    }
+
+    this.chatService.updateChatTitle(chatId, title).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
+      error: () => undefined,
     });
   }
 
@@ -88,8 +105,11 @@ export class ManualChatComponent {
     ]);
     this.input.set('');
     this.streaming.set(true);
+    this.error.set(null);
 
-    this.chatService.streamMessage(chatId, text).subscribe({
+    this.chatService.streamMessage(chatId, text).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
       next: delta => {
         this.messages.update(msgs => {
           const last = msgs.at(-1);
@@ -103,7 +123,10 @@ export class ManualChatComponent {
         });
       },
       complete: () => this.streaming.set(false),
-      error: () => this.streaming.set(false),
+      error: () => {
+        this.streaming.set(false);
+        this.error.set('The reply stopped unexpectedly. Please send your message again.');
+      },
     });
   }
 

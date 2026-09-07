@@ -10,7 +10,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { catalogResolver } from './catalog.resolver';
 import { CatalogService } from './catalog.service';
-import { Product } from '../products/product.model';
+import { CatalogProduct } from './catalog-product.model';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
@@ -20,22 +20,19 @@ const testRoutes = [
   { path: 'catalog/not-found', component: DummyComponent },
 ];
 
-const mockProduct: Product = {
+const mockProduct: CatalogProduct = {
   id: 'aaaaaaaa-0000-0000-0000-000000000001',
   name: 'LG TV',
-  price: 1299.99,
   brand: 'LG',
   modelNumber: null,
-  serialNumber: null,
-  purchaseDate: null,
   category: null,
-  description: null,
   manualUrl: null,
+  msrpPrice: 1299.99,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: null,
 };
 
-function makeSnapshot(id: string): ActivatedRouteSnapshot {
+function makeSnapshot(id: string | null): ActivatedRouteSnapshot {
   return {
     paramMap: { get: (key: string) => (key === 'id' ? id : null) },
   } as unknown as ActivatedRouteSnapshot;
@@ -52,10 +49,31 @@ describe('catalogResolver', () => {
 
     const result$ = TestBed.runInInjectionContext(() =>
       catalogResolver(makeSnapshot(mockProduct.id), {} as RouterStateSnapshot),
-    ) as Observable<Product>;
+    ) as Observable<CatalogProduct>;
 
     const product = await firstValueFrom(result$);
     expect(product).toEqual(mockProduct);
+  });
+
+  it('navigates to /catalog/not-found without calling the service when the route has no id', async () => {
+    const getById = vi.fn();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: CatalogService, useValue: { getById } },
+        provideRouter(testRoutes),
+      ],
+    });
+
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const result$ = TestBed.runInInjectionContext(() =>
+      catalogResolver(makeSnapshot(null), {} as RouterStateSnapshot),
+    ) as Observable<CatalogProduct>;
+
+    await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
+    expect(getById).not.toHaveBeenCalled();
+    expect(navigateSpy).toHaveBeenCalledWith(['/catalog/not-found']);
   });
 
   it('navigates to /catalog/not-found when getById returns 404', async () => {
@@ -77,7 +95,7 @@ describe('catalogResolver', () => {
 
     const result$ = TestBed.runInInjectionContext(() =>
       catalogResolver(makeSnapshot('missing-id'), {} as RouterStateSnapshot),
-    ) as Observable<Product>;
+    ) as Observable<CatalogProduct>;
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
     expect(navigateSpy).toHaveBeenCalledWith(['/catalog/not-found']);
@@ -102,7 +120,7 @@ describe('catalogResolver', () => {
 
     const result$ = TestBed.runInInjectionContext(() =>
       catalogResolver(makeSnapshot('any-id'), {} as RouterStateSnapshot),
-    ) as Observable<Product>;
+    ) as Observable<CatalogProduct>;
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
     expect(navigateSpy).toHaveBeenCalledWith(['/catalog']);

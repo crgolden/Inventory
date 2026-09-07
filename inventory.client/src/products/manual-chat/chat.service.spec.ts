@@ -119,4 +119,57 @@ describe('ChatService', () => {
     );
     fetchSpy.mockRestore();
   });
+
+  async function collectStream(sseChunk: string): Promise<{ deltas: string[]; error: unknown }> {
+    const encoded = new TextEncoder().encode(sseChunk);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoded);
+            controller.close();
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+      ),
+    );
+
+    const deltas: string[] = [];
+    const result = await new Promise<{ deltas: string[]; error: unknown }>((resolve) => {
+      service.streamMessage('chat-123', 'Hi').subscribe({
+        next: (d) => deltas.push(d),
+        complete: () => resolve({ deltas, error: null }),
+        error: (err: unknown) => resolve({ deltas, error: err }),
+      });
+    });
+
+    fetchSpy.mockRestore();
+    return result;
+  }
+
+  it('streamMessage surfaces a frame that is not JSON instead of skipping it', async () => {
+    const { deltas, error } = await collectStream(
+      ['data: {"delta":{"content":"Hello"}}\n\n', 'data: {oops\n\n', 'data: [DONE]\n\n'].join(''),
+    );
+
+    expect(deltas).toEqual(['Hello']);
+    expect((error as Error).message).toContain('not JSON');
+  });
+
+  it('streamMessage surfaces a well-formed frame that carries no delta.content', async () => {
+    const { deltas, error } = await collectStream(
+      ['data: {"choices":[{"text":"wrong shape"}]}\n\n', 'data: [DONE]\n\n'].join(''),
+    );
+
+    expect(deltas).toEqual([]);
+    expect((error as Error).message).toContain('no delta.content');
+  });
+
+  it('streamMessage rejects a delta whose content is not a string', async () => {
+    const { error } = await collectStream(
+      ['data: {"delta":{"content":42}}\n\n', 'data: [DONE]\n\n'].join(''),
+    );
+
+    expect((error as Error).message).toContain('no delta.content');
+  });
 });

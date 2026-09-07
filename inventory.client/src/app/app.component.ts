@@ -36,10 +36,6 @@ export class AppComponent implements AfterViewInit {
   }
 
   onMessage(event: MessageEvent): void {
-    // The iframe is same-origin (it loads the BFF's own /bff/login), so anything claiming to be the
-    // silent-login result from another origin is not it. Without this check any frame able to
-    // postMessage to this page could spoof { source: 'bff-silent-login', isLoggedIn: true } and drive
-    // an unsolicited token refresh.
     if (event.origin !== globalThis.location.origin) {
       return;
     }

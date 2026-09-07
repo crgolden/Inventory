@@ -3,36 +3,30 @@ import { provideHttpClient, withInterceptorsFromDi, withXhr } from '@angular/com
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
 import { CatalogService, CatalogParams } from './catalog.service';
-import { Product } from '../products/product.model';
+import { CatalogProduct } from './catalog-product.model';
 
-const BASE = '/catalog/api/odata/Products';
+const BASE = '/catalog/api/odata/CatalogProducts';
 
 const mockApiProduct = {
   Id: 'aaaaaaaa-0000-0000-0000-000000000001',
   Name: 'LG OLED C3',
-  Price: 1299.99,
   Brand: 'LG',
   ModelNumber: 'OLED65C3PUA',
-  SerialNumber: null,
-  PurchaseDate: null,
   Category: 'Electronics',
-  Description: null,
   ManualUrl: null,
+  MsrpPrice: 1499.99,
   CreatedAt: '2024-01-01T00:00:00Z',
   UpdatedAt: null,
 };
 
-const mockProduct: Product = {
+const mockProduct: CatalogProduct = {
   id: mockApiProduct.Id,
   name: mockApiProduct.Name,
-  price: mockApiProduct.Price,
   brand: mockApiProduct.Brand,
   modelNumber: mockApiProduct.ModelNumber,
-  serialNumber: null,
-  purchaseDate: null,
   category: mockApiProduct.Category,
-  description: null,
   manualUrl: null,
+  msrpPrice: mockApiProduct.MsrpPrice,
   createdAt: mockApiProduct.CreatedAt,
   updatedAt: null,
 };
@@ -67,10 +61,18 @@ describe('CatalogService', () => {
   afterEach(() => http.verify());
 
   describe('getAll', () => {
+    it('requests the CatalogProducts set, not the owner-scoped inventory', () => {
+      service.getAll(defaultParams).subscribe();
+
+      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
+      expect(req.request.method).toBe('GET');
+      req.flush({ '@odata.count': 0, value: [] });
+    });
+
     it('sends $count=true', () => {
       service.getAll(defaultParams).subscribe();
 
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
+      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
       expect(params(req.request.urlWithParams).get('$count')).toBe('true');
       req.flush({ '@odata.count': 0, value: [] });
     });
@@ -78,7 +80,7 @@ describe('CatalogService', () => {
     it('sends $orderby with direction', () => {
       service.getAll(defaultParams).subscribe();
 
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
+      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
       expect(params(req.request.urlWithParams).get('$orderby')).toBe('Name asc');
       req.flush({ '@odata.count': 0, value: [] });
     });
@@ -86,7 +88,7 @@ describe('CatalogService', () => {
     it('sends $top and $skip for page 1', () => {
       service.getAll({ ...defaultParams, page: 1, pageSize: 20 }).subscribe();
 
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
+      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
       const p = params(req.request.urlWithParams);
       expect(p.get('$top')).toBe('20');
       expect(p.get('$skip')).toBe('0');
@@ -96,7 +98,7 @@ describe('CatalogService', () => {
     it('sends correct $skip for page 2', () => {
       service.getAll({ ...defaultParams, page: 2, pageSize: 20 }).subscribe();
 
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
+      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
       expect(params(req.request.urlWithParams).get('$skip')).toBe('20');
       req.flush({ '@odata.count': 0, value: [] });
     });
@@ -104,26 +106,46 @@ describe('CatalogService', () => {
     it('applies tolower contains $filter when search is provided', () => {
       service.getAll({ ...defaultParams, search: 'oled' }).subscribe();
 
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
+      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
       const filter = params(req.request.urlWithParams).get('$filter');
       expect(filter).not.toBeNull();
       expect(filter).toContain("contains(tolower(Name), tolower('oled'))");
       req.flush({ '@odata.count': 0, value: [] });
     });
 
+    it('doubles an apostrophe so the OData string literal is not closed early', () => {
+      service.getAll({ ...defaultParams, search: "O'Brien" }).subscribe();
+
+      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
+      const filter = params(req.request.urlWithParams).get('$filter');
+      expect(filter).not.toBeNull();
+      expect(filter).toContain("tolower('O''Brien')");
+      req.flush({ '@odata.count': 0, value: [] });
+    });
+
+    it('trims whitespace from the search term', () => {
+      service.getAll({ ...defaultParams, search: '  dyson  ' }).subscribe();
+
+      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
+      const filter = params(req.request.urlWithParams).get('$filter');
+      expect(filter).not.toBeNull();
+      expect(filter).toContain("tolower('dyson')");
+      req.flush({ '@odata.count': 0, value: [] });
+    });
+
     it('does not include $filter when search is empty', () => {
       service.getAll({ ...defaultParams, search: '' }).subscribe();
 
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
+      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
       expect(params(req.request.urlWithParams).has('$filter')).toBe(false);
       req.flush({ '@odata.count': 0, value: [] });
     });
 
-    it('unwraps the OData envelope and maps PascalCase response to Product', async () => {
+    it('unwraps the OData envelope and maps PascalCase response to CatalogProduct', async () => {
       const promise = firstValueFrom(service.getAll(defaultParams));
 
       http
-        .expectOne((r) => r.urlWithParams.startsWith(BASE))
+        .expectOne(r => r.urlWithParams.startsWith(BASE))
         .flush({
           '@odata.count': 1,
           value: [mockApiProduct],
@@ -134,11 +156,34 @@ describe('CatalogService', () => {
       expect(page.items[0]).toEqual(mockProduct);
     });
 
+    it('drops owner-private fields the anonymous surface must never carry', async () => {
+      const promise = firstValueFrom(service.getAll(defaultParams));
+
+      http
+        .expectOne(r => r.urlWithParams.startsWith(BASE))
+        .flush({
+          '@odata.count': 1,
+          value: [
+            {
+              ...mockApiProduct,
+              OwnerId: 'cccccccc-0000-0000-0000-000000000001',
+              SerialNumber: 'SN-LEAKED',
+              PurchaseDate: '2023-11-24T14:30:00Z',
+              PricePaid: 1299.99,
+              Description: 'private note',
+            },
+          ],
+        });
+
+      const page = await promise;
+      expect(Object.keys(page.items[0]).sort()).toEqual(Object.keys(mockProduct).sort());
+    });
+
     it('returns the total count from @odata.count', async () => {
       const promise = firstValueFrom(service.getAll(defaultParams));
 
       http
-        .expectOne((r) => r.urlWithParams.startsWith(BASE))
+        .expectOne(r => r.urlWithParams.startsWith(BASE))
         .flush({
           '@odata.count': 42,
           value: [],
@@ -151,17 +196,17 @@ describe('CatalogService', () => {
     it('defaults total to 0 when @odata.count is absent', async () => {
       const promise = firstValueFrom(service.getAll(defaultParams));
 
-      http.expectOne((r) => r.urlWithParams.startsWith(BASE)).flush({ value: [] });
+      http.expectOne(r => r.urlWithParams.startsWith(BASE)).flush({ value: [] });
 
       const page = await promise;
       expect(page.total).toBe(0);
     });
 
     it('sends desc orderDir correctly', () => {
-      service.getAll({ ...defaultParams, orderBy: 'Price', orderDir: 'desc' }).subscribe();
+      service.getAll({ ...defaultParams, orderBy: 'MsrpPrice', orderDir: 'desc' }).subscribe();
 
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
-      expect(params(req.request.urlWithParams).get('$orderby')).toBe('Price desc');
+      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
+      expect(params(req.request.urlWithParams).get('$orderby')).toBe('MsrpPrice desc');
       req.flush({ '@odata.count': 0, value: [] });
     });
   });
@@ -174,14 +219,13 @@ describe('CatalogService', () => {
       req.flush(mockApiProduct);
     });
 
-    it('maps PascalCase API response to Product', async () => {
+    it('maps PascalCase API response to CatalogProduct', async () => {
       const promise = firstValueFrom(service.getById(mockProduct.id));
 
       http.expectOne(`${BASE}(${mockProduct.id})`).flush(mockApiProduct);
 
       const product = await promise;
-      expect(product.id).toBe(mockProduct.id);
-      expect(product.name).toBe('LG OLED C3');
+      expect(product).toEqual(mockProduct);
     });
   });
 });

@@ -17,27 +17,38 @@
 
     <div class="row mb-3">
       <div class="col">
-        <label for="brand" class="form-label">Brand</label>
+        <label for="brand" class="form-label">Brand <span class="text-danger">*</span></label>
         <input id="brand" type="text" class="form-control" formControlName="brand" />
       </div>
       <div class="col">
-        <label for="price" class="form-label">Price</label>
+        <label for="pricePaid" class="form-label">Price You Paid</label>
         <div class="input-group">
           <span class="input-group-text">$</span>
-          <input id="price" type="number" min="0" step="0.01" class="form-control"
-            formControlName="price" placeholder="0.00" />
+          <input id="pricePaid" type="number" min="0" step="0.01" class="form-control"
+            formControlName="pricePaid" placeholder="0.00" />
         </div>
       </div>
     </div>
 
     <div class="row mb-3">
       <div class="col">
-        <label for="modelNumber" class="form-label">Model Number</label>
+        <label for="modelNumber" class="form-label">Model Number <span class="text-danger">*</span></label>
         <input id="modelNumber" type="text" class="form-control" formControlName="modelNumber" />
       </div>
       <div class="col">
         <label for="serialNumber" class="form-label">Serial Number</label>
         <input id="serialNumber" type="text" class="form-control" formControlName="serialNumber" />
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col">
+        <label for="msrpPrice" class="form-label">List Price (shared with everyone)</label>
+        <div class="input-group">
+          <span class="input-group-text">$</span>
+          <input id="msrpPrice" type="number" min="0" step="0.01" class="form-control"
+            formControlName="msrpPrice" placeholder="0.00" />
+        </div>
       </div>
     </div>
 

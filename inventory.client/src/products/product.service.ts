@@ -1,87 +1,52 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpResponse } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
-import buildQuery from 'odata-query';
-import { ODataResponse, Product } from './product.model';
+import {
+  AddToInventoryRequest,
+  CatalogProductEdit,
+  InventoryItemEdit,
+  InventoryItemView,
+} from './inventory-item.model';
 
-const BASE = '/products/api/odata/Products';
-
-interface ApiProduct {
-  Id: string;
-  Name: string | null;
-  Price: number | null;
-  Brand: string | null;
-  ModelNumber: string | null;
-  SerialNumber: string | null;
-  PurchaseDate: string | null;
-  Category: string | null;
-  Description: string | null;
-  ManualUrl: string | null;
-  CreatedAt: string;
-  UpdatedAt: string | null;
-}
-
-// OData escapes a single quote inside a string literal by doubling it. Without this a search for a term
-// containing an apostrophe ("O'Brien") closes the literal early and the server rejects the $filter.
-export function escapeODataLiteral(value: string): string {
-  return value.replace(/'/g, "''");
-}
-
-function fromApi(raw: ApiProduct): Product {
-  return {
-    id: raw.Id,
-    name: raw.Name,
-    price: raw.Price,
-    brand: raw.Brand,
-    modelNumber: raw.ModelNumber,
-    serialNumber: raw.SerialNumber,
-    purchaseDate: raw.PurchaseDate,
-    category: raw.Category,
-    description: raw.Description,
-    manualUrl: raw.ManualUrl,
-    createdAt: raw.CreatedAt,
-    updatedAt: raw.UpdatedAt,
-  };
-}
+const INVENTORY_BASE = '/products/api/inventory/items';
+const ODATA_BASE = '/products/api/odata/InventoryItems';
+const CATALOG_ODATA_BASE = '/products/api/odata/CatalogProducts';
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
 
   private readonly http = inject(HttpClient);
 
-  getAll(search?: string): Observable<Product[]> {
+  getAll(search?: string): Observable<InventoryItemView[]> {
     const term = search?.trim();
-    const filter = term
-      ? `contains(tolower(Name), tolower('${escapeODataLiteral(term)}'))`
-      : undefined;
-    const qs = buildQuery({ filter, orderBy: 'Name' });
+    const params = term ? new HttpParams().set('search', term) : new HttpParams();
+    return this.http.get<InventoryItemView[]>(INVENTORY_BASE, { params });
+  }
+
+  getById(id: string): Observable<InventoryItemView | null> {
     return this.http
-      .get<ODataResponse<ApiProduct>>(`${BASE}${qs}`)
-      .pipe(map(r => r.value.map(fromApi)));
+      .get<InventoryItemView[]>(INVENTORY_BASE)
+      .pipe(map(items => items.find(item => item.id === id) ?? null));
   }
 
-  getById(id: string): Observable<Product> {
-    return this.http.get<ApiProduct>(`${BASE}(${id})`).pipe(map(fromApi));
+  create(request: AddToInventoryRequest): Observable<string | null> {
+    return this.http
+      .post<InventoryItemView>(INVENTORY_BASE, request, { observe: 'response' })
+      .pipe(map(response => response.body?.id ?? null));
   }
 
-  create(product: Partial<Product>): Observable<string | null> {
-    return this.http.post<ApiProduct>(BASE, product, { observe: 'response' }).pipe(
-      map((response: HttpResponse<ApiProduct>) => {
-        const location = response.headers.get('Location');
-        if (location === null) {
-          return null;
-        }
-
-        return /\(([^)]+)\)$/.exec(location)?.[1] ?? null;
-      })
-    );
+  patch(id: string, changes: Partial<InventoryItemEdit>): Observable<void> {
+    return this.http.patch<void>(`${ODATA_BASE}(${id})`, changes);
   }
 
-  patch(id: string, changes: Partial<Product>): Observable<void> {
-    return this.http.patch<void>(`${BASE}(${id})`, changes);
+  patchCatalogProduct(
+    catalogProductId: string,
+    changes: Partial<CatalogProductEdit>
+  ): Observable<void> {
+    return this.http.patch<void>(`${CATALOG_ODATA_BASE}(${catalogProductId})`, changes);
   }
 
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${BASE}(${id})`);
+    return this.http.delete<void>(`${ODATA_BASE}(${id})`);
   }
 }

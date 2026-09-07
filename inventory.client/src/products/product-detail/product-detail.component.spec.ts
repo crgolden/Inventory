@@ -3,7 +3,7 @@ import { ProductDetailComponent } from './product-detail.component';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes, ActivatedRoute } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
-import { Product } from '../product.model';
+import { InventoryItemView } from '../inventory-item.model';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
@@ -14,17 +14,19 @@ const testRoutes: Routes = [
   { path: 'products/:id/edit', component: DummyComponent },
 ];
 
-const mockProduct: Product = {
+const mockProduct: InventoryItemView = {
   id: 'aaaaaaaa-0000-0000-0000-000000000001',
+  catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000001',
   name: 'LG TV',
-  price: 1299.99,
   brand: 'LG',
   modelNumber: 'OLED65C3',
+  category: 'Electronics',
+  manualUrl: null,
+  msrpPrice: 1499.99,
   serialNumber: 'SN-001',
   purchaseDate: '2023-11-24T14:30:00Z',
-  category: 'Electronics',
+  pricePaid: 1299.99,
   description: null,
-  manualUrl: null,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: null,
 };
@@ -83,7 +85,7 @@ describe('ProductDetailComponent', () => {
 describe('ProductDetailComponent — with manualUrl', () => {
   let fixture: ComponentFixture<ProductDetailComponent>;
 
-  const productWithManual: Product = {
+  const productWithManual: InventoryItemView = {
     ...mockProduct,
     manualUrl: 'https://example.com/lg-tv-manual.pdf',
   };

@@ -54,7 +54,7 @@
               <td [attr.id]="'product-name-' + $index">{{ product.name ?? '—' }}</td>
               <td>{{ product.brand ?? '—' }}</td>
               <td>{{ product.category ?? '—' }}</td>
-              <td>{{ product.price !== null ? ('$' + product.price) : '—' }}</td>
+              <td>{{ product.pricePaid !== null ? ('$' + product.pricePaid) : '—' }}</td>
               <td>{{ product.purchaseDate ?? '—' }}</td>
               <td class="text-end">
                 @if (confirmingDeleteId() === product.id) {

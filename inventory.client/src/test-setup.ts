@@ -26,10 +26,6 @@ const resourceMap = buildResourceMap(srcDir);
 
 const resourceResolver = (url: string): Promise<{ text(): Promise<string> }> => {
   const filename = url.split('/').pop()?.split('\\').pop() ?? url;
-  // Falling back to an empty resource is deliberate and was re-tested on 2026-09-06: this resolver runs
-  // inside Angular's resolveComponentResources during beforeEach, where a throw kills the whole vitest
-  // worker ("Worker exited unexpectedly") before any test name or message is printed, rather than
-  // failing one test with a readable reason. Empty is the less bad of the two.
   const content = resourceMap.get(filename) ?? '';
   return Promise.resolve({ text: () => Promise.resolve(content) });
 };

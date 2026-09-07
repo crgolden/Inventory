@@ -2,12 +2,12 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ProductFormComponent } from './product-form.component';
 import { ProductService } from '../product.service';
 import { By } from '@angular/platform-browser';
-import { provideRouter, Routes, ActivatedRoute } from '@angular/router';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { provideRouter, Router, Routes, ActivatedRoute } from '@angular/router';
+import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
-import { of } from 'rxjs';
-import { Product } from '../product.model';
+import { of, throwError } from 'rxjs';
+import { InventoryItemView } from '../inventory-item.model';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
@@ -18,20 +18,31 @@ const testRoutes: Routes = [
   { path: 'products/not-found', component: DummyComponent },
 ];
 
-const mockProduct: Product = {
+const CATALOG_PRODUCT_ID = 'bbbbbbbb-0000-0000-0000-000000000042';
+
+const mockProduct: InventoryItemView = {
   id: 'aaaaaaaa-0000-0000-0000-000000000042',
+  catalogProductId: CATALOG_PRODUCT_ID,
   name: 'Test TV',
-  price: 999.99,
   brand: 'Sony',
   modelNumber: 'X90L',
+  category: 'Electronics',
+  manualUrl: null,
+  msrpPrice: 1499.99,
   serialNumber: 'SN-001',
   purchaseDate: '2024-01-15T09:00:00Z',
-  category: 'Electronics',
+  pricePaid: 999.99,
   description: null,
-  manualUrl: null,
   createdAt: '2024-01-15T00:00:00Z',
   updatedAt: null,
 };
+
+function typeInto(fixture: ComponentFixture<ProductFormComponent>, id: string, value: string): void {
+  const input: HTMLInputElement = fixture.debugElement.query(By.css(id)).nativeElement;
+  input.value = value;
+  input.dispatchEvent(new Event('input'));
+  fixture.detectChanges();
+}
 
 describe('ProductFormComponent — create mode', () => {
   let fixture: ComponentFixture<ProductFormComponent>;
@@ -63,30 +74,51 @@ describe('ProductFormComponent — create mode', () => {
     expect(btn.nativeElement.disabled).toBe(true);
   });
 
-  it('submit button is enabled when name is filled', () => {
-    const nameInput = fixture.debugElement.query(By.css('#name'));
-    nameInput.nativeElement.value = 'My Product';
-    nameInput.nativeElement.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
+  it('submit button stays disabled when only the name is filled, since the match key needs brand and model', () => {
+    typeInto(fixture, '#name', 'My Product');
+
+    const btn = fixture.debugElement.query(By.css('button[type="submit"]'));
+    expect(btn.nativeElement.disabled).toBe(true);
+  });
+
+  it('submit button is enabled once name, brand and model number are filled', () => {
+    typeInto(fixture, '#name', 'My Product');
+    typeInto(fixture, '#brand', 'Acme');
+    typeInto(fixture, '#modelNumber', 'AC-1');
 
     const btn = fixture.debugElement.query(By.css('button[type="submit"]'));
     expect(btn.nativeElement.disabled).toBe(false);
   });
 
   it('submit calls ProductService.create in create mode', () => {
-    const nameInput = fixture.debugElement.query(By.css('#name'));
-    nameInput.nativeElement.value = 'My Product';
-    nameInput.nativeElement.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
+    typeInto(fixture, '#name', 'My Product');
+    typeInto(fixture, '#brand', 'Acme');
+    typeInto(fixture, '#modelNumber', 'AC-1');
 
     fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
 
-    expect(mockService.create).toHaveBeenCalled();
+    expect(mockService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'My Product', brand: 'Acme', modelNumber: 'AC-1' }),
+    );
   });
 
-  it('renders the price field', () => {
-    const priceInput = fixture.debugElement.query(By.css('#price'));
-    expect(priceInput).toBeTruthy();
+  it('converts the datetime-local purchase date to a UTC instant on create', () => {
+    typeInto(fixture, '#name', 'My Product');
+    typeInto(fixture, '#brand', 'Acme');
+    typeInto(fixture, '#modelNumber', 'AC-1');
+    typeInto(fixture, '#purchaseDate', '2024-03-04T17:45');
+
+    fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
+
+    expect(mockService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ purchaseDate: '2024-03-04T17:45:00.000Z' }),
+    );
+  });
+
+  it('renders separate controls for what the owner paid and the shared list price', () => {
+    expect(fixture.debugElement.query(By.css('#pricePaid'))).toBeTruthy();
+    expect(fixture.debugElement.query(By.css('#msrpPrice'))).toBeTruthy();
+    expect(fixture.debugElement.query(By.css('#price'))).toBeNull();
   });
 
   it('embeds the manual-chat panel (collapsed by default)', () => {
@@ -124,6 +156,7 @@ describe('ProductFormComponent — edit mode', () => {
       getById: vi.fn(),
       create: vi.fn(),
       patch: vi.fn(() => of<void>(undefined)),
+      patchCatalogProduct: vi.fn(() => of<void>(undefined)),
     };
 
     await TestBed.configureTestingModule({
@@ -154,17 +187,91 @@ describe('ProductFormComponent — edit mode', () => {
     expect(nameInput.value).toBe('Test TV');
   });
 
-  it('pre-populates the price field', () => {
-    const priceInput: HTMLInputElement = fixture.debugElement.query(By.css('#price')).nativeElement;
-    expect(priceInput.value).toBe('999.99');
+  it('pre-populates what the owner paid and the shared list price into separate fields', () => {
+    const pricePaid: HTMLInputElement = fixture.debugElement.query(
+      By.css('#pricePaid'),
+    ).nativeElement;
+    const msrpPrice: HTMLInputElement = fixture.debugElement.query(
+      By.css('#msrpPrice'),
+    ).nativeElement;
+
+    expect(pricePaid.value).toBe('999.99');
+    expect(msrpPrice.value).toBe('1499.99');
   });
 
-  it('submit calls ProductService.patch in edit mode', () => {
+  it('pre-populates the purchase date in the format datetime-local accepts', () => {
+    const purchaseDate: HTMLInputElement = fixture.debugElement.query(
+      By.css('#purchaseDate'),
+    ).nativeElement;
+
+    expect(purchaseDate.value).toBe('2024-01-15T09:00');
+  });
+
+  it('sends nothing when nothing was touched', () => {
     fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
-    expect(mockService.patch).toHaveBeenCalledWith(
-      'aaaaaaaa-0000-0000-0000-000000000042',
-      expect.any(Object),
+
+    expect(mockService.patch).not.toHaveBeenCalled();
+    expect(mockService.patchCatalogProduct).not.toHaveBeenCalled();
+  });
+
+  it('routes an owner-private edit to the inventory item alone', () => {
+    typeInto(fixture, '#serialNumber', 'SN-002');
+
+    fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
+
+    expect(mockService.patch).toHaveBeenCalledWith('aaaaaaaa-0000-0000-0000-000000000042', {
+      serialNumber: 'SN-002',
+    });
+    expect(mockService.patchCatalogProduct).not.toHaveBeenCalled();
+  });
+
+  it('routes a shared catalog edit to the catalog product alone', () => {
+    typeInto(fixture, '#brand', 'Panasonic');
+
+    fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
+
+    expect(mockService.patchCatalogProduct).toHaveBeenCalledWith(CATALOG_PRODUCT_ID, {
+      brand: 'Panasonic',
+    });
+    expect(mockService.patch).not.toHaveBeenCalled();
+  });
+
+  it('sends only the touched fields, so one owner cannot blank another contributor’s facts', () => {
+    typeInto(fixture, '#category', 'Home Theatre');
+
+    fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
+
+    expect(mockService.patchCatalogProduct).toHaveBeenCalledWith(CATALOG_PRODUCT_ID, {
+      category: 'Home Theatre',
+    });
+  });
+
+  it('converts an edited purchase date back to a UTC instant', () => {
+    typeInto(fixture, '#purchaseDate', '2024-01-15T11:30');
+
+    fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
+
+    expect(mockService.patch).toHaveBeenCalledWith('aaaaaaaa-0000-0000-0000-000000000042', {
+      purchaseDate: '2024-01-15T11:30:00.000Z',
+    });
+  });
+
+  it('names which half survived when the shared write fails after the private one lands', () => {
+    (mockService.patchCatalogProduct as ReturnType<typeof vi.fn>).mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 403 })),
     );
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    typeInto(fixture, '#serialNumber', 'SN-002');
+    typeInto(fixture, '#brand', 'Panasonic');
+    fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
+    fixture.detectChanges();
+
+    const alert = fixture.debugElement.query(By.css('.alert-danger'));
+    expect(alert.nativeElement.textContent).toContain('shared product facts were not');
+    expect(alert.nativeElement.textContent).toContain('403');
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 
   it('productContext() includes the product id in edit mode', () => {

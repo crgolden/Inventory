@@ -5,39 +5,33 @@ import { By } from '@angular/platform-browser';
 import { provideRouter, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { of } from 'rxjs';
-import { Product } from '../../products/product.model';
+import { CatalogProduct } from '../catalog-product.model';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes: Routes = [{ path: 'catalog/:id', component: DummyComponent }];
 
-const mockProducts: Product[] = [
+const mockProducts: CatalogProduct[] = [
   {
     id: 'aaaaaaaa-0000-0000-0000-000000000001',
     name: 'Apple TV',
-    price: 129.99,
     brand: 'Apple',
     modelNumber: null,
-    serialNumber: null,
-    purchaseDate: null,
     category: 'Electronics',
-    description: null,
     manualUrl: null,
+    msrpPrice: 129.99,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: null,
   },
   {
     id: 'aaaaaaaa-0000-0000-0000-000000000002',
     name: 'Dyson V15',
-    price: 499.99,
     brand: 'Dyson',
     modelNumber: null,
-    serialNumber: null,
-    purchaseDate: null,
     category: 'Home',
-    description: null,
     manualUrl: null,
+    msrpPrice: 499.99,
     createdAt: '2024-01-02T00:00:00Z',
     updatedAt: null,
   },

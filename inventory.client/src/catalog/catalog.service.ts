@@ -2,56 +2,47 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import buildQuery from 'odata-query';
-import { Product } from '../products/product.model';
-import { escapeODataLiteral } from '../products/product.service';
+import { CatalogProduct } from './catalog-product.model';
+import { escapeODataLiteral, ODataCountResponse } from '../odata';
 
-const BASE = '/catalog/api/odata/Products';
+const BASE = '/catalog/api/odata/CatalogProducts';
+
+export type CatalogSortColumn = 'Name' | 'Brand' | 'Category' | 'MsrpPrice';
 
 export interface CatalogParams {
   search?: string;
-  orderBy: string;
+  orderBy: CatalogSortColumn;
   orderDir: 'asc' | 'desc';
   page: number;
   pageSize: number;
 }
 
 export interface CatalogPage {
-  items: Product[];
+  items: CatalogProduct[];
   total: number;
 }
 
-interface ApiProduct {
+interface ApiCatalogProduct {
   Id: string;
   Name: string | null;
-  Price: number | null;
   Brand: string | null;
   ModelNumber: string | null;
-  SerialNumber: string | null;
-  PurchaseDate: string | null;
   Category: string | null;
-  Description: string | null;
   ManualUrl: string | null;
+  MsrpPrice: number | null;
   CreatedAt: string;
   UpdatedAt: string | null;
 }
 
-interface ODataCountResponse<T> {
-  '@odata.count'?: number;
-  value: T[];
-}
-
-function fromApi(raw: ApiProduct): Product {
+function fromApi(raw: ApiCatalogProduct): CatalogProduct {
   return {
     id: raw.Id,
     name: raw.Name,
-    price: raw.Price,
     brand: raw.Brand,
     modelNumber: raw.ModelNumber,
-    serialNumber: raw.SerialNumber,
-    purchaseDate: raw.PurchaseDate,
     category: raw.Category,
-    description: raw.Description,
     manualUrl: raw.ManualUrl,
+    msrpPrice: raw.MsrpPrice,
     createdAt: raw.CreatedAt,
     updatedAt: raw.UpdatedAt,
   };
@@ -76,11 +67,11 @@ export class CatalogService {
       count: true,
     });
     return this.http
-      .get<ODataCountResponse<ApiProduct>>(`${BASE}${qs}`)
+      .get<ODataCountResponse<ApiCatalogProduct>>(`${BASE}${qs}`)
       .pipe(map(r => ({ items: r.value.map(fromApi), total: r['@odata.count'] ?? 0 })));
   }
 
-  getById(id: string): Observable<Product> {
-    return this.http.get<ApiProduct>(`${BASE}(${id})`).pipe(map(fromApi));
+  getById(id: string): Observable<CatalogProduct> {
+    return this.http.get<ApiCatalogProduct>(`${BASE}(${id})`).pipe(map(fromApi));
   }
 }

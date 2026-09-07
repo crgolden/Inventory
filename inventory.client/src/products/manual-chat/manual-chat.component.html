@@ -63,6 +63,11 @@
     @if (streaming()) {
       <small class="text-muted mt-1 d-block">Responding&hellip;</small>
     }
+    @if (error(); as message) {
+      <div id="manual-chat-error" class="alert alert-danger mt-2 mb-0 py-2 small" role="alert">
+        {{ message }}
+      </div>
+    }
   </div>
 
 </div>

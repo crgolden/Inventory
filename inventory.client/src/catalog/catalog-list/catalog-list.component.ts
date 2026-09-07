@@ -12,8 +12,8 @@ import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 import { debounceTime, distinctUntilChanged, Subject, switchMap } from 'rxjs';
-import { CatalogService } from '../catalog.service';
-import { Product } from '../../products/product.model';
+import { CatalogService, CatalogSortColumn } from '../catalog.service';
+import { CatalogProduct } from '../catalog-product.model';
 
 const PAGE_SIZE = 20;
 
@@ -29,11 +29,11 @@ export class CatalogListComponent implements OnInit {
   private readonly catalogService = inject(CatalogService);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly items = signal<Product[]>([]);
+  readonly items = signal<CatalogProduct[]>([]);
   readonly total = signal(0);
   readonly loading = signal(false);
   readonly searchTerm = signal('');
-  readonly orderBy = signal('Name');
+  readonly orderBy = signal<CatalogSortColumn>('Name');
   readonly orderDir = signal<'asc' | 'desc'>('asc');
   readonly page = signal(1);
 
@@ -44,6 +44,7 @@ export class CatalogListComponent implements OnInit {
   readonly showingTo = computed(() => (this.page() - 1) * PAGE_SIZE + this.items().length);
 
   private readonly search$ = new Subject<string>();
+  private readonly load$ = new Subject<void>();
 
   ngOnInit(): void {
     this.titleService.setTitle('Inventory | Catalog');
@@ -51,14 +52,20 @@ export class CatalogListComponent implements OnInit {
     this.search$.pipe(
       debounceTime(300),
       distinctUntilChanged(),
-      switchMap(term => {
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(() => {
+      this.page.set(1);
+      this.load$.next();
+    });
+
+    this.load$.pipe(
+      switchMap(() => {
         this.loading.set(true);
-        this.page.set(1);
         return this.catalogService.getAll({
-          search: term,
+          search: this.searchTerm(),
           orderBy: this.orderBy(),
           orderDir: this.orderDir(),
-          page: 1,
+          page: this.page(),
           pageSize: PAGE_SIZE,
         });
       }),
@@ -69,7 +76,7 @@ export class CatalogListComponent implements OnInit {
       this.loading.set(false);
     });
 
-    this.loadPage();
+    this.load$.next();
   }
 
   onSearch(term: string): void {
@@ -77,7 +84,7 @@ export class CatalogListComponent implements OnInit {
     this.search$.next(term);
   }
 
-  sortBy(column: string): void {
+  sortBy(column: CatalogSortColumn): void {
     if (this.orderBy() === column) {
       this.orderDir.update(d => (d === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -85,35 +92,20 @@ export class CatalogListComponent implements OnInit {
       this.orderDir.set('asc');
     }
     this.page.set(1);
-    this.loadPage();
+    this.load$.next();
   }
 
   prevPage(): void {
     if (this.page() > 1) {
       this.page.update(p => p - 1);
-      this.loadPage();
+      this.load$.next();
     }
   }
 
   nextPage(): void {
     if (this.page() < this.totalPages()) {
       this.page.update(p => p + 1);
-      this.loadPage();
+      this.load$.next();
     }
-  }
-
-  private loadPage(): void {
-    this.loading.set(true);
-    this.catalogService.getAll({
-      search: this.searchTerm(),
-      orderBy: this.orderBy(),
-      orderDir: this.orderDir(),
-      page: this.page(),
-      pageSize: PAGE_SIZE,
-    }).subscribe(result => {
-      this.items.set(result.items);
-      this.total.set(result.total);
-      this.loading.set(false);
-    });
   }
 }

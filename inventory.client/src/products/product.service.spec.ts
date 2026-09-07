@@ -3,38 +3,46 @@ import { provideHttpClient, withInterceptorsFromDi, withXhr } from '@angular/com
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
 import { ProductService } from './product.service';
-import { ODataResponse, Product } from './product.model';
+import { AddToInventoryRequest, InventoryItemView } from './inventory-item.model';
 
-const BASE = '/products/api/odata/Products';
+const ITEMS_URL = '/products/api/inventory/items';
+const ODATA_BASE = '/products/api/odata/InventoryItems';
 
-const mockProduct: Product = {
+const mockItem: InventoryItemView = {
   id: 'aaaaaaaa-0000-0000-0000-000000000001',
+  catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000001',
   name: 'LG OLED C3',
-  price: 1299.99,
   brand: 'LG',
   modelNumber: 'OLED65C3PUA',
+  category: 'Electronics',
+  manualUrl: null,
+  msrpPrice: 1499.99,
   serialNumber: 'SN-LG-001',
   purchaseDate: '2023-11-24T14:30:00Z',
-  category: 'Electronics',
+  pricePaid: 1299.99,
   description: '65-inch 4K OLED smart TV',
-  manualUrl: null,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: null,
 };
 
-const mockApiProduct = {
-  Id: mockProduct.id,
-  Name: mockProduct.name,
-  Price: mockProduct.price,
-  Brand: mockProduct.brand,
-  ModelNumber: mockProduct.modelNumber,
-  SerialNumber: mockProduct.serialNumber,
-  PurchaseDate: mockProduct.purchaseDate,
-  Category: mockProduct.category,
-  Description: mockProduct.description,
-  ManualUrl: mockProduct.manualUrl,
-  CreatedAt: mockProduct.createdAt,
-  UpdatedAt: mockProduct.updatedAt,
+const otherItem: InventoryItemView = {
+  ...mockItem,
+  id: 'aaaaaaaa-0000-0000-0000-000000000002',
+  catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000002',
+  name: 'Dyson V15',
+};
+
+const newRequest: AddToInventoryRequest = {
+  name: 'New Item',
+  brand: 'Acme',
+  modelNumber: 'AC-1',
+  category: null,
+  manualUrl: null,
+  msrpPrice: null,
+  serialNumber: null,
+  purchaseDate: null,
+  pricePaid: null,
+  description: null,
 };
 
 describe('ProductService', () => {
@@ -60,168 +68,131 @@ describe('ProductService', () => {
   }
 
   describe('getAll', () => {
-    it('requests the OData Products collection ordered by Name', () => {
+    it('requests the owner-scoped inventory projection, not the anonymous catalog', () => {
       service.getAll().subscribe();
 
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
-      expect(params(req.request.urlWithParams).get('$orderby')).toBe('Name');
-      req.flush({ value: [mockApiProduct] });
+      const req = http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL));
+      expect(req.request.method).toBe('GET');
+      req.flush([mockItem]);
     });
 
-    it('unwraps the OData value envelope and maps PascalCase API response to Product', async () => {
+    it('returns the items unwrapped, since the projection is a bare array', async () => {
       const promise = firstValueFrom(service.getAll());
 
-      http.expectOne((r) => r.urlWithParams.startsWith(BASE)).flush({ value: [mockApiProduct] });
+      http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL)).flush([mockItem]);
 
-      const products = await promise;
-      expect(products.length).toBe(1);
-      expect(products[0].id).toBe(mockProduct.id);
-      expect(products[0].name).toBe(mockProduct.name);
+      const items = await promise;
+      expect(items.length).toBe(1);
+      expect(items[0].id).toBe(mockItem.id);
+      expect(items[0].pricePaid).toBe(mockItem.pricePaid);
     });
 
-    it('applies a tolower contains $filter when search is provided', () => {
-      const envelope: ODataResponse<Product> = { value: [] };
-
+    it('passes the search term through as a plain query parameter', () => {
       service.getAll('oled').subscribe();
 
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
-      const filter = params(req.request.urlWithParams).get('$filter');
-      expect(filter).not.toBeNull();
-      expect(filter).toContain("contains(tolower(Name), tolower('oled'))");
-      req.flush(envelope);
+      const req = http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL));
+      expect(params(req.request.urlWithParams).get('search')).toBe('oled');
+      req.flush([]);
     });
 
-    it('does not include $filter when search is empty', () => {
-      const envelope: ODataResponse<Product> = { value: [] };
-
+    it('does not send a search parameter when the term is empty', () => {
       service.getAll('').subscribe();
 
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
-      expect(params(req.request.urlWithParams).has('$filter')).toBe(false);
-      req.flush(envelope);
+      const req = http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL));
+      expect(params(req.request.urlWithParams).has('search')).toBe(false);
+      req.flush([]);
     });
 
-    it('doubles an apostrophe so the OData string literal is not closed early', () => {
-      const envelope: ODataResponse<Product> = { value: [] };
+    it('does not send a search parameter when the term is only whitespace', () => {
+      service.getAll('   ').subscribe();
 
-      service.getAll("O'Brien").subscribe();
-
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
-      const filter = params(req.request.urlWithParams).get('$filter');
-      expect(filter).not.toBeNull();
-      expect(filter).toContain("tolower('O''Brien')");
-      req.flush(envelope);
+      const req = http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL));
+      expect(params(req.request.urlWithParams).has('search')).toBe(false);
+      req.flush([]);
     });
 
     it('trims whitespace from the search term', () => {
-      const envelope: ODataResponse<Product> = { value: [] };
-
       service.getAll('  dyson  ').subscribe();
 
-      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
-      const filter = params(req.request.urlWithParams).get('$filter');
-      expect(filter).not.toBeNull();
-      expect(filter).toContain("tolower('dyson')");
-      req.flush(envelope);
+      const req = http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL));
+      expect(params(req.request.urlWithParams).get('search')).toBe('dyson');
+      req.flush([]);
     });
   });
 
   describe('getById', () => {
-    it('requests the keyed OData entity URL', () => {
-      service.getById(mockProduct.id).subscribe();
+    it('selects the matching item out of the owner-scoped projection', async () => {
+      const promise = firstValueFrom(service.getById(otherItem.id));
 
-      const req = http.expectOne(`${BASE}(${mockProduct.id})`);
-      req.flush(mockApiProduct);
+      http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL)).flush([mockItem, otherItem]);
+
+      const item = await promise;
+      expect(item).not.toBeNull();
+      expect(item?.id).toBe(otherItem.id);
+      expect(item?.name).toBe(otherItem.name);
     });
 
-    it('maps PascalCase API response to Product', async () => {
-      const promise = firstValueFrom(service.getById(mockProduct.id));
+    it('emits null when the id is absent from the owner-scoped projection', async () => {
+      const promise = firstValueFrom(service.getById(otherItem.id));
 
-      http.expectOne(`${BASE}(${mockProduct.id})`).flush(mockApiProduct);
+      http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL)).flush([mockItem]);
 
-      const product = await promise;
-      expect(product.id).toBe(mockProduct.id);
-      expect(product.name).toBe('LG OLED C3');
+      expect(await promise).toBeNull();
     });
   });
 
   describe('create', () => {
-    it('POSTs to the collection URL', () => {
-      service.create({ name: 'New Item' }).subscribe();
+    it('POSTs the composite request to the inventory items URL', () => {
+      service.create(newRequest).subscribe();
 
-      const req = http.expectOne(BASE);
+      const req = http.expectOne(ITEMS_URL);
       expect(req.request.method).toBe('POST');
-      expect(req.request.body).toEqual({ name: 'New Item' });
-      req.flush(null, {
-        headers: { Location: `${BASE}(${mockProduct.id})` },
-        status: 201,
-        statusText: 'Created',
-      });
+      expect(req.request.body).toEqual(newRequest);
+      req.flush(mockItem, { status: 201, statusText: 'Created' });
     });
 
-    it('extracts the id from the Location header', async () => {
-      const promise = firstValueFrom(service.create({ name: 'New Item' }));
+    it('emits the new item id from the response body', async () => {
+      const promise = firstValueFrom(service.create(newRequest));
 
-      http
-        .expectOne(BASE)
-        .flush(null, {
-          headers: { Location: `${BASE}(${mockProduct.id})` },
-          status: 201,
-          statusText: 'Created',
-        });
+      http.expectOne(ITEMS_URL).flush(mockItem, { status: 201, statusText: 'Created' });
 
-      const id = await promise;
-      expect(id).toBe(mockProduct.id);
+      expect(await promise).toBe(mockItem.id);
     });
 
-    it('emits null when the response carries no Location header', async () => {
-      const promise = firstValueFrom(service.create({ name: 'New Item' }));
+    it('emits null when the response carries no body', async () => {
+      const promise = firstValueFrom(service.create(newRequest));
 
-      http.expectOne(BASE).flush(null, { status: 201, statusText: 'Created' });
-
-      expect(await promise).toBeNull();
-    });
-
-    it('emits null when the Location header holds no parseable key', async () => {
-      const promise = firstValueFrom(service.create({ name: 'New Item' }));
-
-      http
-        .expectOne(BASE)
-        .flush(null, {
-          headers: { Location: BASE },
-          status: 201,
-          statusText: 'Created',
-        });
+      http.expectOne(ITEMS_URL).flush(null, { status: 201, statusText: 'Created' });
 
       expect(await promise).toBeNull();
     });
   });
 
   describe('patch', () => {
-    it('PATCHes to the keyed entity URL with only the changed fields', () => {
-      service.patch(mockProduct.id, { name: 'Updated Name' }).subscribe();
+    it('PATCHes the owner-scoped OData entity with only the changed fields', () => {
+      service.patch(mockItem.id, { serialNumber: 'SN-UPDATED' }).subscribe();
 
-      const req = http.expectOne(`${BASE}(${mockProduct.id})`);
+      const req = http.expectOne(`${ODATA_BASE}(${mockItem.id})`);
       expect(req.request.method).toBe('PATCH');
-      expect(req.request.body).toEqual({ name: 'Updated Name' });
-      req.flush(mockApiProduct);
+      expect(req.request.body).toEqual({ serialNumber: 'SN-UPDATED' });
+      req.flush(null);
     });
   });
 
   describe('delete', () => {
-    it('sends DELETE to the keyed entity URL', () => {
-      service.delete(mockProduct.id).subscribe();
+    it('sends DELETE to the owner-scoped OData entity URL', () => {
+      service.delete(mockItem.id).subscribe();
 
-      const req = http.expectOne(`${BASE}(${mockProduct.id})`);
+      const req = http.expectOne(`${ODATA_BASE}(${mockItem.id})`);
       expect(req.request.method).toBe('DELETE');
       req.flush(null, { status: 204, statusText: 'No Content' });
     });
 
     it('completes without error on 204', async () => {
-      const promise = firstValueFrom(service.delete(mockProduct.id));
+      const promise = firstValueFrom(service.delete(mockItem.id));
 
       http
-        .expectOne(`${BASE}(${mockProduct.id})`)
+        .expectOne(`${ODATA_BASE}(${mockItem.id})`)
         .flush(null, { status: 204, statusText: 'No Content' });
 
       await expect(promise).resolves.toBeNull();

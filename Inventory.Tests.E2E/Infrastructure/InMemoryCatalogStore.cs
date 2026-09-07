@@ -9,8 +9,9 @@ public sealed class InMemoryCatalogStore
     public sealed record CatalogRecord(
         Guid Id,
         string? Name,
-        decimal? Price,
+        decimal? MsrpPrice,
         string? Brand,
+        string? ModelNumber,
         string? Category,
         string? ManualUrl,
         DateTimeOffset CreatedAt);
@@ -34,10 +35,12 @@ public sealed class InMemoryCatalogStore
         decimal? price = null,
         string? brand = null,
         string? category = null,
-        string? manualUrl = null)
+        string? manualUrl = null,
+        string? modelNumber = null)
     {
         var id = Guid.NewGuid();
-        var product = new CatalogRecord(id, name, price, brand, category, manualUrl, DateTimeOffset.UtcNow);
+        var product = new CatalogRecord(
+            id, name, price, brand, modelNumber, category, manualUrl, DateTimeOffset.UtcNow);
         _products[id] = product;
         return product;
     }

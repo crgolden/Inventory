@@ -175,6 +175,8 @@ public sealed class ProductManualChatTests
             await page.WaitForURLAsync("**/products/new");
 
             await page.FillAsync("#name", productName);
+            await page.FillAsync("#brand", "Chipper");
+            await page.FillAsync("#modelNumber", "CP-1");
             await page.ClickAsync("#manual-chat-toggle");
 
             await page.FillAsync("#manual-chat-input", "Manual link?");

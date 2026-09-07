@@ -6,7 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 import { debounceTime, distinctUntilChanged, Subject, switchMap } from 'rxjs';
 import { ProductService } from '../product.service';
-import { Product } from '../product.model';
+import { InventoryItemView } from '../inventory-item.model';
 
 @Component({
   selector: 'app-product-list',
@@ -21,7 +21,7 @@ export class ProductListComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly products = signal<Product[]>([]);
+  readonly products = signal<InventoryItemView[]>([]);
   readonly confirmingDeleteId = signal<string | null>(null);
   readonly searchTerm = signal('');
   readonly loading = signal(false);
@@ -31,10 +31,8 @@ export class ProductListComponent implements OnInit {
 
   ngOnInit(): void {
     this.titleService.setTitle('Inventory | My Products');
-    this.products.set(this.route.snapshot.data['products'] as Product[]);
+    this.products.set(this.route.snapshot.data['products'] as InventoryItemView[]);
 
-    // search$ is a Subject and never completes, so this subscription would otherwise outlive the
-    // component on every route change.
     this.search$.pipe(
       debounceTime(300),
       distinctUntilChanged(),
