@@ -10,16 +10,17 @@ describe('utcInstantToDateTimeLocalInput', () => {
     expect(utcInstantToDateTimeLocalInput(instant)).toBe(wallClock);
   });
 
-  it('shifts by the local offset rather than printing the UTC components', () => {
+  it('displaces the wall clock from the instant by exactly the zone offset', () => {
     const instant = '2024-06-15T12:00:00Z';
-    const offsetMinutes = -new Date(instant).getTimezoneOffset();
     const rendered = utcInstantToDateTimeLocalInput(instant);
     if (rendered === null) {
       throw new Error('The conversion returned null, so there is no rendered value to compare.');
     }
 
     const shiftMinutes = (new Date(`${rendered}Z`).getTime() - new Date(instant).getTime()) / MS_PER_MINUTE;
-    expect(shiftMinutes).toBe(offsetMinutes);
+    const zoneOffsetMinutes = new Date(instant).getTimezoneOffset();
+
+    expect(shiftMinutes + zoneOffsetMinutes).toBe(0);
   });
 
   it('pads every component to the width datetime-local requires', () => {
