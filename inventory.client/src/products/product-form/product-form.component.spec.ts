@@ -20,6 +20,9 @@ const testRoutes: Routes = [
 
 const CATALOG_PRODUCT_ID = 'bbbbbbbb-0000-0000-0000-000000000042';
 
+const PURCHASED_WALL_CLOCK = '2024-01-15T09:00';
+const PURCHASED_INSTANT = new Date(PURCHASED_WALL_CLOCK).toISOString();
+
 const mockProduct: InventoryItemView = {
   id: 'aaaaaaaa-0000-0000-0000-000000000042',
   catalogProductId: CATALOG_PRODUCT_ID,
@@ -30,7 +33,7 @@ const mockProduct: InventoryItemView = {
   manualUrl: null,
   msrpPrice: 1499.99,
   serialNumber: 'SN-001',
-  purchaseDate: '2024-01-15T09:00:00Z',
+  purchaseDate: PURCHASED_INSTANT,
   pricePaid: 999.99,
   description: null,
   createdAt: '2024-01-15T00:00:00Z',
@@ -102,16 +105,17 @@ describe('ProductFormComponent — create mode', () => {
     );
   });
 
-  it('converts the datetime-local purchase date to a UTC instant on create', () => {
+  it('reads the purchase date as the local wall clock the user typed', () => {
+    const typed = '2024-03-04T17:45';
     typeInto(fixture, '#name', 'My Product');
     typeInto(fixture, '#brand', 'Acme');
     typeInto(fixture, '#modelNumber', 'AC-1');
-    typeInto(fixture, '#purchaseDate', '2024-03-04T17:45');
+    typeInto(fixture, '#purchaseDate', typed);
 
     fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
 
     expect(mockService.create).toHaveBeenCalledWith(
-      expect.objectContaining({ purchaseDate: '2024-03-04T17:45:00.000Z' }),
+      expect.objectContaining({ purchaseDate: new Date(typed).toISOString() }),
     );
   });
 
@@ -199,12 +203,12 @@ describe('ProductFormComponent — edit mode', () => {
     expect(msrpPrice.value).toBe('1499.99');
   });
 
-  it('pre-populates the purchase date in the format datetime-local accepts', () => {
+  it('pre-populates the purchase date as the local wall clock, in the format datetime-local accepts', () => {
     const purchaseDate: HTMLInputElement = fixture.debugElement.query(
       By.css('#purchaseDate'),
     ).nativeElement;
 
-    expect(purchaseDate.value).toBe('2024-01-15T09:00');
+    expect(purchaseDate.value).toBe(PURCHASED_WALL_CLOCK);
   });
 
   it('sends nothing when nothing was touched', () => {
@@ -246,13 +250,24 @@ describe('ProductFormComponent — edit mode', () => {
     });
   });
 
-  it('converts an edited purchase date back to a UTC instant', () => {
-    typeInto(fixture, '#purchaseDate', '2024-01-15T11:30');
+  it('converts an edited purchase date from the local wall clock back to a UTC instant', () => {
+    const typed = '2024-01-15T11:30';
+    typeInto(fixture, '#purchaseDate', typed);
 
     fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
 
     expect(mockService.patch).toHaveBeenCalledWith('aaaaaaaa-0000-0000-0000-000000000042', {
-      purchaseDate: '2024-01-15T11:30:00.000Z',
+      purchaseDate: new Date(typed).toISOString(),
+    });
+  });
+
+  it('leaves an untouched purchase date out of the payload, so it cannot drift by an offset per save', () => {
+    typeInto(fixture, '#serialNumber', 'SN-002');
+
+    fixture.debugElement.query(By.css('form')).triggerEventHandler('ngSubmit');
+
+    expect(mockService.patch).toHaveBeenCalledWith('aaaaaaaa-0000-0000-0000-000000000042', {
+      serialNumber: 'SN-002',
     });
   });
 

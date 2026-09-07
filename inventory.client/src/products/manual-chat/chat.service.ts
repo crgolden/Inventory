@@ -12,11 +12,11 @@ function isStreamDelta(value: unknown): value is StreamDelta {
     return false;
   }
 
-  const delta = (value as { delta: unknown }).delta;
+  const delta = value.delta;
   return typeof delta === 'object'
     && delta !== null
     && 'content' in delta
-    && typeof (delta as { content: unknown }).content === 'string';
+    && typeof delta.content === 'string';
 }
 
 @Injectable({ providedIn: 'root' })

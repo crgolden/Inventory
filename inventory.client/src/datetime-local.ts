@@ -1,4 +1,6 @@
-const DATETIME_LOCAL_LENGTH = 'YYYY-MM-DDTHH:mm'.length;
+function pad(value: number, width: number): string {
+  return String(value).padStart(width, '0');
+}
 
 export function utcInstantToDateTimeLocalInput(iso: string | null): string | null {
   if (iso === null) {
@@ -10,7 +12,9 @@ export function utcInstantToDateTimeLocalInput(iso: string | null): string | nul
     return null;
   }
 
-  return parsed.toISOString().slice(0, DATETIME_LOCAL_LENGTH);
+  const date = `${pad(parsed.getFullYear(), 4)}-${pad(parsed.getMonth() + 1, 2)}-${pad(parsed.getDate(), 2)}`;
+  const time = `${pad(parsed.getHours(), 2)}:${pad(parsed.getMinutes(), 2)}`;
+  return `${date}T${time}`;
 }
 
 export function dateTimeLocalInputToUtcInstant(value: string | null): string | null {
@@ -18,7 +22,7 @@ export function dateTimeLocalInputToUtcInstant(value: string | null): string | n
     return null;
   }
 
-  const parsed = new Date(`${value}Z`);
+  const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     return null;
   }
