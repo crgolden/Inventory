@@ -54,7 +54,12 @@ export class ChatService {
             return;
           }
 
-          const reader = response.body!.getReader();
+          if (response.body === null) {
+            subscriber.error(new Error('The response carried no body to stream.'));
+            return;
+          }
+
+          const reader = response.body.getReader();
           const decoder = new TextDecoder();
           let buffer = '';
 

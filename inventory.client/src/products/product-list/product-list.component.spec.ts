@@ -4,7 +4,8 @@ import { ProductService } from '../product.service';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, provideRouter, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Product } from '../product.model';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
@@ -147,5 +148,22 @@ describe('ProductListComponent', () => {
     yesBtn.nativeElement.click();
 
     expect(mockService.delete).toHaveBeenCalledWith('aaaaaaaa-0000-0000-0000-000000000001');
+  });
+
+  it('a failed delete surfaces an error and leaves the row in place', () => {
+    (mockService.delete as ReturnType<typeof vi.fn>).mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+    );
+
+    const deleteBtn = fixture.debugElement.queryAll(By.css('button.btn-outline-danger'))[0];
+    deleteBtn.nativeElement.click();
+    fixture.detectChanges();
+    fixture.debugElement.query(By.css('button.btn-danger')).nativeElement.click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.products().length).toBe(2);
+    const alert = fixture.debugElement.query(By.css('#product-list-error'));
+    expect(alert).toBeTruthy();
+    expect(alert.nativeElement.textContent).toContain('500');
   });
 });

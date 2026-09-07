@@ -22,7 +22,7 @@ public sealed class InMemoryProductsStore
 
     public IReadOnlyList<ProductRecord> GetProducts(string? nameFilter = null)
     {
-        var all = _products.Values.OrderBy(p => p.Name).AsEnumerable();
+        var all = _products.Values.OrderBy(p => p.Name, StringComparer.Ordinal).AsEnumerable();
         if (!string.IsNullOrWhiteSpace(nameFilter))
         {
             all = all.Where(p => p.Name?.Contains(nameFilter, StringComparison.OrdinalIgnoreCase) == true);

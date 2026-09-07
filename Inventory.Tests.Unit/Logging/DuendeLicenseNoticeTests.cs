@@ -11,7 +11,13 @@ using Serilog.Events;
 [Trait("Category", "Unit")]
 public sealed class DuendeLicenseNoticeTests
 {
-    private const string LicenseValidatorSourceContext = "Duende.Bff.Licensing.LicenseValidator";
+    // The source context and the dropped event's name are read at RUNTIME by the filter, so production
+    // owns them and this test borrows - a rename must break the build, not this assertion. The three
+    // event names below are the opposite case: production never reads them, they exist only to prove
+    // the filter leaves its siblings alone, so the test owns and pins them. The numeric EventIds are
+    // Duende's own constants, fixed outside this repo.
+    private const string LicenseValidatorSourceContext = DuendeLicenseNotice.LicenseValidatorSourceContext;
+    private const string DroppedEventName = DuendeLicenseNotice.NoLicenseConfiguredEventName;
     private const int NoValidLicenseEventId = 767400809;
     private const int LicenseHasExpiredEventId = 770251973;
     private const int TrialModeWarningEventId = 875645872;
@@ -20,7 +26,7 @@ public sealed class DuendeLicenseNoticeTests
     [Fact]
     public void IsNoLicenseConfiguredNotice_DropsTheUnlicensedNotice()
     {
-        var eventId = new EventId(NoValidLicenseEventId, "NoValidLicense");
+        var eventId = new EventId(NoValidLicenseEventId, DroppedEventName);
 
         var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Error);
 
@@ -61,7 +67,7 @@ public sealed class DuendeLicenseNoticeTests
     public void IsNoLicenseConfiguredNotice_KeepsTheDroppedEventNameWhenItComesFromAnotherSource()
     {
         var sourceContext = $"Contoso.Licensing.{Guid.NewGuid():N}";
-        var eventId = new EventId(NoValidLicenseEventId, "NoValidLicense");
+        var eventId = new EventId(NoValidLicenseEventId, DroppedEventName);
 
         var reachedTheSink = WriteThroughFilter(sourceContext, eventId, LogLevel.Error);
 

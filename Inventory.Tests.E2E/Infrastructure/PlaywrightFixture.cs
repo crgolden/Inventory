@@ -39,39 +39,25 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
     public string BaseAddress =>
         _baseAddress ?? throw new InvalidOperationException("BaseAddress is not available until InitializeAsync has run.");
 
-    private static void Stage(string msg) =>
-        Console.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] PlaywrightFixture: {msg}");
-
     public async ValueTask InitializeAsync()
     {
-        Stage("InitializeAsync enter");
-        Stage("Factory.StartAsync() enter");
         await Factory.StartAsync();
         _baseAddress = Factory.ServerAddress;
-        Stage($"Factory.StartAsync() done base={BaseAddress}");
 
-        Stage("playwright install chromium enter");
         var exitCode = Microsoft.Playwright.Program.Main(["install", "chromium"]);
-        Stage($"playwright install exit={exitCode}");
         if (exitCode != 0)
         {
             throw new InvalidOperationException($"Playwright install failed with exit code {exitCode}.");
         }
 
-        Stage("Playwright.CreateAsync enter");
         _playwright = await Playwright.CreateAsync();
-        Stage("Chromium.LaunchAsync enter");
         _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
         {
             Headless = Headless
         });
-        Stage("Chromium.LaunchAsync done");
 
-        Stage("warmup NewProductsPageAsync enter");
         var warmup = await NewProductsPageAsync();
-        Stage("warmup NewProductsPageAsync done");
         await using (warmup.Context) { }
-        Stage("InitializeAsync exit");
     }
 
     public async Task<(IAsyncDisposable Context, IPage Page)> NewProductsPageAsync()
@@ -88,13 +74,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         });
 
         page.SetDefaultTimeout(60_000);
-
-        page.Request += (_, req) => Stage($"REQ {req.Method} {req.Url}");
-        page.Response += (_, resp) =>
-        {
-            Stage($"RESP {resp.Status} {resp.Url}");
-        };
-        page.RequestFailed += (_, req) => Stage($"FAIL {req.Method} {req.Url} err={req.Failure}");
 
         await page.RouteAsync("**/bff/user", async route =>
         {
@@ -163,13 +142,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             IgnoreHTTPSErrors = true,
         });
         page.SetDefaultTimeout(60_000);
-
-        page.Request += (_, req) => Stage($"REQ {req.Method} {req.Url}");
-        page.Response += (_, resp) =>
-        {
-            Stage($"RESP {resp.Status} {resp.Url}");
-        };
-        page.RequestFailed += (_, req) => Stage($"FAIL {req.Method} {req.Url} err={req.Failure}");
 
         await page.RouteAsync("**/bff/user", async route =>
         {
@@ -343,12 +315,12 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
         {
             "Price" when !orderDesc => allProducts.OrderBy(p => p.Price),
             "Price" => allProducts.OrderByDescending(p => p.Price),
-            "Brand" when !orderDesc => allProducts.OrderBy(p => p.Brand),
-            "Brand" => allProducts.OrderByDescending(p => p.Brand),
-            "Category" when !orderDesc => allProducts.OrderBy(p => p.Category),
-            "Category" => allProducts.OrderByDescending(p => p.Category),
-            _ when orderDesc => allProducts.OrderByDescending(p => p.Name),
-            _ => allProducts.OrderBy(p => p.Name),
+            "Brand" when !orderDesc => allProducts.OrderBy(p => p.Brand, StringComparer.Ordinal),
+            "Brand" => allProducts.OrderByDescending(p => p.Brand, StringComparer.Ordinal),
+            "Category" when !orderDesc => allProducts.OrderBy(p => p.Category, StringComparer.Ordinal),
+            "Category" => allProducts.OrderByDescending(p => p.Category, StringComparer.Ordinal),
+            _ when orderDesc => allProducts.OrderByDescending(p => p.Name, StringComparer.Ordinal),
+            _ => allProducts.OrderBy(p => p.Name, StringComparer.Ordinal),
         };
 
         var pageItems = ordered.Skip(skip).Take(top).Select(CatalogRecordToJson).ToArray();

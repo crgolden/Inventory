@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 import { debounceTime, distinctUntilChanged, Subject, switchMap } from 'rxjs';
@@ -17,11 +19,13 @@ export class ProductListComponent implements OnInit {
   private readonly titleService = inject(Title);
   private readonly productService = inject(ProductService);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly products = signal<Product[]>([]);
   readonly confirmingDeleteId = signal<string | null>(null);
   readonly searchTerm = signal('');
   readonly loading = signal(false);
+  readonly error = signal<string | null>(null);
 
   private readonly search$ = new Subject<string>();
 
@@ -29,13 +33,16 @@ export class ProductListComponent implements OnInit {
     this.titleService.setTitle('Inventory | My Products');
     this.products.set(this.route.snapshot.data['products'] as Product[]);
 
+    // search$ is a Subject and never completes, so this subscription would otherwise outlive the
+    // component on every route change.
     this.search$.pipe(
       debounceTime(300),
       distinctUntilChanged(),
       switchMap(term => {
         this.loading.set(true);
         return this.productService.getAll(term);
-      })
+      }),
+      takeUntilDestroyed(this.destroyRef)
     ).subscribe(p => {
       this.products.set(p);
       this.loading.set(false);
@@ -56,9 +63,16 @@ export class ProductListComponent implements OnInit {
   }
 
   delete(id: string): void {
-    this.productService.delete(id).subscribe(() => {
-      this.products.update(list => list.filter(p => p.id !== id));
-      this.confirmingDeleteId.set(null);
+    this.error.set(null);
+    this.productService.delete(id).subscribe({
+      next: () => {
+        this.products.update(list => list.filter(p => p.id !== id));
+        this.confirmingDeleteId.set(null);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.error.set(`Delete failed (${err.status}). The product is still in your list.`);
+        this.confirmingDeleteId.set(null);
+      },
     });
   }
 }

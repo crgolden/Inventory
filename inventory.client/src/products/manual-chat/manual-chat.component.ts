@@ -92,8 +92,12 @@ export class ManualChatComponent {
     this.chatService.streamMessage(chatId, text).subscribe({
       next: delta => {
         this.messages.update(msgs => {
+          const last = msgs.at(-1);
+          if (last === undefined) {
+            return msgs;
+          }
+
           const updated = [...msgs];
-          const last = updated.at(-1)!;
           updated[updated.length - 1] = { ...last, content: last.content + delta };
           return updated;
         });

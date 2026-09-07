@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -52,7 +53,11 @@ export class ProductFormComponent implements OnInit {
   });
 
   constructor() {
-    this.form.valueChanges.subscribe(() => this.formSignal.set(this.form.getRawValue()));
+    // valueChanges never completes, so without this the subscription outlives every navigation away
+    // from the form. Safe to use the no-arg overload here: a constructor is an injection context.
+    this.form.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.formSignal.set(this.form.getRawValue()));
   }
 
   ngOnInit(): void {
@@ -91,8 +96,13 @@ export class ProductFormComponent implements OnInit {
         void this.router.navigate(['/products', id]);
       });
     } else {
-      this.productService.create(value).pipe(catchError(onError)).subscribe(id => {
-        void this.router.navigate(['/products', id]);
+      this.productService.create(value).pipe(catchError(onError)).subscribe(newId => {
+        if (newId === null) {
+          this.error.set('Saved, but the new product could not be opened. Find it in your list.');
+          return;
+        }
+
+        void this.router.navigate(['/products', newId]);
       });
     }
   }

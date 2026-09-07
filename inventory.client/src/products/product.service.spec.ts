@@ -85,7 +85,8 @@ describe('ProductService', () => {
       service.getAll('oled').subscribe();
 
       const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
-      const filter = params(req.request.urlWithParams).get('$filter') ?? '';
+      const filter = params(req.request.urlWithParams).get('$filter');
+      expect(filter).not.toBeNull();
       expect(filter).toContain("contains(tolower(Name), tolower('oled'))");
       req.flush(envelope);
     });
@@ -100,13 +101,26 @@ describe('ProductService', () => {
       req.flush(envelope);
     });
 
+    it('doubles an apostrophe so the OData string literal is not closed early', () => {
+      const envelope: ODataResponse<Product> = { value: [] };
+
+      service.getAll("O'Brien").subscribe();
+
+      const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
+      const filter = params(req.request.urlWithParams).get('$filter');
+      expect(filter).not.toBeNull();
+      expect(filter).toContain("tolower('O''Brien')");
+      req.flush(envelope);
+    });
+
     it('trims whitespace from the search term', () => {
       const envelope: ODataResponse<Product> = { value: [] };
 
       service.getAll('  dyson  ').subscribe();
 
       const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
-      const filter = params(req.request.urlWithParams).get('$filter') ?? '';
+      const filter = params(req.request.urlWithParams).get('$filter');
+      expect(filter).not.toBeNull();
       expect(filter).toContain("tolower('dyson')");
       req.flush(envelope);
     });
@@ -158,6 +172,28 @@ describe('ProductService', () => {
 
       const id = await promise;
       expect(id).toBe(mockProduct.id);
+    });
+
+    it('emits null when the response carries no Location header', async () => {
+      const promise = firstValueFrom(service.create({ name: 'New Item' }));
+
+      http.expectOne(BASE).flush(null, { status: 201, statusText: 'Created' });
+
+      expect(await promise).toBeNull();
+    });
+
+    it('emits null when the Location header holds no parseable key', async () => {
+      const promise = firstValueFrom(service.create({ name: 'New Item' }));
+
+      http
+        .expectOne(BASE)
+        .flush(null, {
+          headers: { Location: BASE },
+          status: 201,
+          statusText: 'Created',
+        });
+
+      expect(await promise).toBeNull();
     });
   });
 

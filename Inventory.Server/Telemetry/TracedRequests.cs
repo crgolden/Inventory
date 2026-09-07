@@ -2,7 +2,9 @@ namespace Inventory.Telemetry;
 
 internal static class TracedRequests
 {
-    private static readonly string[] StaticAssetExtensions =
+    internal const string HealthPathPrefix = "/health";
+
+    internal static readonly string[] StaticAssetExtensions =
     [
         ".css", ".ico", ".jpg", ".jpeg", ".js", ".json", ".map", ".png", ".svg", ".webp", ".woff", ".woff2"
     ];
@@ -11,7 +13,7 @@ internal static class TracedRequests
     {
         var path = context.Request.Path;
 
-        if (path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWithSegments(HealthPathPrefix, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }

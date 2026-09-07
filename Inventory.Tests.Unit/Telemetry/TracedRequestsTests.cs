@@ -6,40 +6,55 @@ using Microsoft.AspNetCore.Http;
 [Trait("Category", "Unit")]
 public sealed class TracedRequestsTests
 {
+    // Drawn from the SUT's own list rather than a hand-picked sample of it: the previous three literals
+    // covered 3 of the 12 extensions production declares, so adding a thirteenth would have shipped
+    // untested. Sourcing the theory here means the coverage follows the production array automatically.
+    public static TheoryData<string> DeclaredStaticAssetExtensions() =>
+        [.. TracedRequests.StaticAssetExtensions];
+
     [Theory]
-    [InlineData("/chunk-BlZ1Efuc.js")]
-    [InlineData("/main-PSZ56RKK.js")]
-    [InlineData("/styles-K6J5AP2Y.css")]
-    [InlineData("/favicon.ico")]
-    [InlineData("/media/bootstrap-icons-CVBWLLHT.woff2")]
-    [InlineData("/MAIN-UPPERCASE.JS")]
-    public void ShouldTrace_IsFalseForAStaticAsset(string path)
+    [MemberData(nameof(DeclaredStaticAssetExtensions))]
+    public void ShouldTrace_IsFalseForAStaticAsset(string extension)
     {
-        Assert.False(TracedRequests.ShouldTrace(ContextFor(path)));
+        Assert.False(TracedRequests.ShouldTrace(ContextFor(HashedAssetPath(extension))));
+    }
+
+    [Fact]
+    public void ShouldTrace_IsFalseWhenTheExtensionIsUppercased()
+    {
+        Assert.False(TracedRequests.ShouldTrace(ContextFor(HashedAssetPath(".JS"))));
     }
 
     [Theory]
-    [InlineData("/health")]
-    [InlineData("/health/ready")]
-    public void ShouldTrace_IsFalseForTheHealthProbe(string path)
+    [InlineData("")]
+    [InlineData("/ready")]
+    public void ShouldTrace_IsFalseForTheHealthProbe(string suffix)
     {
+        var path = $"{TracedRequests.HealthPathPrefix}{suffix}";
+
         Assert.False(TracedRequests.ShouldTrace(ContextFor(path)));
     }
 
-    [Theory]
-    [InlineData("/products/api/odata/Products")]
-    [InlineData("/bff/user")]
-    [InlineData("/products/9182")]
-    [InlineData("/")]
-    public void ShouldTrace_IsTrueForRealApplicationTraffic(string path)
+    [Fact]
+    public void ShouldTrace_IsTrueForApplicationTraffic()
     {
+        var path = $"/{Token()}/{Token()}";
+
         Assert.True(TracedRequests.ShouldTrace(ContextFor(path)));
+    }
+
+    [Fact]
+    public void ShouldTrace_IsTrueForTheRootPath()
+    {
+        Assert.True(TracedRequests.ShouldTrace(ContextFor("/")));
     }
 
     [Fact]
     public void ShouldTrace_IsTrueForAPathThatMerelyContainsAnExtensionMidway()
     {
-        Assert.True(TracedRequests.ShouldTrace(ContextFor("/products/manual.js/details")));
+        var path = $"/{Token()}/manual.js/{Token()}";
+
+        Assert.True(TracedRequests.ShouldTrace(ContextFor(path)));
     }
 
     [Fact]
@@ -47,6 +62,10 @@ public sealed class TracedRequestsTests
     {
         Assert.True(TracedRequests.ShouldTrace(new DefaultHttpContext()));
     }
+
+    private static string Token() => Guid.NewGuid().ToString("N");
+
+    private static string HashedAssetPath(string extension) => $"/{Token()}-{Token()}{extension}";
 
     private static HttpContext ContextFor(string path)
     {

@@ -18,17 +18,12 @@ public sealed class InventoryWebApplicationFactory : IAsyncDisposable
     public string ServerAddress => _serverAddress
         ?? throw new InvalidOperationException("Server address is not available. Call StartAsync() first.");
 
-    private static void Stage(string msg) =>
-        Console.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] Factory: {msg}");
-
     public async Task StartAsync()
     {
         if (_app is not null)
         {
             return;
         }
-
-        Stage("StartAsync enter: creating builder");
 
         var contentRoot = Path.GetFullPath(
             Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Inventory.Server"));
@@ -57,20 +52,17 @@ public sealed class InventoryWebApplicationFactory : IAsyncDisposable
 
         builder.Services.AddSingleton<IStartupFilter, TestStaticFilesStartupFilter>();
 
-        Stage("Services configured; building app");
         _app = builder.Build();
 
         _app.UseDefaultFiles();
         _app.MapStaticAssets();
         _app.MapFallbackToFile("/index.html");
 
-        Stage("App built; starting");
         await _app.StartAsync();
 
         var server = _app.Services.GetRequiredService<IServer>();
         var addresses = server.Features.GetRequiredFeature<IServerAddressesFeature>();
         _serverAddress = addresses.Addresses.First().TrimEnd('/');
-        Stage($"StartAsync exit: {_serverAddress}");
     }
 
     public async ValueTask DisposeAsync()

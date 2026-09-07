@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import buildQuery from 'odata-query';
 import { Product } from '../products/product.model';
+import { escapeODataLiteral } from '../products/product.service';
 
 const BASE = '/catalog/api/odata/Products';
 
@@ -62,8 +63,9 @@ export class CatalogService {
   private readonly http = inject(HttpClient);
 
   getAll(params: CatalogParams): Observable<CatalogPage> {
-    const filter = params.search?.trim()
-      ? `contains(tolower(Name), tolower('${params.search.trim()}'))`
+    const term = params.search?.trim();
+    const filter = term
+      ? `contains(tolower(Name), tolower('${escapeODataLiteral(term)}'))`
       : undefined;
     const skip = (params.page - 1) * params.pageSize;
     const qs = buildQuery({

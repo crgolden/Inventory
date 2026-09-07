@@ -2,10 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   OnInit,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
@@ -25,6 +27,7 @@ export class CatalogListComponent implements OnInit {
 
   private readonly titleService = inject(Title);
   private readonly catalogService = inject(CatalogService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly items = signal<Product[]>([]);
   readonly total = signal(0);
@@ -58,7 +61,8 @@ export class CatalogListComponent implements OnInit {
           page: 1,
           pageSize: PAGE_SIZE,
         });
-      })
+      }),
+      takeUntilDestroyed(this.destroyRef)
     ).subscribe(result => {
       this.items.set(result.items);
       this.total.set(result.total);

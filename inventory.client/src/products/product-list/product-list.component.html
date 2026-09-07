@@ -4,6 +4,10 @@
     <a id="new-product-link" class="btn btn-primary" [routerLink]="['/products/new']">+ New Product</a>
   </div>
 
+  @if (error(); as message) {
+    <div id="product-list-error" class="alert alert-danger" role="alert">{{ message }}</div>
+  }
+
   <div class="mb-3">
     <input
       id="product-search"

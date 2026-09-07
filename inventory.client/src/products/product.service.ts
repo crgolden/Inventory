@@ -21,6 +21,12 @@ interface ApiProduct {
   UpdatedAt: string | null;
 }
 
+// OData escapes a single quote inside a string literal by doubling it. Without this a search for a term
+// containing an apostrophe ("O'Brien") closes the literal early and the server rejects the $filter.
+export function escapeODataLiteral(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
 function fromApi(raw: ApiProduct): Product {
   return {
     id: raw.Id,
@@ -44,8 +50,9 @@ export class ProductService {
   private readonly http = inject(HttpClient);
 
   getAll(search?: string): Observable<Product[]> {
-    const filter = search?.trim()
-      ? `contains(tolower(Name), tolower('${search.trim()}'))`
+    const term = search?.trim();
+    const filter = term
+      ? `contains(tolower(Name), tolower('${escapeODataLiteral(term)}'))`
       : undefined;
     const qs = buildQuery({ filter, orderBy: 'Name' });
     return this.http
@@ -57,12 +64,15 @@ export class ProductService {
     return this.http.get<ApiProduct>(`${BASE}(${id})`).pipe(map(fromApi));
   }
 
-  create(product: Partial<Product>): Observable<string> {
+  create(product: Partial<Product>): Observable<string | null> {
     return this.http.post<ApiProduct>(BASE, product, { observe: 'response' }).pipe(
       map((response: HttpResponse<ApiProduct>) => {
-        const location = response.headers.get('Location') ?? '';
-        const match = /\(([^)]+)\)$/.exec(location);
-        return match?.[1] ?? '';
+        const location = response.headers.get('Location');
+        if (location === null) {
+          return null;
+        }
+
+        return /\(([^)]+)\)$/.exec(location)?.[1] ?? null;
       })
     );
   }

@@ -70,8 +70,11 @@ describe('ProductDetailComponent', () => {
     const findManual = links.find((l) =>
       (l.nativeElement.textContent as string).includes('Find Manual'),
     );
-    expect(findManual).toBeTruthy();
-    expect(findManual!.nativeElement.getAttribute('href')).toContain(
+    if (findManual === undefined) {
+      throw new Error('No "Find Manual" link rendered, so there is no href to assert on.');
+    }
+
+    expect(findManual.nativeElement.getAttribute('href')).toContain(
       `/products/${mockProduct.id}/edit`,
     );
   });

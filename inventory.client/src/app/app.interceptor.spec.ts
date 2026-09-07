@@ -22,8 +22,11 @@ describe('appInterceptor', () => {
     };
 
     interceptor(request, next).subscribe(() => {
-      expect(modifiedReq).toBeDefined();
-      expect(modifiedReq!.headers.get('X-CSRF')).toBe('1');
+      if (modifiedReq === undefined) {
+        throw new Error('The interceptor never forwarded a request to the next handler.');
+      }
+
+      expect(modifiedReq.headers.get('X-CSRF')).toBe('1');
     });
   });
 });

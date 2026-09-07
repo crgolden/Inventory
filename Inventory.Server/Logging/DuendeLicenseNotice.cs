@@ -5,8 +5,8 @@ using Serilog.Events;
 
 internal static class DuendeLicenseNotice
 {
-    private const string LicenseValidatorSourceContext = "Duende.Bff.Licensing.LicenseValidator";
-    private const string NoLicenseConfiguredEventName = "NoValidLicense";
+    internal const string LicenseValidatorSourceContext = "Duende.Bff.Licensing.LicenseValidator";
+    internal const string NoLicenseConfiguredEventName = "NoValidLicense";
     private const string EventIdPropertyName = "EventId";
     private const string EventNamePropertyName = "Name";
 

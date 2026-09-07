@@ -105,7 +105,8 @@ describe('CatalogService', () => {
       service.getAll({ ...defaultParams, search: 'oled' }).subscribe();
 
       const req = http.expectOne((r) => r.urlWithParams.startsWith(BASE));
-      const filter = params(req.request.urlWithParams).get('$filter') ?? '';
+      const filter = params(req.request.urlWithParams).get('$filter');
+      expect(filter).not.toBeNull();
       expect(filter).toContain("contains(tolower(Name), tolower('oled'))");
       req.flush({ '@odata.count': 0, value: [] });
     });

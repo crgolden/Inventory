@@ -135,7 +135,7 @@ internal sealed class PlaywrightArtifactRecorder
             }
 
             Directory.CreateDirectory(artifact.FinalDirectory);
-            var targetDirectory = Path.Combine(artifact.FinalDirectory, artifact.ContextId);
+            var targetDirectory = Path.Combine(artifact.FinalDirectory, artifact.ContextId.ToString("N"));
             if (Directory.Exists(targetDirectory))
             {
                 DeleteDirectory(targetDirectory);
@@ -199,7 +199,7 @@ internal sealed class PlaywrightArtifactRecorder
             return;
         }
 
-        PendingArtifacts.GetOrAdd(_testId, _ => []).Add(new PendingArtifact(_tempDirectory, _finalDirectory, Guid.NewGuid().ToString("N")));
+        PendingArtifacts.GetOrAdd(_testId, _ => []).Add(new PendingArtifact(_tempDirectory, _finalDirectory, Guid.NewGuid()));
     }
 
     private static void WriteFailureMetadata(string directory, TestResultState? state)
@@ -271,12 +271,12 @@ internal sealed class PlaywrightArtifactRecorder
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(payload, JsonOptions()));
     }
 
-    private sealed class PendingArtifact(string tempDirectory, string finalDirectory, string contextId)
+    private sealed class PendingArtifact(string tempDirectory, string finalDirectory, Guid contextId)
     {
         public string TempDirectory { get; } = tempDirectory;
 
         public string FinalDirectory { get; } = finalDirectory;
 
-        public string ContextId { get; } = contextId;
+        public Guid ContextId { get; } = contextId;
     }
 }
