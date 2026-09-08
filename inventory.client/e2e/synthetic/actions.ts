@@ -105,7 +105,7 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
         await page.goto('/products/new');
         await page.locator('#name').fill(name);
         await page.locator('#brand').fill(SYNTHETIC_BRAND);
-        await page.locator('#price').fill(String(1 + rng.int(MAX_SYNTHETIC_PRICE - 1)));
+        await page.locator('#pricePaid').fill(String(1 + rng.int(MAX_SYNTHETIC_PRICE - 1)));
         await page.locator('#product-form-submit').click();
         await page.waitForURL(/\/products\/[^/]+$/);
         await expect(page.locator('#product-detail-heading')).toHaveText(name, { timeout: RENDER_TIMEOUT_MS });
