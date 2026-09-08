@@ -11,7 +11,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
-import { debounceTime, distinctUntilChanged, Subject, switchMap } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, EMPTY, Subject, switchMap } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { CatalogService, CatalogSortColumn } from '../catalog.service';
 import { CatalogProduct } from '../catalog-product.model';
 
@@ -32,6 +33,7 @@ export class CatalogListComponent implements OnInit {
   readonly items = signal<CatalogProduct[]>([]);
   readonly total = signal(0);
   readonly loading = signal(false);
+  readonly error = signal<string | null>(null);
   readonly searchTerm = signal('');
   readonly orderBy = signal<CatalogSortColumn>('Name');
   readonly orderDir = signal<'asc' | 'desc'>('asc');
@@ -61,13 +63,22 @@ export class CatalogListComponent implements OnInit {
     this.load$.pipe(
       switchMap(() => {
         this.loading.set(true);
+        this.error.set(null);
         return this.catalogService.getAll({
           search: this.searchTerm(),
           orderBy: this.orderBy(),
           orderDir: this.orderDir(),
           page: this.page(),
           pageSize: PAGE_SIZE,
-        });
+        }).pipe(
+          catchError((err: HttpErrorResponse) => {
+            this.error.set(`Could not load the catalog (${err.status}). Please try again.`);
+            this.items.set([]);
+            this.total.set(0);
+            this.loading.set(false);
+            return EMPTY;
+          })
+        );
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(result => {

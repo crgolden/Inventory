@@ -134,6 +134,49 @@ describe('ProductListComponent', () => {
     expect(emptyState.nativeElement.textContent).toContain('xyz');
   });
 
+  it('a failed search surfaces an error and stops the spinner instead of hanging on Loading', async () => {
+    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+    );
+
+    const input: HTMLInputElement = fixture.debugElement.query(
+      By.css('input[type="search"]'),
+    ).nativeElement;
+    input.value = 'anything';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.loading()).toBe(false);
+    const alert = fixture.debugElement.query(By.css('#product-list-error'));
+    expect(alert.nativeElement.textContent).toContain('500');
+  });
+
+  it('stays searchable after a failed search, so one API error does not kill the page', async () => {
+    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+    );
+    const input: HTMLInputElement = fixture.debugElement.query(
+      By.css('input[type="search"]'),
+    ).nativeElement;
+    input.value = 'boom';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await vi.runAllTimersAsync();
+
+    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(of(mockProducts));
+    input.value = 'tv';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+
+    expect(mockService.getAll).toHaveBeenLastCalledWith('tv');
+    expect(fixture.debugElement.queryAll(By.css('tbody tr')).length).toBe(2);
+  });
+
   it('clicking Delete shows inline confirmation', () => {
     const deleteBtn = fixture.debugElement.queryAll(By.css('button.btn-outline-danger'))[0];
     deleteBtn.nativeElement.click();

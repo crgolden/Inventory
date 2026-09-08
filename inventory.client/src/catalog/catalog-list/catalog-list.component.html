@@ -3,6 +3,10 @@
     <h2 id="catalog-heading" class="mb-0">Product Catalog</h2>
   </div>
 
+  @if (error(); as message) {
+    <div id="catalog-error" class="alert alert-danger" role="alert">{{ message }}</div>
+  }
+
   <div class="mb-3">
     <input
       id="catalog-search"

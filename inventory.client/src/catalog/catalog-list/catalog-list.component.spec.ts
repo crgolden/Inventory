@@ -4,7 +4,8 @@ import { CatalogService } from '../catalog.service';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { CatalogProduct } from '../catalog-product.model';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
@@ -153,6 +154,51 @@ describe('CatalogListComponent', () => {
 
     const emptyState = fixture.debugElement.query(By.css('.empty-state'));
     expect(emptyState.nativeElement.textContent).toContain('xyz');
+  });
+
+  it('a failed load surfaces an error and stops the spinner instead of hanging on Loading', async () => {
+    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+    );
+
+    const input: HTMLInputElement = fixture.debugElement.query(
+      By.css('input[type="search"]'),
+    ).nativeElement;
+    input.value = 'anything';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.loading()).toBe(false);
+    const alert = fixture.debugElement.query(By.css('#catalog-error'));
+    expect(alert.nativeElement.textContent).toContain('500');
+  });
+
+  it('stays usable after a failed load, so one API error does not kill the page', async () => {
+    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+    );
+    const input: HTMLInputElement = fixture.debugElement.query(
+      By.css('input[type="search"]'),
+    ).nativeElement;
+    input.value = 'boom';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await vi.runAllTimersAsync();
+
+    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
+      of({ items: mockProducts, total: 2 }),
+    );
+    input.value = 'dyson';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.css('#catalog-error'))).toBeNull();
+    expect(fixture.debugElement.queryAll(By.css('tbody tr')).length).toBe(2);
   });
 
   it('Next Page button is enabled and navigates to page 2 when total exceeds page size', async () => {

@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
-import { debounceTime, distinctUntilChanged, Subject, switchMap } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, EMPTY, Subject, switchMap } from 'rxjs';
 import { ProductService } from '../product.service';
 import { InventoryItemView } from '../inventory-item.model';
 
@@ -38,7 +38,14 @@ export class ProductListComponent implements OnInit {
       distinctUntilChanged(),
       switchMap(term => {
         this.loading.set(true);
-        return this.productService.getAll(term);
+        this.error.set(null);
+        return this.productService.getAll(term).pipe(
+          catchError((err: HttpErrorResponse) => {
+            this.error.set(`Could not load your products (${err.status}). Please try again.`);
+            this.loading.set(false);
+            return EMPTY;
+          })
+        );
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(p => {
