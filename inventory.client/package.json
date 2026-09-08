@@ -48,7 +48,7 @@
     "@angular/build": "^22.1.4",
     "@angular/cli": "^22.1.4",
     "@angular/compiler-cli": "^22.1.2",
-    "@crgolden/modules": "0.2.2",
+    "@crgolden/modules": "0.3.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@vitest/coverage-istanbul": "^4.1.8",
