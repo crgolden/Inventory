@@ -1,5 +1,6 @@
 namespace Inventory.Tests.E2E;
 
+using System.Text.RegularExpressions;
 using Inventory.Tests.E2E.Infrastructure;
 using Microsoft.Playwright;
 
@@ -7,6 +8,12 @@ using Microsoft.Playwright;
 [Trait("Category", "E2E")]
 public sealed class ProductCrudTests
 {
+    private static readonly Regex NewProductUrl = new(@"/products/new$");
+
+    private static readonly Regex ProductNotFoundUrl = new(@"/products/not-found$");
+
+    private static readonly Regex ProductDetailUrl = new(@"/products/[0-9a-fA-F-]{36}$");
+
     private readonly PlaywrightFixture _fixture;
 
     public ProductCrudTests(PlaywrightFixture fixture) => _fixture = fixture;
@@ -86,7 +93,7 @@ public sealed class ProductCrudTests
         await using (ctx)
         {
             await page.ClickAsync("#new-product-link");
-            await page.WaitForURLAsync("**/products/new");
+            await Assertions.Expect(page).ToHaveURLAsync(NewProductUrl);
 
             await page.FillAsync("#name", "My Laptop");
             await page.FillAsync("#brand", "Dell");
@@ -95,7 +102,7 @@ public sealed class ProductCrudTests
 
             await page.ClickAsync("#product-form-submit");
 
-            await page.WaitForURLAsync(url => url.Contains("/products/", StringComparison.Ordinal) && !url.Contains("/new", StringComparison.Ordinal));
+            await Assertions.Expect(page).ToHaveURLAsync(ProductDetailUrl);
 
             await Assertions.Expect(page.Locator("#product-detail-heading")).ToHaveTextAsync("My Laptop");
         }
@@ -120,7 +127,7 @@ public sealed class ProductCrudTests
 
             await page.ClickAsync("#product-form-submit");
 
-            await Assertions.Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex($@"/products/{product.Id}$"));
+            await Assertions.Expect(page).ToHaveURLAsync(new Regex($@"/products/{product.Id}$"));
 
             await Assertions.Expect(page.Locator("#product-detail-heading")).ToHaveTextAsync("Updated Name");
         }
@@ -155,7 +162,7 @@ public sealed class ProductCrudTests
         {
             await page.GotoAsync("/products/00000000-0000-0000-0000-000000000000");
 
-            await page.WaitForURLAsync("**/products/not-found");
+            await Assertions.Expect(page).ToHaveURLAsync(ProductNotFoundUrl);
             await Assertions.Expect(page.Locator("#product-not-found-heading")).ToContainTextAsync("Product Not Found");
         }
     }

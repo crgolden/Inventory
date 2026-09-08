@@ -1,5 +1,6 @@
 namespace Inventory.Tests.E2E;
 
+using System.Text.RegularExpressions;
 using Inventory.Tests.E2E.Infrastructure;
 using Microsoft.Playwright;
 
@@ -7,6 +8,8 @@ using Microsoft.Playwright;
 [Trait("Category", "E2E")]
 public sealed class ProductManualChatTests
 {
+    private static readonly Regex ProductDetailUrl = new(@"/products/[0-9a-fA-F-]{36}$");
+
     private readonly PlaywrightFixture _fixture;
 
     public ProductManualChatTests(PlaywrightFixture fixture) => _fixture = fixture;
@@ -193,7 +196,7 @@ public sealed class ProductManualChatTests
 
             await page.ClickAsync("#product-form-submit");
 
-            await page.WaitForURLAsync(url => url.Contains("/products/", StringComparison.Ordinal) && !url.Contains("/new", StringComparison.Ordinal));
+            await Assertions.Expect(page).ToHaveURLAsync(ProductDetailUrl);
 
             var created = _fixture.ProductStore.GetProducts(null)
                 .FirstOrDefault(p => string.Equals(p.Name, productName, StringComparison.Ordinal));
