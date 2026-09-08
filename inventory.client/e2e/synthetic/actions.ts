@@ -10,6 +10,7 @@ async function expectRendered(locator: Locator): Promise<void> {
 export const SYNTHETIC_PRODUCT_PREFIX = 'Synthetic Walker Product';
 
 const SYNTHETIC_BRAND = 'Synthetic';
+const SYNTHETIC_MODEL_PREFIX = 'SYN';
 const SWEEP_ITERATION_LIMIT = 50;
 const SWEEP_SETTLE_TIMEOUT_MS = 10_000;
 const MAX_SYNTHETIC_PRICE = 500;
@@ -105,6 +106,7 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
         await page.goto('/products/new');
         await page.locator('#name').fill(name);
         await page.locator('#brand').fill(SYNTHETIC_BRAND);
+        await page.locator('#modelNumber').fill(`${SYNTHETIC_MODEL_PREFIX}-${seed}-${createdSequence}`);
         await page.locator('#pricePaid').fill(String(1 + rng.int(MAX_SYNTHETIC_PRICE - 1)));
         await page.locator('#product-form-submit').click();
         await page.waitForURL(/\/products\/[^/]+$/);
