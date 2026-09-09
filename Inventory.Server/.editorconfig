@@ -302,4 +302,4 @@ dotnet_diagnostic.CA1307.severity = warning
 dotnet_diagnostic.CA1309.severity = warning
 dotnet_diagnostic.CA1310.severity = warning
 dotnet_diagnostic.CA1862.severity = warning
-dotnet_diagnostic.CA1308.severity = none  # the only site is the OTel deployment.environment attribute, which AGENTS/TELEMETRY.md fixes as a lowercase wire value
+dotnet_diagnostic.CA1308.severity = none  # the only site is the OTel deployment.environment attribute, which AGENTS/OBSERVABILITY.md fixes as a lowercase wire value

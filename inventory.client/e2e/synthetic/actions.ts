@@ -109,7 +109,7 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
         await page.locator('#modelNumber').fill(`${SYNTHETIC_MODEL_PREFIX}-${seed}-${createdSequence}`);
         await page.locator('#pricePaid').fill(String(1 + rng.int(MAX_SYNTHETIC_PRICE - 1)));
         await page.locator('#product-form-submit').click();
-        await page.waitForURL(/\/products\/[^/]+$/);
+        await expect(page).toHaveURL(/\/products\/[^/]+$/);
         await expect(page.locator('#product-detail-heading')).toHaveText(name, { timeout: RENDER_TIMEOUT_MS });
         createdNames.push(name);
       },
@@ -127,7 +127,7 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
         await expect(page).toHaveURL(/\/products\/.+\/edit$/);
         await page.locator('#brand').fill(`${SYNTHETIC_BRAND} ${1 + rng.int(MAX_SYNTHETIC_BRAND_SUFFIX - 1)}`);
         await page.locator('#product-form-submit').click();
-        await page.waitForURL(url => !url.pathname.endsWith('/edit'));
+        await expect(page).toHaveURL(url => !url.pathname.endsWith('/edit'));
       },
     },
     {
