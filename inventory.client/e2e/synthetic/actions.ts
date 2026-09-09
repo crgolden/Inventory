@@ -47,6 +47,7 @@ async function showOnlyProductNamed(page: Page, name: string): Promise<void> {
 
 export function createInventoryActions(seed: number): readonly WalkerAction[] {
   const createdNames: string[] = [];
+  const runToken = Date.now().toString(36);
   let createdSequence = 0;
   return [
     {
@@ -106,7 +107,7 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
         await page.goto('/products/new');
         await page.locator('#name').fill(name);
         await page.locator('#brand').fill(SYNTHETIC_BRAND);
-        await page.locator('#modelNumber').fill(`${SYNTHETIC_MODEL_PREFIX}-${seed}-${createdSequence}`);
+        await page.locator('#modelNumber').fill(`${SYNTHETIC_MODEL_PREFIX}-${runToken}-${createdSequence}`);
         await page.locator('#pricePaid').fill(String(1 + rng.int(MAX_SYNTHETIC_PRICE - 1)));
         await page.locator('#product-form-submit').click();
         await expect(page).toHaveURL(/\/products\/[^/]+$/);
