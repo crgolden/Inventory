@@ -65,7 +65,7 @@ notice out of Elasticsearch. Only one of its six tests asserts something is drop
 assert that the four sibling events from the same logger — `ErrorValidatingLicenseKey`,
 `LicenseHasExpired`, `TrialModeWarning`, and a same-named event from any other logger — still get
 through, and those are the ones that can fail. Widening the predicate to match the logger category
-instead of the event turns four of the six red. Background: `AGENTS/Inventory.md`.
+instead of the event turns four of the six red. Background: `AGENTS/REPOS/Inventory.md`.
 
 ### E2E Tests (critical pre-commit subset — ~5 tests, ~10 min)
 
