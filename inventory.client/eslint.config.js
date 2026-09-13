@@ -30,6 +30,7 @@ module.exports = tseslint.config(
       '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'app', style: 'kebab-case' }],
       '@typescript-eslint/unbound-method': ['error', { ignoreStatic: true }],
       'no-inline-comments': 'error',
+      'crgolden/no-component-data-fetch': 'error',
       'crgolden/no-component-navigation': 'error',
     },
   },

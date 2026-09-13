@@ -508,7 +508,13 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
                 {
                     var body = request.PostData ?? "{}";
                     using var doc = JsonDocument.Parse(body);
-                    var input = doc.RootElement.TryGetProperty("input", out var i) ? (i.GetString() ?? string.Empty) : string.Empty;
+                    var input = ReadString(doc.RootElement, "input");
+                    if (input is null)
+                    {
+                        await route.FulfillAsync(new RouteFulfillOptions { Status = 400 });
+                        return;
+                    }
+
                     var chat = ChatStore.CompleteMessage(chatId, input);
                     if (chat is null)
                     {
@@ -718,7 +724,13 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
     {
         var body = request.PostData ?? "{}";
         using var doc = JsonDocument.Parse(body);
-        var input = doc.RootElement.TryGetProperty("input", out var i) ? (i.GetString() ?? string.Empty) : string.Empty;
+        var input = ReadString(doc.RootElement, "input");
+        if (input is null)
+        {
+            await route.FulfillAsync(new RouteFulfillOptions { Status = 400 });
+            return;
+        }
+
         var (_, sseBody) = ChatStore.CompleteStream(chatId, input);
 
         await route.FulfillAsync(new RouteFulfillOptions

@@ -31,7 +31,9 @@ export class ProductListComponent implements OnInit {
 
   ngOnInit(): void {
     this.titleService.setTitle('Inventory | My Products');
-    this.products.set(this.route.snapshot.data['products'] as InventoryItemView[]);
+    const resolved = (this.route.snapshot.data['products'] ?? null) as InventoryItemView[] | null;
+    this.error.set(resolved === null ? 'Could not load your products. Please try again.' : null);
+    this.products.set(resolved ?? []);
 
     this.search$.pipe(
       debounceTime(300),

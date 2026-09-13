@@ -9,6 +9,9 @@ public sealed class TracedRequestsTests
     public static TheoryData<string> DeclaredStaticAssetExtensions() =>
         [.. TracedRequests.StaticAssetExtensions];
 
+    public static TheoryData<string> UppercasedStaticAssetExtensions() =>
+        [.. TracedRequests.StaticAssetExtensions.Select(extension => extension.ToUpperInvariant())];
+
     [Theory]
     [MemberData(nameof(DeclaredStaticAssetExtensions))]
     public void ShouldTrace_IsFalseForAStaticAsset(string extension)
@@ -16,18 +19,23 @@ public sealed class TracedRequestsTests
         Assert.False(TracedRequests.ShouldTrace(ContextFor(HashedAssetPath(extension))));
     }
 
-    [Fact]
-    public void ShouldTrace_IsFalseWhenTheExtensionIsUppercased()
+    [Theory]
+    [MemberData(nameof(UppercasedStaticAssetExtensions))]
+    public void ShouldTrace_IsFalseWhenTheExtensionIsUppercased(string extension)
     {
-        Assert.False(TracedRequests.ShouldTrace(ContextFor(HashedAssetPath(".JS"))));
+        Assert.False(TracedRequests.ShouldTrace(ContextFor(HashedAssetPath(extension))));
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("/ready")]
-    public void ShouldTrace_IsFalseForTheHealthProbe(string suffix)
+    [Fact]
+    public void ShouldTrace_IsFalseForTheHealthPrefixItself()
     {
-        var path = $"{TracedRequests.HealthPathPrefix}{suffix}";
+        Assert.False(TracedRequests.ShouldTrace(ContextFor(TracedRequests.HealthPathPrefix)));
+    }
+
+    [Fact]
+    public void ShouldTrace_IsFalseForAPathBeneathTheHealthPrefix()
+    {
+        var path = $"{TracedRequests.HealthPathPrefix}/{Token()}";
 
         Assert.False(TracedRequests.ShouldTrace(ContextFor(path)));
     }
@@ -46,10 +54,11 @@ public sealed class TracedRequestsTests
         Assert.True(TracedRequests.ShouldTrace(ContextFor("/")));
     }
 
-    [Fact]
-    public void ShouldTrace_IsTrueForAPathThatMerelyContainsAnExtensionMidway()
+    [Theory]
+    [MemberData(nameof(DeclaredStaticAssetExtensions))]
+    public void ShouldTrace_IsTrueForAPathThatMerelyContainsAnExtensionMidway(string extension)
     {
-        var path = $"/{Token()}/manual.js/{Token()}";
+        var path = $"/{Token()}/{Token()}{extension}/{Token()}";
 
         Assert.True(TracedRequests.ShouldTrace(ContextFor(path)));
     }

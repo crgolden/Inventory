@@ -134,6 +134,25 @@ describe('ProductListComponent', () => {
     expect(emptyState.nativeElement.textContent).toContain('xyz');
   });
 
+  it('reports a failed first load instead of rendering an empty list as if nothing was owned', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [ProductListComponent],
+      providers: [
+        { provide: ProductService, useValue: mockService },
+        provideRouter(testRoutes),
+        { provide: ActivatedRoute, useValue: { snapshot: { data: { products: null } } } },
+      ],
+    }).compileComponents();
+
+    const degraded = TestBed.createComponent(ProductListComponent);
+    degraded.detectChanges();
+
+    const alert = degraded.debugElement.query(By.css('#product-list-error'));
+    expect(alert.nativeElement.textContent).toContain('Could not load your products');
+    expect(degraded.componentInstance.products()).toEqual([]);
+  });
+
   it('a failed search surfaces an error and stops the spinner instead of hanging on Loading', async () => {
     (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 500 })),

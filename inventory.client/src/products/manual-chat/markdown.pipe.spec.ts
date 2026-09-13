@@ -9,16 +9,16 @@ describe('MarkdownPipe', () => {
     pipe = TestBed.runInInjectionContext(() => new MarkdownPipe());
   });
 
-  it('returns empty string for null', () => {
-    expect(pipe.transform(null)).toBe('');
+  it('returns null for null', () => {
+    expect(pipe.transform(null)).toBeNull();
   });
 
-  it('returns empty string for undefined', () => {
-    expect(pipe.transform(undefined)).toBe('');
+  it('returns null for undefined', () => {
+    expect(pipe.transform(undefined)).toBeNull();
   });
 
-  it('returns empty string for empty string', () => {
-    expect(pipe.transform('')).toBe('');
+  it('returns null for a blank value', () => {
+    expect(pipe.transform('')).toBeNull();
   });
 
   it('wraps plain text in a paragraph', () => {

@@ -8,15 +8,16 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 import { catchError, debounceTime, distinctUntilChanged, EMPTY, Subject, switchMap } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { CatalogService, CatalogSortColumn } from '../catalog.service';
+import { CatalogPage, CatalogService, CatalogSortColumn } from '../catalog.service';
 import { CatalogProduct } from '../catalog-product.model';
+import { CATALOG_PAGE_SIZE } from '../catalog-list.resolver';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = CATALOG_PAGE_SIZE;
 
 @Component({
   selector: 'app-catalog-list',
@@ -29,6 +30,7 @@ export class CatalogListComponent implements OnInit {
   private readonly titleService = inject(Title);
   private readonly catalogService = inject(CatalogService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
 
   readonly items = signal<CatalogProduct[]>([]);
   readonly total = signal(0);
@@ -87,7 +89,13 @@ export class CatalogListComponent implements OnInit {
       this.loading.set(false);
     });
 
-    this.load$.next();
+    const resolved = (this.route.snapshot.data['catalog'] ?? null) as CatalogPage | null;
+    if (resolved === null) {
+      this.error.set('Could not load the catalog. Please try again.');
+      return;
+    }
+    this.items.set(resolved.items);
+    this.total.set(resolved.total);
   }
 
   onSearch(term: string): void {

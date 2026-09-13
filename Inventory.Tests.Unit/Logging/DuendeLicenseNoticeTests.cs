@@ -13,15 +13,16 @@ public sealed class DuendeLicenseNoticeTests
 {
     private const string LicenseValidatorSourceContext = DuendeLicenseNotice.LicenseValidatorSourceContext;
     private const string DroppedEventName = DuendeLicenseNotice.NoLicenseConfiguredEventName;
-    private const int NoValidLicenseEventId = 767400809;
-    private const int LicenseHasExpiredEventId = 770251973;
-    private const int TrialModeWarningEventId = 875645872;
-    private const int ErrorValidatingLicenseKeyEventId = 197645874;
+    private const string LicenseHasExpiredEventName = "LicenseHasExpired";
+    private const string TrialModeWarningEventName = "TrialModeWarning";
+    private const string ErrorValidatingLicenseKeyEventName = "ErrorValidatingLicenseKey";
+
+    private static readonly int DroppedEventIdentifier = NewEventIdentifier();
 
     [Fact]
     public void IsNoLicenseConfiguredNotice_DropsTheUnlicensedNotice()
     {
-        var eventId = new EventId(NoValidLicenseEventId, DroppedEventName);
+        var eventId = new EventId(DroppedEventIdentifier, DroppedEventName);
 
         var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Error);
 
@@ -31,7 +32,8 @@ public sealed class DuendeLicenseNoticeTests
     [Fact]
     public void IsNoLicenseConfiguredNotice_KeepsTheExpiredLicenseEventFromTheSameSource()
     {
-        var eventId = new EventId(LicenseHasExpiredEventId, "LicenseHasExpired");
+        var licenseHasExpiredEventIdentifier = NewEventIdentifier();
+        var eventId = new EventId(licenseHasExpiredEventIdentifier, LicenseHasExpiredEventName);
 
         var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Warning);
 
@@ -41,7 +43,8 @@ public sealed class DuendeLicenseNoticeTests
     [Fact]
     public void IsNoLicenseConfiguredNotice_KeepsTheTrialModeSessionLimitEvent()
     {
-        var eventId = new EventId(TrialModeWarningEventId, "TrialModeWarning");
+        var trialModeWarningEventIdentifier = NewEventIdentifier();
+        var eventId = new EventId(trialModeWarningEventIdentifier, TrialModeWarningEventName);
 
         var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Error);
 
@@ -51,7 +54,8 @@ public sealed class DuendeLicenseNoticeTests
     [Fact]
     public void IsNoLicenseConfiguredNotice_KeepsTheMalformedLicenseKeyEventFromTheSameSource()
     {
-        var eventId = new EventId(ErrorValidatingLicenseKeyEventId, "ErrorValidatingLicenseKey");
+        var errorValidatingLicenseKeyEventIdentifier = NewEventIdentifier();
+        var eventId = new EventId(errorValidatingLicenseKeyEventIdentifier, ErrorValidatingLicenseKeyEventName);
 
         var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Error);
 
@@ -62,7 +66,7 @@ public sealed class DuendeLicenseNoticeTests
     public void IsNoLicenseConfiguredNotice_KeepsTheDroppedEventNameWhenItComesFromAnotherSource()
     {
         var sourceContext = $"Contoso.Licensing.{Guid.NewGuid():N}";
-        var eventId = new EventId(NoValidLicenseEventId, DroppedEventName);
+        var eventId = new EventId(DroppedEventIdentifier, DroppedEventName);
 
         var reachedTheSink = WriteThroughFilter(sourceContext, eventId, LogLevel.Error);
 
@@ -72,7 +76,7 @@ public sealed class DuendeLicenseNoticeTests
     [Fact]
     public void IsNoLicenseConfiguredNotice_KeepsAnotherEventCarryingTheDroppedEventIdentifier()
     {
-        var eventId = new EventId(NoValidLicenseEventId, $"Event{Guid.NewGuid():N}");
+        var eventId = new EventId(DroppedEventIdentifier, $"Event{Guid.NewGuid():N}");
 
         var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Error);
 
@@ -91,13 +95,17 @@ public sealed class DuendeLicenseNoticeTests
                    .SetMinimumLevel(LogLevel.Trace)
                    .AddSerilog(serilogLogger)))
         {
+            var messageTemplate = Guid.NewGuid().ToString("N");
+
             loggerFactory
                 .CreateLogger(sourceContext)
-                .Log(logLevel, eventId, "Please start a conversation with us: https://duende.link/l/bff/contact");
+                .Log(logLevel, eventId, messageTemplate);
         }
 
         return sink.Events;
     }
+
+    private static int NewEventIdentifier() => Random.Shared.Next();
 
     private sealed class CapturingSink : ILogEventSink
     {

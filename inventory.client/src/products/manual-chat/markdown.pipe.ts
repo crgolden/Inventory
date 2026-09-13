@@ -9,12 +9,12 @@ import { marked } from 'marked';
 export class MarkdownPipe implements PipeTransform {
   private readonly sanitizer = inject(DomSanitizer);
 
-  transform(value: string | null | undefined): string {
+  transform(value: string | null | undefined): string | null {
     if (!value) {
-      return '';
+      return null;
     }
 
     const html = marked.parse(value) as string;
-    return this.sanitizer.sanitize(SecurityContext.HTML, html) ?? '';
+    return this.sanitizer.sanitize(SecurityContext.HTML, html);
   }
 }

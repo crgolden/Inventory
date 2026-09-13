@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CatalogListComponent } from './catalog-list.component';
 import { CatalogService } from '../catalog.service';
 import { By } from '@angular/platform-browser';
-import { provideRouter, Routes } from '@angular/router';
+import { ActivatedRoute, provideRouter, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -51,7 +51,14 @@ describe('CatalogListComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [CatalogListComponent],
-      providers: [{ provide: CatalogService, useValue: mockService }, provideRouter(testRoutes)],
+      providers: [
+        { provide: CatalogService, useValue: mockService },
+        provideRouter(testRoutes),
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { data: { catalog: { items: mockProducts, total: 2 } } } },
+        },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(CatalogListComponent);

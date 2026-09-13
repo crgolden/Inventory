@@ -110,6 +110,10 @@ jobs:
         working-directory: inventory.client
         run: npm run typecheck:e2e
 
+      - name: Type-check unit specs
+        working-directory: inventory.client
+        run: npm run typecheck:spec
+
       - name: Begin Sonar analysis
         if: github.actor != 'dependabot[bot]'
         env:

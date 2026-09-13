@@ -79,7 +79,7 @@ export class ManualChatComponent {
 
   private setInitialTitle(chatId: string): void {
     const title = this.buildInitialTitle();
-    if (!title) {
+    if (title === null) {
       return;
     }
 
@@ -130,11 +130,11 @@ export class ManualChatComponent {
     });
   }
 
-  private buildInitialTitle(): string {
+  private buildInitialTitle(): string | null {
     const ctx = this.productContext();
     const parts = ['Manual:', ctx?.name, ctx?.brand, ctx?.modelNumber].filter(Boolean) as string[];
     if (parts.length <= 1) {
-      return '';
+      return null;
     }
 
     const title = parts.join(' ');

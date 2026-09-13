@@ -8,15 +8,12 @@ export interface InventoryItemView {
   category: string | null;
   manualUrl: string | null;
 
-  /** Manufacturer list price from the shared catalog record, not what this owner paid. */
   msrpPrice: number | null;
 
   serialNumber: string | null;
 
-  /** ISO 8601 datetime string, e.g. `"2024-01-15T00:00:00Z"`. */
   purchaseDate: string | null;
 
-  /** What this owner paid, as opposed to the catalog record's `msrpPrice`. */
   pricePaid: number | null;
 
   description: string | null;

@@ -77,15 +77,16 @@ export class ChatService {
 
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
-          let buffer = '';
+          let pendingLine: string | null = null;
 
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() ?? '';
+            const chunk = decoder.decode(value, { stream: true });
+            const lines: string[] = (pendingLine === null ? chunk : pendingLine + chunk).split('\n');
+            const remainder: string | undefined = lines.pop();
+            pendingLine = remainder === undefined || remainder.length === 0 ? null : remainder;
 
             for (const line of lines) {
               if (!line.startsWith('data: ')) continue;
