@@ -13,10 +13,18 @@ const SYNTHETIC_BRAND = 'Synthetic';
 const SYNTHETIC_MODEL_PREFIX = 'SYN';
 const SWEEP_ITERATION_LIMIT = 50;
 const SWEEP_SETTLE_TIMEOUT_MS = 10_000;
+const CATALOG_ODATA_BASE = '/products/api/odata/CatalogProducts';
+const CATALOG_SWEEP_PAGE_SIZE = 100;
+const CSRF_HEADER = { 'X-CSRF': '1' } as const;
 const MAX_SYNTHETIC_PRICE = 500;
 const MAX_SYNTHETIC_BRAND_SUFFIX = 100;
 
 export async function sweepSyntheticProducts(page: Page): Promise<void> {
+  await sweepSyntheticInventoryItems(page);
+  await sweepSyntheticCatalogRows(page);
+}
+
+async function sweepSyntheticInventoryItems(page: Page): Promise<void> {
   await page.goto('/products');
   await expect(page.locator('#products-heading')).toBeVisible();
   const searchBox = page.locator('#product-search');
@@ -37,6 +45,24 @@ export async function sweepSyntheticProducts(page: Page): Promise<void> {
     await expect(rows).toHaveCount(rowCount - 1, { timeout: RENDER_TIMEOUT_MS });
   }
   throw new Error(`Sweep did not converge after ${SWEEP_ITERATION_LIMIT} deletions of "${SYNTHETIC_PRODUCT_PREFIX}" rows.`);
+}
+
+async function sweepSyntheticCatalogRows(page: Page): Promise<void> {
+  const filter = `startswith(ModelNumber,'${SYNTHETIC_MODEL_PREFIX}-')`;
+  const listed = await page.request.get(
+    `${CATALOG_ODATA_BASE}?$filter=${encodeURIComponent(filter)}&$select=Id&$top=${CATALOG_SWEEP_PAGE_SIZE}`,
+    { headers: CSRF_HEADER },
+  );
+  if (!listed.ok()) {
+    return;
+  }
+  const body = (await listed.json()) as { value?: { Id?: string }[] };
+  for (const row of body.value ?? []) {
+    if (row.Id === undefined) {
+      continue;
+    }
+    await page.request.delete(`${CATALOG_ODATA_BASE}(${row.Id})`, { headers: CSRF_HEADER });
+  }
 }
 
 async function showOnlyProductNamed(page: Page, name: string): Promise<void> {

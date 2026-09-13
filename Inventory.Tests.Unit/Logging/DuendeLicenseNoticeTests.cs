@@ -13,9 +13,10 @@ public sealed class DuendeLicenseNoticeTests
 {
     private const string LicenseValidatorSourceContext = DuendeLicenseNotice.LicenseValidatorSourceContext;
     private const string DroppedEventName = DuendeLicenseNotice.NoLicenseConfiguredEventName;
-    private const string LicenseHasExpiredEventName = "LicenseHasExpired";
-    private const string TrialModeWarningEventName = "TrialModeWarning";
-    private const string ErrorValidatingLicenseKeyEventName = "ErrorValidatingLicenseKey";
+    private const string LicenseHasExpiredEventName = DuendeLicenseEventConstants.LicenseHasExpiredEventName;
+    private const string LicenseDetailsEventName = DuendeLicenseEventConstants.LicenseDetailsEventName;
+    private const string TrialModeWarningEventName = DuendeLicenseEventConstants.TrialModeWarningEventName;
+    private const string ErrorValidatingLicenseKeyEventName = DuendeLicenseEventConstants.ErrorValidatingLicenseKeyEventName;
 
     private static readonly int DroppedEventIdentifier = NewEventIdentifier();
 
@@ -58,6 +59,17 @@ public sealed class DuendeLicenseNoticeTests
         var eventId = new EventId(errorValidatingLicenseKeyEventIdentifier, ErrorValidatingLicenseKeyEventName);
 
         var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Error);
+
+        Assert.Single(reachedTheSink);
+    }
+
+    [Fact]
+    public void IsNoLicenseConfiguredNotice_KeepsTheLicenseDetailsEventFromTheSameSource()
+    {
+        var licenseDetailsEventIdentifier = NewEventIdentifier();
+        var eventId = new EventId(licenseDetailsEventIdentifier, LicenseDetailsEventName);
+
+        var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Debug);
 
         Assert.Single(reachedTheSink);
     }

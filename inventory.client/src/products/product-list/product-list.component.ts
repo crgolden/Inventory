@@ -1,12 +1,13 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 import { catchError, debounceTime, distinctUntilChanged, EMPTY, Subject, switchMap } from 'rxjs';
 import { ProductService } from '../product.service';
 import { InventoryItemView } from '../inventory-item.model';
+import { productSearchFrom } from '../product-query';
 
 @Component({
   selector: 'app-product-list',
@@ -19,6 +20,7 @@ export class ProductListComponent implements OnInit {
   private readonly titleService = inject(Title);
   private readonly productService = inject(ProductService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly products = signal<InventoryItemView[]>([]);
@@ -28,6 +30,8 @@ export class ProductListComponent implements OnInit {
   readonly error = signal<string | null>(null);
 
   private readonly search$ = new Subject<string>();
+  private readonly load$ = new Subject<string>();
+  private loadedTerm = '';
 
   ngOnInit(): void {
     this.titleService.setTitle('Inventory | My Products');
@@ -38,6 +42,12 @@ export class ProductListComponent implements OnInit {
     this.search$.pipe(
       debounceTime(300),
       distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(term => {
+      this.writeListStateToUrl({ q: term || null });
+    });
+
+    this.load$.pipe(
       switchMap(term => {
         this.loading.set(true);
         this.error.set(null);
@@ -54,11 +64,34 @@ export class ProductListComponent implements OnInit {
       this.products.set(p);
       this.loading.set(false);
     });
+
+    this.loadedTerm = productSearchFrom(this.route.snapshot.queryParams);
+
+    this.route.queryParams.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
+      const term = productSearchFrom(params);
+      if (this.searchTerm() !== term) {
+        this.searchTerm.set(term);
+      }
+      if (term === this.loadedTerm) {
+        return;
+      }
+      this.loadedTerm = term;
+      this.load$.next(term);
+    });
   }
 
   onSearch(term: string): void {
     this.searchTerm.set(term);
     this.search$.next(term);
+  }
+
+  private writeListStateToUrl(queryParams: Params): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams,
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   confirmDelete(id: string): void {

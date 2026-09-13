@@ -31,7 +31,7 @@ module.exports = tseslint.config(
       '@typescript-eslint/unbound-method': ['error', { ignoreStatic: true }],
       'no-inline-comments': 'error',
       'crgolden/no-component-data-fetch': 'error',
-      'crgolden/no-component-navigation': 'error',
+      'crgolden/no-component-navigation': ['error', { exemptMethods: ['writeListStateToUrl'] }],
     },
   },
   {

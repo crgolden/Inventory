@@ -2,9 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ProductListComponent } from './product-list.component';
 import { ProductService } from '../product.service';
 import { By } from '@angular/platform-browser';
-import { ActivatedRoute, provideRouter, Routes } from '@angular/router';
+import { ActivatedRoute, Params, provideRouter, Router, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { InventoryItemView } from '../inventory-item.model';
 
@@ -55,6 +55,22 @@ const mockProducts: InventoryItemView[] = [
 describe('ProductListComponent', () => {
   let fixture: ComponentFixture<ProductListComponent>;
   let mockService: Partial<ProductService>;
+  let queryParams$: BehaviorSubject<Params>;
+
+  function interceptNavigation(): void {
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockImplementation((_commands, extras) => {
+      const merged: Params = { ...queryParams$.value };
+      for (const [key, value] of Object.entries(extras?.queryParams ?? {})) {
+        if (value === null || value === undefined) {
+          delete merged[key];
+        } else {
+          merged[key] = String(value);
+        }
+      }
+      queryParams$.next(merged);
+      return Promise.resolve(true);
+    });
+  }
 
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -64,6 +80,8 @@ describe('ProductListComponent', () => {
       delete: vi.fn(() => of(void 0)),
     };
 
+    queryParams$ = new BehaviorSubject<Params>({});
+
     await TestBed.configureTestingModule({
       imports: [ProductListComponent],
       providers: [
@@ -71,10 +89,17 @@ describe('ProductListComponent', () => {
         provideRouter(testRoutes),
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { data: { products: mockProducts } } },
+          useValue: {
+            snapshot: { data: { products: mockProducts }, queryParams: {} },
+            get queryParams() {
+              return queryParams$.asObservable();
+            },
+          },
         },
       ],
     }).compileComponents();
+
+    interceptNavigation();
 
     fixture = TestBed.createComponent(ProductListComponent);
 
@@ -134,6 +159,34 @@ describe('ProductListComponent', () => {
     expect(emptyState.nativeElement.textContent).toContain('xyz');
   });
 
+  it('puts the search term in the URL so a filtered list can be shared', async () => {
+    const input: HTMLInputElement = fixture.debugElement.query(
+      By.css('input[type="search"]'),
+    ).nativeElement;
+    input.value = 'dyson';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+
+    expect(queryParams$.value['q']).toBe('dyson');
+    expect(mockService.getAll).toHaveBeenCalledWith('dyson');
+  });
+
+  it('restores the search box from the URL rather than opening blank on a shared link', async () => {
+    queryParams$.next({ q: 'kettle' });
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.searchTerm()).toBe('kettle');
+    expect(mockService.getAll).toHaveBeenCalledWith('kettle');
+  });
+
+  it('does not refetch the list the resolver already answered for this URL', () => {
+    expect(mockService.getAll).not.toHaveBeenCalled();
+  });
+
   it('reports a failed first load instead of rendering an empty list as if nothing was owned', async () => {
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
@@ -141,9 +194,19 @@ describe('ProductListComponent', () => {
       providers: [
         { provide: ProductService, useValue: mockService },
         provideRouter(testRoutes),
-        { provide: ActivatedRoute, useValue: { snapshot: { data: { products: null } } } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { data: { products: null }, queryParams: {} },
+            get queryParams() {
+              return queryParams$.asObservable();
+            },
+          },
+        },
       ],
     }).compileComponents();
+
+    interceptNavigation();
 
     const degraded = TestBed.createComponent(ProductListComponent);
     degraded.detectChanges();

@@ -2,9 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CatalogListComponent } from './catalog-list.component';
 import { CatalogService } from '../catalog.service';
 import { By } from '@angular/platform-browser';
-import { ActivatedRoute, provideRouter, Routes } from '@angular/router';
+import { ActivatedRoute, Params, provideRouter, Router, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
-import { of, throwError } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { CatalogProduct } from '../catalog-product.model';
 
@@ -41,6 +41,7 @@ const mockProducts: CatalogProduct[] = [
 describe('CatalogListComponent', () => {
   let fixture: ComponentFixture<CatalogListComponent>;
   let mockService: Partial<CatalogService>;
+  let queryParams$: BehaviorSubject<Params>;
 
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -49,6 +50,8 @@ describe('CatalogListComponent', () => {
       getAll: vi.fn(() => of({ items: mockProducts, total: 2 })),
     };
 
+    queryParams$ = new BehaviorSubject<Params>({});
+
     await TestBed.configureTestingModule({
       imports: [CatalogListComponent],
       providers: [
@@ -56,10 +59,28 @@ describe('CatalogListComponent', () => {
         provideRouter(testRoutes),
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { data: { catalog: { items: mockProducts, total: 2 } } } },
+          useValue: {
+            snapshot: { data: { catalog: { items: mockProducts, total: 2 } }, queryParams: {} },
+            get queryParams() {
+              return queryParams$.asObservable();
+            },
+          },
         },
       ],
     }).compileComponents();
+
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockImplementation((_commands, extras) => {
+      const merged: Params = { ...queryParams$.value };
+      for (const [key, value] of Object.entries(extras?.queryParams ?? {})) {
+        if (value === null || value === undefined) {
+          delete merged[key];
+        } else {
+          merged[key] = String(value);
+        }
+      }
+      queryParams$.next(merged);
+      return Promise.resolve(true);
+    });
 
     fixture = TestBed.createComponent(CatalogListComponent);
     fixture.detectChanges();
@@ -91,44 +112,57 @@ describe('CatalogListComponent', () => {
     expect(text.nativeElement.textContent).toContain('of 2');
   });
 
-  it('Previous Page button is disabled on first page', () => {
-    const buttons = fixture.debugElement.queryAll(By.css('button.btn-outline-secondary'));
-    const prevBtn = buttons[0];
-    expect(prevBtn.nativeElement.disabled).toBe(true);
+  it('Previous Page is an inert control on the first page', () => {
+    const prev = fixture.debugElement.query(By.css('#catalog-prev-page'));
+    expect(prev.nativeElement.tagName).toBe('BUTTON');
+    expect(prev.nativeElement.disabled).toBe(true);
   });
 
-  it('Next Page button is disabled when total fits on one page', () => {
-    const buttons = fixture.debugElement.queryAll(By.css('button.btn-outline-secondary'));
-    const nextBtn = buttons[1];
-    expect(nextBtn.nativeElement.disabled).toBe(true);
+  it('Next Page is an inert control when total fits on one page', () => {
+    const next = fixture.debugElement.query(By.css('#catalog-next-page'));
+    expect(next.nativeElement.tagName).toBe('BUTTON');
+    expect(next.nativeElement.disabled).toBe(true);
   });
 
-  it('clicking Name column header calls getAll with orderBy Name', () => {
-    const headerBtns = fixture.debugElement.queryAll(By.css('thead button'));
-    headerBtns[0].nativeElement.click();
-    fixture.detectChanges();
-
-    expect(mockService.getAll).toHaveBeenCalledWith(expect.objectContaining({ orderBy: 'Name' }));
+  it('offers every column header as a link rather than a click handler', () => {
+    const headers = fixture.debugElement.queryAll(By.css('thead a'));
+    expect(headers.length).toBe(4);
+    expect(fixture.debugElement.queryAll(By.css('thead button')).length).toBe(0);
   });
 
-  it('clicking the active Name column toggles orderDir to desc', () => {
-    const nameBtn = fixture.debugElement.queryAll(By.css('thead button'))[0];
+  it('the Name header offers descending once Name is the active ascending sort', () => {
+    expect(fixture.componentInstance.sortParams('Name')).toEqual({
+      orderBy: null,
+      orderDir: 'desc',
+      page: null,
+    });
+  });
 
-    nameBtn.nativeElement.click();
+  it('a different column offers ascending, and drops orderDir rather than writing the default', () => {
+    expect(fixture.componentInstance.sortParams('Brand')).toEqual({
+      orderBy: 'Brand',
+      orderDir: null,
+      page: null,
+    });
+  });
+
+  it('asks for the order the URL names', async () => {
+    queryParams$.next({ orderBy: 'Brand', orderDir: 'desc' });
+    await vi.runAllTimersAsync();
     fixture.detectChanges();
 
     expect(mockService.getAll).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: 'Name', orderDir: 'desc' }),
+      expect.objectContaining({ orderBy: 'Brand', orderDir: 'desc' }),
     );
   });
 
-  it('clicking a different column resets direction to asc', () => {
-    const brandBtn = fixture.debugElement.queryAll(By.css('thead button'))[1];
-    brandBtn.nativeElement.click();
+  it('falls back to the default order when the URL names a column that does not exist', async () => {
+    queryParams$.next({ orderBy: 'Nonsense', orderDir: 'sideways' });
+    await vi.runAllTimersAsync();
     fixture.detectChanges();
 
     expect(mockService.getAll).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: 'Brand', orderDir: 'asc' }),
+      expect.objectContaining({ orderBy: 'Name', orderDir: 'asc' }),
     );
   });
 
@@ -208,20 +242,33 @@ describe('CatalogListComponent', () => {
     expect(fixture.debugElement.queryAll(By.css('tbody tr')).length).toBe(2);
   });
 
-  it('Next Page button is enabled and navigates to page 2 when total exceeds page size', async () => {
-    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
-      of({ items: mockProducts, total: 25 }),
-    );
+  it('Next Page becomes a link carrying page 2 when the total exceeds one page', () => {
     fixture.componentInstance.total.set(25);
     fixture.detectChanges();
 
-    const nextBtn = fixture.debugElement.queryAll(By.css('button.btn-outline-secondary'))[1];
-    expect(nextBtn.nativeElement.disabled).toBe(false);
+    const next = fixture.debugElement.query(By.css('#catalog-next-page'));
+    expect(next.nativeElement.tagName, 'a page turn is a link, not a click handler').toBe('A');
+    expect(fixture.componentInstance.pageParams(2)).toEqual({ page: 2 });
+  });
 
-    nextBtn.nativeElement.click();
+  it('drops the page parameter rather than writing page=1, so the first page has one URL', () => {
+    expect(fixture.componentInstance.pageParams(1)).toEqual({ page: null });
+  });
+
+  it('asks for the page the URL names', async () => {
+    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
+      of({ items: mockProducts, total: 25 }),
+    );
+
+    queryParams$.next({ page: '2' });
+    await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.page()).toBe(2);
     expect(mockService.getAll).toHaveBeenCalledWith(expect.objectContaining({ page: 2 }));
+    expect(fixture.componentInstance.page()).toBe(2);
+  });
+
+  it('does not refetch the page the resolver already answered for this URL', () => {
+    expect(mockService.getAll).not.toHaveBeenCalled();
   });
 });
