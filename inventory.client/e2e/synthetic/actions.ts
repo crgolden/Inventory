@@ -15,6 +15,7 @@ const SWEEP_ITERATION_LIMIT = 50;
 const SWEEP_SETTLE_TIMEOUT_MS = 10_000;
 const CATALOG_ODATA_BASE = '/products/api/odata/CatalogProducts';
 const CATALOG_SWEEP_PAGE_SIZE = 100;
+const NOT_OURS_TO_REMOVE_STATUSES: ReadonlySet<number> = new Set([409, 404]);
 const CSRF_HEADER = { 'X-CSRF': '1' } as const;
 const MAX_SYNTHETIC_PRICE = 500;
 const MAX_SYNTHETIC_BRAND_SUFFIX = 100;
@@ -54,14 +55,21 @@ async function sweepSyntheticCatalogRows(page: Page): Promise<void> {
     { headers: CSRF_HEADER },
   );
   if (!listed.ok()) {
-    return;
+    throw new Error(
+      `Catalog sweep could not list its rows: ${listed.status()} from ${CATALOG_ODATA_BASE}. ` +
+        'A sweep that cannot list is indistinguishable from a sweep with nothing to do, and the residue it ' +
+        'exists to remove would grow with every run while this walk stayed green.',
+    );
   }
   const body = (await listed.json()) as { value?: { Id?: string }[] };
   for (const row of body.value ?? []) {
     if (row.Id === undefined) {
       continue;
     }
-    await page.request.delete(`${CATALOG_ODATA_BASE}(${row.Id})`, { headers: CSRF_HEADER });
+    const deleted = await page.request.delete(`${CATALOG_ODATA_BASE}(${row.Id})`, { headers: CSRF_HEADER });
+    if (!deleted.ok() && !NOT_OURS_TO_REMOVE_STATUSES.has(deleted.status())) {
+      throw new Error(`Catalog sweep could not delete ${row.Id}: ${deleted.status()}.`);
+    }
   }
 }
 
