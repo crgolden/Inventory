@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
+using static Inventory.Tests.Unit.TestSupport.TestValues;
 
 [Trait("Category", "Unit")]
 public sealed class DuendeLicenseNoticeTests
@@ -116,8 +117,6 @@ public sealed class DuendeLicenseNoticeTests
 
         return sink.Events;
     }
-
-    private static int NewEventIdentifier() => Random.Shared.Next();
 
     private sealed class CapturingSink : ILogEventSink
     {

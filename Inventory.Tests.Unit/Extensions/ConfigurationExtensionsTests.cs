@@ -3,6 +3,7 @@ namespace Inventory.Tests.Unit.Extensions;
 using System.Collections.Generic;
 using Inventory.Extensions;
 using Microsoft.Extensions.Configuration;
+using static Inventory.Tests.Unit.TestSupport.TestValues;
 
 [Trait("Category", "Unit")]
 public sealed class ConfigurationExtensionsTests
@@ -10,8 +11,8 @@ public sealed class ConfigurationExtensionsTests
     [Fact]
     public void GetRequired_ReturnsValue_WhenKeyExists()
     {
-        var settingKey = NewToken();
-        var settingValue = NewToken();
+        var settingKey = NewSettingToken();
+        var settingValue = NewSettingToken();
         IConfiguration config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { [settingKey] = settingValue })
             .Build();
@@ -22,7 +23,7 @@ public sealed class ConfigurationExtensionsTests
     [Fact]
     public void GetRequired_ThrowsWithKeyNameInMessage_WhenKeyIsMissing()
     {
-        var missingKey = NewToken();
+        var missingKey = NewSettingToken();
         IConfiguration config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>())
             .Build();
@@ -31,6 +32,4 @@ public sealed class ConfigurationExtensionsTests
 
         Assert.Equal($"Invalid '{missingKey}'.", ex.Message);
     }
-
-    private static string NewToken() => Guid.NewGuid().ToString("N");
 }

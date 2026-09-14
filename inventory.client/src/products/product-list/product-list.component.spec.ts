@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ProductListComponent } from './product-list.component';
 import { ProductService } from '../product.service';
 import { By } from '@angular/platform-browser';
-import { ActivatedRoute, Params, provideRouter, Router, Routes } from '@angular/router';
+import { ActivatedRoute, Data, Params, provideRouter, Router, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -56,21 +56,7 @@ describe('ProductListComponent', () => {
   let fixture: ComponentFixture<ProductListComponent>;
   let mockService: Partial<ProductService>;
   let queryParams$: BehaviorSubject<Params>;
-
-  function interceptNavigation(): void {
-    vi.spyOn(TestBed.inject(Router), 'navigate').mockImplementation((_commands, extras) => {
-      const merged: Params = { ...queryParams$.value };
-      for (const [key, value] of Object.entries(extras?.queryParams ?? {})) {
-        if (value === null || value === undefined) {
-          delete merged[key];
-        } else {
-          merged[key] = String(value);
-        }
-      }
-      queryParams$.next(merged);
-      return Promise.resolve(true);
-    });
-  }
+  let data$: BehaviorSubject<Data>;
 
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -81,6 +67,7 @@ describe('ProductListComponent', () => {
     };
 
     queryParams$ = new BehaviorSubject<Params>({});
+    data$ = new BehaviorSubject<Data>({ products: mockProducts });
 
     await TestBed.configureTestingModule({
       imports: [ProductListComponent],
@@ -94,12 +81,26 @@ describe('ProductListComponent', () => {
             get queryParams() {
               return queryParams$.asObservable();
             },
+            get data() {
+              return data$.asObservable();
+            },
           },
         },
       ],
     }).compileComponents();
 
-    interceptNavigation();
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockImplementation((_commands, extras) => {
+      const merged: Params = { ...queryParams$.value };
+      for (const [key, value] of Object.entries(extras?.queryParams ?? {})) {
+        if (value === null || value === undefined) {
+          delete merged[key];
+        } else {
+          merged[key] = String(value);
+        }
+      }
+      queryParams$.next(merged);
+      return Promise.resolve(true);
+    });
 
     fixture = TestBed.createComponent(ProductListComponent);
 
@@ -128,30 +129,9 @@ describe('ProductListComponent', () => {
     expect(input).toBeTruthy();
   });
 
-  it('typing in the search input calls ProductService.getAll with the term', async () => {
-    const input: HTMLInputElement = fixture.debugElement.query(
-      By.css('input[type="search"]'),
-    ).nativeElement;
-    input.value = 'vacuum';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    await vi.runAllTimersAsync();
-    fixture.detectChanges();
-
-    expect(mockService.getAll).toHaveBeenCalledWith('vacuum');
-  });
-
-  it('shows no-match message when search returns empty list', async () => {
-    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(of([]));
-
-    const input: HTMLInputElement = fixture.debugElement.query(
-      By.css('input[type="search"]'),
-    ).nativeElement;
-    input.value = 'xyz';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
+  it('shows no-match message when the resolver answers an empty list', async () => {
+    queryParams$.next({ q: 'xyz' });
+    data$.next({ products: [] });
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
@@ -159,7 +139,7 @@ describe('ProductListComponent', () => {
     expect(emptyState.nativeElement.textContent).toContain('xyz');
   });
 
-  it('puts the search term in the URL so a filtered list can be shared', async () => {
+  it('puts the search term in the URL so a filtered list can be shared, and so the resolver re-runs', async () => {
     const input: HTMLInputElement = fixture.debugElement.query(
       By.css('input[type="search"]'),
     ).nativeElement;
@@ -171,7 +151,6 @@ describe('ProductListComponent', () => {
     fixture.detectChanges();
 
     expect(queryParams$.value['q']).toBe('dyson');
-    expect(mockService.getAll).toHaveBeenCalledWith('dyson');
   });
 
   it('restores the search box from the URL rather than opening blank on a shared link', async () => {
@@ -180,82 +159,37 @@ describe('ProductListComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.componentInstance.searchTerm()).toBe('kettle');
-    expect(mockService.getAll).toHaveBeenCalledWith('kettle');
   });
 
-  it('does not refetch the list the resolver already answered for this URL', () => {
+  it('never fetches the list itself, on the first render or on a URL change', async () => {
+    queryParams$.next({ q: 'dyson' });
+    data$.next({ products: mockProducts });
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+
     expect(mockService.getAll).not.toHaveBeenCalled();
   });
 
-  it('reports a failed first load instead of rendering an empty list as if nothing was owned', async () => {
-    TestBed.resetTestingModule();
-    await TestBed.configureTestingModule({
-      imports: [ProductListComponent],
-      providers: [
-        { provide: ProductService, useValue: mockService },
-        provideRouter(testRoutes),
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            snapshot: { data: { products: null }, queryParams: {} },
-            get queryParams() {
-              return queryParams$.asObservable();
-            },
-          },
-        },
-      ],
-    }).compileComponents();
-
-    interceptNavigation();
-
-    const degraded = TestBed.createComponent(ProductListComponent);
-    degraded.detectChanges();
-
-    const alert = degraded.debugElement.query(By.css('#product-list-error'));
-    expect(alert.nativeElement.textContent).toContain('Could not load your products');
-    expect(degraded.componentInstance.products()).toEqual([]);
-  });
-
-  it('a failed search surfaces an error and stops the spinner instead of hanging on Loading', async () => {
-    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 500 })),
-    );
-
-    const input: HTMLInputElement = fixture.debugElement.query(
-      By.css('input[type="search"]'),
-    ).nativeElement;
-    input.value = 'anything';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
+  it('reports a failed load instead of rendering an empty list as if nothing was owned', async () => {
+    data$.next({ products: null });
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.loading()).toBe(false);
     const alert = fixture.debugElement.query(By.css('#product-list-error'));
-    expect(alert.nativeElement.textContent).toContain('500');
+    expect(alert.nativeElement.textContent).toContain('Could not load your products');
+    expect(fixture.componentInstance.products()).toEqual([]);
   });
 
-  it('stays searchable after a failed search, so one API error does not kill the page', async () => {
-    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 500 })),
-    );
-    const input: HTMLInputElement = fixture.debugElement.query(
-      By.css('input[type="search"]'),
-    ).nativeElement;
-    input.value = 'boom';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-    await vi.runAllTimersAsync();
-
-    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(of(mockProducts));
-    input.value = 'tv';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
+  it('stays usable after a failed load, so one API error does not kill the page', async () => {
+    data$.next({ products: null });
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    expect(mockService.getAll).toHaveBeenLastCalledWith('tv');
+    data$.next({ products: mockProducts });
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.css('#product-list-error'))).toBeNull();
     expect(fixture.debugElement.queryAll(By.css('tbody tr')).length).toBe(2);
   });
 

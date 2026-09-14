@@ -4,7 +4,7 @@ import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
-import { catchError, debounceTime, distinctUntilChanged, EMPTY, Subject, switchMap } from 'rxjs';
+import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
 import { ProductService } from '../product.service';
 import { InventoryItemView } from '../inventory-item.model';
 import { productSearchFrom } from '../product-query';
@@ -26,18 +26,12 @@ export class ProductListComponent implements OnInit {
   readonly products = signal<InventoryItemView[]>([]);
   readonly confirmingDeleteId = signal<string | null>(null);
   readonly searchTerm = signal('');
-  readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
   private readonly search$ = new Subject<string>();
-  private readonly load$ = new Subject<string>();
-  private loadedTerm = '';
 
   ngOnInit(): void {
     this.titleService.setTitle('Inventory | My Products');
-    const resolved = (this.route.snapshot.data['products'] ?? null) as InventoryItemView[] | null;
-    this.error.set(resolved === null ? 'Could not load your products. Please try again.' : null);
-    this.products.set(resolved ?? []);
 
     this.search$.pipe(
       debounceTime(300),
@@ -47,36 +41,17 @@ export class ProductListComponent implements OnInit {
       this.writeListStateToUrl({ q: term || null });
     });
 
-    this.load$.pipe(
-      switchMap(term => {
-        this.loading.set(true);
-        this.error.set(null);
-        return this.productService.getAll(term).pipe(
-          catchError((err: HttpErrorResponse) => {
-            this.error.set(`Could not load your products (${err.status}). Please try again.`);
-            this.loading.set(false);
-            return EMPTY;
-          })
-        );
-      }),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe(p => {
-      this.products.set(p);
-      this.loading.set(false);
+    this.route.data.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(data => {
+      const resolved = (data['products'] ?? null) as InventoryItemView[] | null;
+      this.error.set(resolved === null ? 'Could not load your products. Please try again.' : null);
+      this.products.set(resolved ?? []);
     });
-
-    this.loadedTerm = productSearchFrom(this.route.snapshot.queryParams);
 
     this.route.queryParams.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       const term = productSearchFrom(params);
       if (this.searchTerm() !== term) {
         this.searchTerm.set(term);
       }
-      if (term === this.loadedTerm) {
-        return;
-      }
-      this.loadedTerm = term;
-      this.load$.next(term);
     });
   }
 

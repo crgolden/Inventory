@@ -11,9 +11,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
-import { catchError, debounceTime, distinctUntilChanged, EMPTY, Subject, switchMap } from 'rxjs';
-import { HttpErrorResponse } from '@angular/common/http';
-import { CatalogPage, CatalogService, CatalogSortColumn } from '../catalog.service';
+import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
+import { CatalogPage, CatalogSortColumn } from '../catalog.service';
 import { CatalogProduct } from '../catalog-product.model';
 import {
   CATALOG_PAGE_SIZE,
@@ -21,7 +20,6 @@ import {
   catalogOrderByFrom,
   catalogOrderDirFrom,
   catalogPageFrom,
-  catalogQueryKey,
   catalogSearchFrom,
 } from '../catalog-query';
 
@@ -36,14 +34,12 @@ const PAGE_SIZE = CATALOG_PAGE_SIZE;
 export class CatalogListComponent implements OnInit {
 
   private readonly titleService = inject(Title);
-  private readonly catalogService = inject(CatalogService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
   readonly items = signal<CatalogProduct[]>([]);
   readonly total = signal(0);
-  readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly searchTerm = signal('');
   readonly orderBy = signal<CatalogSortColumn>(DEFAULT_CATALOG_SORT);
@@ -59,8 +55,6 @@ export class CatalogListComponent implements OnInit {
   readonly hasNextPage = computed(() => this.page() < this.totalPages());
 
   private readonly search$ = new Subject<string>();
-  private readonly load$ = new Subject<void>();
-  private loadedKey = catalogQueryKey({});
 
   ngOnInit(): void {
     this.titleService.setTitle('Inventory | Catalog');
@@ -73,51 +67,21 @@ export class CatalogListComponent implements OnInit {
       this.writeListStateToUrl({ q: term || null }, true);
     });
 
-    this.load$.pipe(
-      switchMap(() => {
-        this.loading.set(true);
-        this.error.set(null);
-        return this.catalogService.getAll({
-          search: this.searchTerm() || undefined,
-          orderBy: this.orderBy(),
-          orderDir: this.orderDir(),
-          page: this.page(),
-          pageSize: PAGE_SIZE,
-        }).pipe(
-          catchError((err: HttpErrorResponse) => {
-            this.error.set(`Could not load the catalog (${err.status}). Please try again.`);
-            this.items.set([]);
-            this.total.set(0);
-            this.loading.set(false);
-            return EMPTY;
-          })
-        );
-      }),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe(result => {
-      this.items.set(result.items);
-      this.total.set(result.total);
-      this.loading.set(false);
-    });
-
-    this.loadedKey = catalogQueryKey(this.route.snapshot.queryParams);
-
-    const resolved = (this.route.snapshot.data['catalog'] ?? null) as CatalogPage | null;
-    if (resolved === null) {
-      this.error.set('Could not load the catalog. Please try again.');
-    } else {
+    this.route.data.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(data => {
+      const resolved = (data['catalog'] ?? null) as CatalogPage | null;
+      if (resolved === null) {
+        this.error.set('Could not load the catalog. Please try again.');
+        this.items.set([]);
+        this.total.set(0);
+        return;
+      }
+      this.error.set(null);
       this.items.set(resolved.items);
       this.total.set(resolved.total);
-    }
+    });
 
     this.route.queryParams.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       this.readControlsFrom(params);
-      const key = catalogQueryKey(params);
-      if (key === this.loadedKey) {
-        return;
-      }
-      this.loadedKey = key;
-      this.load$.next();
     });
   }
 

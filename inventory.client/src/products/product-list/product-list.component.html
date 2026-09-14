@@ -19,9 +19,7 @@
       aria-label="Search products by name" />
   </div>
 
-  @if (loading()) {
-    <div class="text-muted">Loading&hellip;</div>
-  } @else if (products().length === 0) {
+  @if (products().length === 0) {
     <div id="products-empty-state" class="empty-state text-center py-5">
       @if (searchTerm()) {
         <i class="bi bi-search fs-1 text-secondary mb-3 d-block"></i>

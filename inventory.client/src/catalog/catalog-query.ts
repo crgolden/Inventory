@@ -32,12 +32,3 @@ export function catalogPageFrom(params: Params): number {
   const requested = Number(params['page']);
   return Number.isInteger(requested) && requested > 0 ? requested : 1;
 }
-
-export function catalogQueryKey(params: Params): string {
-  return JSON.stringify([
-    catalogSearchFrom(params),
-    catalogOrderByFrom(params),
-    catalogOrderDirFrom(params),
-    catalogPageFrom(params),
-  ]);
-}

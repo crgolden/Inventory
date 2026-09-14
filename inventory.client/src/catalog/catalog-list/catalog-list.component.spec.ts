@@ -2,10 +2,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CatalogListComponent } from './catalog-list.component';
 import { CatalogService } from '../catalog.service';
 import { By } from '@angular/platform-browser';
-import { ActivatedRoute, Params, provideRouter, Router, Routes } from '@angular/router';
+import { ActivatedRoute, Data, Params, provideRouter, Router, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
-import { BehaviorSubject, of, throwError } from 'rxjs';
-import { HttpErrorResponse } from '@angular/common/http';
+import { BehaviorSubject, of } from 'rxjs';
 import { CatalogProduct } from '../catalog-product.model';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
@@ -42,6 +41,8 @@ describe('CatalogListComponent', () => {
   let fixture: ComponentFixture<CatalogListComponent>;
   let mockService: Partial<CatalogService>;
   let queryParams$: BehaviorSubject<Params>;
+  let data$: BehaviorSubject<Data>;
+  let navigateSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -51,6 +52,7 @@ describe('CatalogListComponent', () => {
     };
 
     queryParams$ = new BehaviorSubject<Params>({});
+    data$ = new BehaviorSubject<Data>({ catalog: { items: mockProducts, total: 2 } });
 
     await TestBed.configureTestingModule({
       imports: [CatalogListComponent],
@@ -64,12 +66,15 @@ describe('CatalogListComponent', () => {
             get queryParams() {
               return queryParams$.asObservable();
             },
+            get data() {
+              return data$.asObservable();
+            },
           },
         },
       ],
     }).compileComponents();
 
-    vi.spyOn(TestBed.inject(Router), 'navigate').mockImplementation((_commands, extras) => {
+    navigateSpy = vi.spyOn(TestBed.inject(Router), 'navigate').mockImplementation((_commands, extras) => {
       const merged: Params = { ...queryParams$.value };
       for (const [key, value] of Object.entries(extras?.queryParams ?? {})) {
         if (value === null || value === undefined) {
@@ -146,14 +151,13 @@ describe('CatalogListComponent', () => {
     });
   });
 
-  it('asks for the order the URL names', async () => {
+  it('reads the order the URL names into its controls', async () => {
     queryParams$.next({ orderBy: 'Brand', orderDir: 'desc' });
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    expect(mockService.getAll).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: 'Brand', orderDir: 'desc' }),
-    );
+    expect(fixture.componentInstance.orderBy()).toBe('Brand');
+    expect(fixture.componentInstance.orderDir()).toBe('desc');
   });
 
   it('falls back to the default order when the URL names a column that does not exist', async () => {
@@ -161,12 +165,11 @@ describe('CatalogListComponent', () => {
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    expect(mockService.getAll).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: 'Name', orderDir: 'asc' }),
-    );
+    expect(fixture.componentInstance.orderBy()).toBe('Name');
+    expect(fixture.componentInstance.orderDir()).toBe('asc');
   });
 
-  it('typing in the search input calls getAll with the term after debounce', async () => {
+  it('typing in the search input writes the term to the URL after debounce, so the resolver re-runs', async () => {
     const input: HTMLInputElement = fixture.debugElement.query(
       By.css('input[type="search"]'),
     ).nativeElement;
@@ -177,19 +180,15 @@ describe('CatalogListComponent', () => {
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    expect(mockService.getAll).toHaveBeenCalledWith(expect.objectContaining({ search: 'dyson' }));
+    expect(navigateSpy).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ queryParams: expect.objectContaining({ q: 'dyson' }) }),
+    );
   });
 
-  it('shows no-match message when search returns empty list', async () => {
-    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(of({ items: [], total: 0 }));
-
-    const input: HTMLInputElement = fixture.debugElement.query(
-      By.css('input[type="search"]'),
-    ).nativeElement;
-    input.value = 'xyz';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
+  it('shows no-match message when the resolver answers an empty page', async () => {
+    queryParams$.next({ q: 'xyz' });
+    data$.next({ catalog: { items: [], total: 0 } });
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
@@ -197,44 +196,21 @@ describe('CatalogListComponent', () => {
     expect(emptyState.nativeElement.textContent).toContain('xyz');
   });
 
-  it('a failed load surfaces an error and stops the spinner instead of hanging on Loading', async () => {
-    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 500 })),
-    );
-
-    const input: HTMLInputElement = fixture.debugElement.query(
-      By.css('input[type="search"]'),
-    ).nativeElement;
-    input.value = 'anything';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
+  it('a resolver that could not load surfaces an error instead of an empty page with no explanation', async () => {
+    data$.next({ catalog: null });
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.loading()).toBe(false);
     const alert = fixture.debugElement.query(By.css('#catalog-error'));
-    expect(alert.nativeElement.textContent).toContain('500');
+    expect(alert.nativeElement.textContent).toContain('Could not load the catalog');
   });
 
   it('stays usable after a failed load, so one API error does not kill the page', async () => {
-    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 500 })),
-    );
-    const input: HTMLInputElement = fixture.debugElement.query(
-      By.css('input[type="search"]'),
-    ).nativeElement;
-    input.value = 'boom';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
+    data$.next({ catalog: null });
     await vi.runAllTimersAsync();
-
-    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
-      of({ items: mockProducts, total: 2 }),
-    );
-    input.value = 'dyson';
-    input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
+
+    data$.next({ catalog: { items: mockProducts, total: 2 } });
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
@@ -255,20 +231,21 @@ describe('CatalogListComponent', () => {
     expect(fixture.componentInstance.pageParams(1)).toEqual({ page: null });
   });
 
-  it('asks for the page the URL names', async () => {
-    (mockService.getAll as ReturnType<typeof vi.fn>).mockReturnValue(
-      of({ items: mockProducts, total: 25 }),
-    );
-
+  it('reads the page the URL names into its controls', async () => {
     queryParams$.next({ page: '2' });
+    data$.next({ catalog: { items: mockProducts, total: 25 } });
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    expect(mockService.getAll).toHaveBeenCalledWith(expect.objectContaining({ page: 2 }));
     expect(fixture.componentInstance.page()).toBe(2);
   });
 
-  it('does not refetch the page the resolver already answered for this URL', () => {
+  it('never fetches the catalog itself, on the first render or on a URL change', async () => {
+    queryParams$.next({ page: '2', q: 'dyson' });
+    data$.next({ catalog: { items: mockProducts, total: 25 } });
+    await vi.runAllTimersAsync();
+    fixture.detectChanges();
+
     expect(mockService.getAll).not.toHaveBeenCalled();
   });
 });

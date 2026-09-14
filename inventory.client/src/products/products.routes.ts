@@ -5,6 +5,7 @@ import { productListResolver } from './product-list.resolver';
 export const productRoutes: Routes = [
   {
     path: '',
+    runGuardsAndResolvers: 'paramsOrQueryParamsChange',
     resolve: { products: productListResolver },
     loadComponent: () =>
       import('./product-list/product-list.component').then(m => m.ProductListComponent),

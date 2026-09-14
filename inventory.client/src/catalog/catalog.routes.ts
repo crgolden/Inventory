@@ -5,6 +5,7 @@ import { catalogListResolver } from './catalog-list.resolver';
 export const catalogRoutes: Routes = [
   {
     path: '',
+    runGuardsAndResolvers: 'paramsOrQueryParamsChange',
     resolve: { catalog: catalogListResolver },
     loadComponent: () =>
       import('./catalog-list/catalog-list.component').then(m => m.CatalogListComponent),
