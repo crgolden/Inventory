@@ -73,8 +73,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             IgnoreHTTPSErrors = true
         });
 
-        page.SetDefaultTimeout(60_000);
-
         await page.RouteAsync("**/bff/user", async route =>
         {
             await route.FulfillAsync(new RouteFulfillOptions
@@ -117,14 +115,10 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
         await page.GotoAsync("/products", new PageGotoOptions
         {
-            WaitUntil = WaitUntilState.DOMContentLoaded,
-            Timeout = 60_000
+            WaitUntil = WaitUntilState.DOMContentLoaded
         });
 
-        await page.WaitForSelectorAsync("#products-empty-state, #products-table", new PageWaitForSelectorOptions
-        {
-            Timeout = 60_000
-        });
+        await page.WaitForSelectorAsync("#products-empty-state, #products-table");
 
         return (session, page);
     }
@@ -141,7 +135,6 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
             BaseURL = BaseAddress,
             IgnoreHTTPSErrors = true,
         });
-        page.SetDefaultTimeout(60_000);
 
         await page.RouteAsync("**/bff/user", async route =>
         {
@@ -177,14 +170,10 @@ public sealed partial class PlaywrightFixture : IAsyncLifetime
 
         await page.GotoAsync("/catalog", new PageGotoOptions
         {
-            WaitUntil = WaitUntilState.DOMContentLoaded,
-            Timeout = 60_000
+            WaitUntil = WaitUntilState.DOMContentLoaded
         });
 
-        await page.WaitForSelectorAsync("#catalog-empty-state, #catalog-table", new PageWaitForSelectorOptions
-        {
-            Timeout = 60_000
-        });
+        await page.WaitForSelectorAsync("#catalog-empty-state, #catalog-table");
 
         return (session, page);
     }

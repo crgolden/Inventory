@@ -74,10 +74,7 @@ public sealed class ProductManualChatTests
             await page.ClickAsync("#manual-chat-send");
 
             var chip = page.Locator("[id^='url-chip-']");
-            await Assertions.Expect(chip).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
-            {
-                Timeout = 10_000
-            });
+            await Assertions.Expect(chip).ToBeVisibleAsync();
             await Assertions.Expect(chip).ToHaveAttributeAsync("title", InMemoryChatsStore.MockManualUrl);
         }
     }
@@ -101,10 +98,7 @@ public sealed class ProductManualChatTests
             await page.ClickAsync("#manual-chat-send");
 
             var chip = page.Locator("[id^='url-chip-']");
-            await Assertions.Expect(chip).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
-            {
-                Timeout = 10_000
-            });
+            await Assertions.Expect(chip).ToBeVisibleAsync();
             await chip.ClickAsync();
 
             await Assertions.Expect(page.Locator("#manualUrl")).ToHaveValueAsync(InMemoryChatsStore.MockManualUrl);
@@ -132,10 +126,7 @@ public sealed class ProductManualChatTests
                 await page.FillAsync("#manual-chat-input", $"message {i}", new PageFillOptions { Force = true });
                 await page.ClickAsync("#manual-chat-send", new PageClickOptions { Force = true });
                 var chips = page.Locator("[id^='url-chip-']");
-                await Assertions.Expect(chips).ToHaveCountAsync(i + 1, new LocatorAssertionsToHaveCountOptions
-                {
-                    Timeout = 10_000
-                });
+                await Assertions.Expect(chips).ToHaveCountAsync(i + 1);
             }
 
             var panelClientHeight = await page.EvaluateAsync<double>(
@@ -186,10 +177,7 @@ public sealed class ProductManualChatTests
             await page.ClickAsync("#manual-chat-send");
 
             var chip = page.Locator("[id^='url-chip-']");
-            await Assertions.Expect(chip).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
-            {
-                Timeout = 10_000
-            });
+            await Assertions.Expect(chip).ToBeVisibleAsync();
             await chip.ClickAsync();
 
             await Assertions.Expect(page.Locator("#manualUrl")).ToHaveValueAsync(InMemoryChatsStore.MockManualUrl);

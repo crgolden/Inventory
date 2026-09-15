@@ -55,8 +55,6 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         userAgent: `${devices['Desktop Chrome'].userAgent} crgolden-synthetic/1.0`,
-        actionTimeout: 30_000,
-        navigationTimeout: 60_000,
       },
     },
   ],

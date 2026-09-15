@@ -223,8 +223,7 @@ Environment contract:
 | `WalkerBaseUrl` | Deployed app URL; disables `webServer`, overrides `baseURL` |
 | `SYNTHETIC_SEED` | **Required** decimal uint32; the whole walk derives from it |
 | `SYNTHETIC_STEPS` | Optional step budget override (default 40) |
-| `EMAIL1` | Identity account the walker signs in as |
-| `PASSKEY_CREDENTIAL1` | That account's passkey, as the five-field JSON Playwright's virtual authenticator returns |
+| `PASSKEY_CREDENTIAL1` | The walker account's passkey, as the five-field JSON Playwright's virtual authenticator returns |
 
 Replay a failed walk with the seed from the job summary / failure message:
 

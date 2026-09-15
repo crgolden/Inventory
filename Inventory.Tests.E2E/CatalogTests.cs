@@ -7,6 +7,12 @@ using Microsoft.Playwright;
 [Trait("Category", "E2E")]
 public sealed class CatalogTests
 {
+    private const int ProductsFillingTheFirstPage = 20;
+    private const int ViewportWidthPixels = 1280;
+    private const int ShortViewportHeightPixels = 400;
+    private const int ScrollDistancePixels = 200;
+    private const int ScrollRestorationTolerancePixels = 5;
+
     private readonly PlaywrightFixture _fixture;
 
     public CatalogTests(PlaywrightFixture fixture) => _fixture = fixture;
@@ -112,7 +118,7 @@ public sealed class CatalogTests
 
             await Assertions.Expect(
                 page.Locator("#catalog-detail-heading")
-            ).ToHaveTextAsync(productName, new LocatorAssertionsToHaveTextOptions { Timeout = 60_000 });
+            ).ToHaveTextAsync(productName);
 
             Assert.Contains($"/catalog/{product.Id}", page.Url, StringComparison.Ordinal);
         }
@@ -130,8 +136,54 @@ public sealed class CatalogTests
 
             await Assertions.Expect(
                 page.Locator("#catalog-not-found-heading")
-            ).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 60_000 });
+            ).ToBeVisibleAsync();
             Assert.Contains("/catalog/not-found", page.Url, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Back_from_a_product_returns_the_reader_to_where_they_were_in_the_list()
+    {
+        _fixture.CatalogStore.Clear();
+        for (var seeded = 0; seeded < ProductsFillingTheFirstPage; seeded++)
+        {
+            _fixture.CatalogStore.Create($"{Guid.NewGuid()}");
+        }
+
+        var (ctx, page) = await _fixture.NewCatalogPageAsync();
+        await using (ctx)
+        {
+            await page.SetViewportSizeAsync(ViewportWidthPixels, ShortViewportHeightPixels);
+            await Assertions.Expect(page.Locator("#catalog-row-0")).ToBeVisibleAsync();
+
+            var readerPosition = await page.EvaluateAsync<int>(
+                "distance => { window.scrollBy(0, distance); return Math.round(window.scrollY); }",
+                ScrollDistancePixels);
+            Assert.True(
+                readerPosition > 0,
+                "the catalog page did not overflow the shortened viewport, so this test cannot tell a "
+                    + $"restored position from a reset one (scrollY {readerPosition})");
+
+            var positionWhenLeaving = await page.EvaluateAsync<int>(
+                """
+                () => {
+                  const link = [...document.querySelectorAll('[id^="view-product-"]')].find((anchor) => {
+                    const box = anchor.getBoundingClientRect();
+                    return box.top >= 0 && box.bottom <= window.innerHeight;
+                  });
+                  link.click();
+                  return Math.round(window.scrollY);
+                }
+                """);
+            Assert.Equal(readerPosition, positionWhenLeaving);
+
+            await Assertions.Expect(page.Locator("#catalog-detail-heading")).ToBeVisibleAsync();
+            await page.GoBackAsync();
+            await Assertions.Expect(page.Locator("#catalog-table")).ToBeVisibleAsync();
+
+            await page.WaitForFunctionAsync(
+                $"expected => Math.abs(window.scrollY - expected) <= {ScrollRestorationTolerancePixels}",
+                readerPosition);
         }
     }
 }
