@@ -33,11 +33,11 @@
       },
       "Duende.BFF.Yarp": {
         "type": "Direct",
-        "requested": "[4.2.0, )",
-        "resolved": "4.2.0",
-        "contentHash": "Vg05gzd/L9QWJsfYIij9J/kKDhB9C7ctjhsM4RApOHrSaijaTAPtu+UREzYw0UDJ4daWPqAoI9urxbGkTpTdLQ==",
+        "requested": "[4.3.0, )",
+        "resolved": "4.3.0",
+        "contentHash": "l66hcg5voEy/W/n2kPYOyEb6NsXB7SYy//GUtkhHmPYzldk/hlurbi5eqtpTGnL7JQfnMjXEWvPExR3noUU4Og==",
         "dependencies": {
-          "Duende.BFF": "4.2.0",
+          "Duende.BFF": "4.3.0",
           "Yarp.ReverseProxy": "2.3.0"
         }
       },
@@ -230,8 +230,8 @@
       },
       "Duende.BFF": {
         "type": "Transitive",
-        "resolved": "4.2.0",
-        "contentHash": "4uskbYboNMt4SkOzzlJzctToIByByGZdPzXls8/6bz9jOeS/zZw3BiSjsZLrGnQhWIo4XSrZNHFzM22CWmY8Gg==",
+        "resolved": "4.3.0",
+        "contentHash": "tLk+YpB3glhyvnD7hSAbifs5KJq9qck1r45Int+QWhH1aD3EphtbMukGcKtG4jA31enDEwx7n0eGj3w9vRCV9g==",
         "dependencies": {
           "Duende.AccessTokenManagement.OpenIdConnect": "4.1.1",
           "Microsoft.Extensions.Caching.Hybrid": "10.0.0"
