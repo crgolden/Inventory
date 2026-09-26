@@ -1,11 +1,14 @@
 import { expect, type Page } from '@playwright/test';
 import { newDisplayName, newText } from '@crgolden/modules/testing';
-import { CSRF_HEADERS } from './product-sweep';
+import e2eSettings from './e2e-settings.json';
+import { CSRF_HEADERS, sweepProducts } from './product-sweep';
 import { showOnlyProduct, type ListedProduct } from './product-list';
 import { INVENTORY_ITEMS_URL } from '../src/products/products-api';
 import { PRODUCT_ROW_ID_PREFIX, confirmDeleteProductId, deleteProductId } from '../src/product-row-ids';
 
 const NO_ROWS = 0;
+const E2E_PRODUCT_PREFIX = e2eSettings.productNamePrefix;
+const E2E_MODEL_PREFIX = e2eSettings.modelNumberPrefix;
 
 export interface NewProduct {
   readonly name: string;
@@ -15,10 +18,14 @@ export interface NewProduct {
 
 export function newProduct(): NewProduct {
   return {
-    name: newDisplayName(),
+    name: `${E2E_PRODUCT_PREFIX} ${newDisplayName()}`,
     brand: newDisplayName(),
-    modelNumber: newText(),
+    modelNumber: `${E2E_MODEL_PREFIX}-${newText()}`,
   };
+}
+
+export async function sweepE2eProducts(page: Page): Promise<void> {
+  await sweepProducts(page, { productNamePrefix: E2E_PRODUCT_PREFIX, modelNumberPrefix: E2E_MODEL_PREFIX });
 }
 
 export async function deleteProductThroughTheList(page: Page, product: ListedProduct): Promise<void> {

@@ -97,10 +97,8 @@ the exact artifact those steps verified.
 
 With `CI` set (CI itself, and the local gate), `playwright.config.ts` also starts three mock servers from
 `e2e/mocks/` and points the BFF at them; without it the BFF keeps its `appsettings.Development.json` targets, the local
-Identity, Products and Manuals, and `auth.setup.ts` signs in by passkey, so that run needs `PASSKEY_CREDENTIAL3`. The
-suite cleans up only through the UI: a journey that creates a product deletes it from the product list
-(`deleteProductThroughTheList` in `e2e/ci-products.ts`) before it completes. The catalog row a product creates has no
-delete lever in the UI, so against real services it stays.
+Identity, Products and Manuals, and `auth.setup.ts` signs in by passkey, so that run needs `PASSKEY_CREDENTIAL3`.
+Cleanup is described under **The suite sweeps before and after the run** below.
 
 ### Run all tests in sequence
 
@@ -193,10 +191,25 @@ are already running locally. With `CI` set every server starts fresh (`reuseExis
 adopts a stranger's BFF pointed somewhere else; the mock Products seeds enough catalog rows to overflow the scroll
 test's shortened viewport, and every other row a spec needs it creates itself.
 
-**The suite cleans up only through the UI.** `e2e/ci-products.ts` mints every product from generated values
-(`newProduct()`), and each journey that creates one deletes it through the product list before completing. The walker's
-API sweep (`e2e/product-sweep.ts`) belongs to the walker layer; generated brands and model numbers stop two runs
-colliding on Products' unique Brand + ModelNumber match key.
+**The suite sweeps before and after the run.** `e2e/ci-products.ts` mints every product from generated values under
+two prefixes from `e2e/e2e-settings.json`: the name starts with `productNamePrefix` and the model number with
+`modelNumberPrefix-`. `auth.setup.ts` sweeps both through `sweepE2eProducts` once it has signed in, before any spec
+runs, and the `sweep` project (`e2e/sweep.teardown.ts`, the `setup` project's `teardown`) sweeps again after the
+suite. The pre-run sweep is the one that matters: a run that crashes, is killed or stops at `--max-failures` never
+reaches its own cleanup, and without a sweep at the start its rows would fail every run after it, most visibly the
+empty-state spec, which asserts the account holds no products. Each journey still deletes its own product through
+the product list, because that deletion is itself under test. The sweep is `e2e/product-sweep.ts`, the same code
+the walker uses under its own prefixes; generated brands and model numbers stop two runs colliding on Products'
+unique Brand + ModelNumber match key.
+
+**The mock Products honors the sweep's own requests.** It filters the catalog on
+`startswith(ModelNumber,'…')`, answers any other `$filter` with 400 rather than ignoring it, and deletes a catalog
+row with 204, 404 when it is gone, and 409 while an inventory item still references it. A mock that ignored the
+filter or answered every delete 404 would let a sweep that removes nothing pass.
+
+**Retries are 0 and a failure keeps its trace.** A retry that passes relabels a failed attempt as flaky and hides
+its cause, and `--max-failures=1` then stops at the next test instead. `trace: 'retain-on-failure'` records every
+attempt and keeps the failed one, so the attempt that failed is the one that carries evidence.
 
 **Specs seed through the API, not through the form.** `createProduct()` in `e2e/ci-products.ts` posts to
 `/products/api/inventory/items` and returns both the inventory-item id and the catalog-product id. Products creates or
@@ -312,8 +325,8 @@ longer matches the installed Playwright.
 ### Playwright reporting
 
 `playwright.config.ts` writes a `list` reporter to the log, an HTML report to `inventory.client/playwright-report/`
-and JUnit XML to `inventory.client/playwright-results.xml`; CI uploads the last two. Traces are captured
-`on-first-retry`, so a failure that reproduces on retry carries a trace and a first-attempt flake does not.
+and JUnit XML to `inventory.client/playwright-results.xml`; CI uploads the last two. Traces are
+`retain-on-failure`, so every failed test carries its trace in the HTML report.
 
 CI uploads these artifacts separately from TRX:
 

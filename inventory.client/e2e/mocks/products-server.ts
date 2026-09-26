@@ -28,6 +28,7 @@ const SEEDED_CATALOG_ROWS = CATALOG_PAGE_SIZE + randomIntBetween(1, CATALOG_PAGE
 const INVENTORY_ITEM_KEY = /^\/odata\/InventoryItems\(([^)]+)\)$/;
 const CATALOG_PRODUCT_KEY = /^\/odata\/CatalogProducts\(([^)]+)\)$/;
 const NAME_CONTAINS_FILTER = /^contains\(tolower\(Name\), tolower\('((?:[^']|'')*)'\)\)$/;
+const MODEL_NUMBER_STARTS_WITH_FILTER = /^startswith\(ModelNumber,'((?:[^']|'')*)'\)$/;
 
 type CatalogRecord = CatalogProductEdit & { id: string; createdAt: string; updatedAt: string | null };
 type ItemRecord = InventoryItemEdit & { id: string; catalogProductId: string; createdAt: string; updatedAt: string | null };
@@ -171,12 +172,26 @@ async function patchCatalogRecord(request: IncomingMessage, response: ServerResp
   sendStatus(response, constants.HTTP_STATUS_NO_CONTENT);
 }
 
+function unescapeODataLiteral(literal: string | undefined): string | null {
+  return literal?.replace(/''/g, "'") ?? null;
+}
+
+function modelNumberStartsWith(modelNumber: string | null, prefix: string | null): boolean {
+  return prefix === null || (modelNumber !== null && modelNumber.startsWith(prefix));
+}
+
 function listCatalog(response: ServerResponse, query: URLSearchParams): void {
   const filter = query.get(ODataQueryOptions.filter);
-  const filterMatch = filter === null ? null : NAME_CONTAINS_FILTER.exec(filter);
-  const term = filterMatch?.[1]?.replace(/''/g, "'").toLowerCase() ?? null;
+  const term = unescapeODataLiteral(filter === null ? undefined : NAME_CONTAINS_FILTER.exec(filter)?.[1])?.toLowerCase() ?? null;
+  const prefix = unescapeODataLiteral(filter === null ? undefined : MODEL_NUMBER_STARTS_WITH_FILTER.exec(filter)?.[1]);
+  if (filter !== null && term === null && prefix === null) {
+    sendStatus(response, constants.HTTP_STATUS_BAD_REQUEST);
+    return;
+  }
   const orderBy = query.get(ODataQueryOptions.orderBy);
-  const matched = [...catalog.values()].filter(record => nameContains(record.name, term));
+  const matched = [...catalog.values()].filter(
+    record => nameContains(record.name, term) && modelNumberStartsWith(record.modelNumber, prefix),
+  );
   if (orderBy !== null) {
     const [orderColumn, orderDirection] = orderBy.split(' ');
     const sortKey = camelCase(orderColumn as CatalogSortColumn);
@@ -186,6 +201,19 @@ function listCatalog(response: ServerResponse, query: URLSearchParams): void {
   const skip = Number(query.get(ODataQueryOptions.skip) ?? 0);
   const top = Number(query.get(ODataQueryOptions.top) ?? matched.length);
   sendJson(response, constants.HTTP_STATUS_OK, { [ODATA_COUNT]: matched.length, value: matched.slice(skip, skip + top).map(pascalCase) });
+}
+
+function deleteCatalogRecord(response: ServerResponse, id: string): void {
+  if (!catalog.has(id)) {
+    sendStatus(response, constants.HTTP_STATUS_NOT_FOUND);
+    return;
+  }
+  if ([...items.values()].some(item => item.catalogProductId === id)) {
+    sendStatus(response, constants.HTTP_STATUS_CONFLICT);
+    return;
+  }
+  catalog.delete(id);
+  sendStatus(response, constants.HTTP_STATUS_NO_CONTENT);
 }
 
 function getCatalogRecord(response: ServerResponse, id: string): void {
@@ -215,6 +243,8 @@ createServer((request, response) => {
     getCatalogRecord(response, catalogKey);
   } else if (catalogKey !== undefined && request.method === HttpMethods.patch) {
     void patchCatalogRecord(request, response, catalogKey);
+  } else if (catalogKey !== undefined && request.method === HttpMethods.delete) {
+    deleteCatalogRecord(response, catalogKey);
   } else {
     sendStatus(response, constants.HTTP_STATUS_NOT_FOUND);
   }

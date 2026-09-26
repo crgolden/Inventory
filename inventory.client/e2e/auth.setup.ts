@@ -4,6 +4,7 @@ import { newId } from '@crgolden/modules/testing';
 import { PRODUCTS_URL } from '../src/app/app-paths';
 import { CSRF_HEADER, CSRF_HEADER_VALUE } from '../src/app/http-headers';
 import { BFF_LOGIN_URL, BFF_USER_PATH } from '../src/auth/auth-contract';
+import { sweepE2eProducts } from './ci-products';
 import { DuendeBffQueryParameters } from './duende-bff-constants';
 import e2eSettings from './e2e-settings.json';
 import { AGAINST_MOCKS, localOrigin } from './mocks/mock-dependencies';
@@ -28,4 +29,6 @@ setup('authenticate through the BFF and save the session cookie', async ({ page 
   expect(response.ok(), `the BFF answered ${response.status()} for the session cookie the login flow just produced`).toBeTruthy();
 
   await page.context().storageState({ path: e2eSettings.authStateFile });
+
+  await sweepE2eProducts(page);
 });

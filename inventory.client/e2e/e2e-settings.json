@@ -5,6 +5,8 @@
   "launchSettingsPath": "../Inventory.Server/Properties/launchSettings.json",
   "scrollDistancePx": 200,
   "catalogSweepPageSize": 100,
+  "productNamePrefix": "E2E Product",
+  "modelNumberPrefix": "E2E",
   "independentlyPinnedBenefitCardCount": 6,
   "localPasskeySlot": 3,
   "mockOidcPort": 5301,

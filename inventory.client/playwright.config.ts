@@ -31,14 +31,14 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   forbidOnly: !!process.env['CI'],
-  retries: process.env['CI'] ? 1 : 0,
+  retries: 0,
   workers: 1,
   reporter: [['list'], ['html', { open: 'never' }], ['junit', { outputFile: 'playwright-results.xml' }]],
 
   use: {
     baseURL: walkerBaseUrl ?? 'https://localhost:50212',
     ignoreHTTPSErrors: true,
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
   },
 
   webServer: (walkerBaseUrl || process.env['SKIP_WEBSERVER']) ? [] : [
@@ -65,6 +65,12 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: /auth\.setup\.ts/,
+      teardown: 'sweep',
+    },
+    {
+      name: 'sweep',
+      testMatch: /sweep\.teardown\.ts/,
+      use: { storageState: e2eSettings.authStateFile },
     },
     {
       name: 'chromium',
