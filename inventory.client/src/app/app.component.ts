@@ -1,16 +1,18 @@
 import { AfterViewInit, Component, inject, ChangeDetectionStrategy, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl, Title } from '@angular/platform-browser';
+import { PageContainerDirective } from '@crgolden/modules/primitives';
 import { NavMenuComponent } from '../nav-menu/nav-menu.component';
 import { AuthService } from '../auth/auth.service';
+import { SILENT_LOGIN_PROMPT, SILENT_LOGIN_SOURCE } from '../auth/auth-contract';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, NavMenuComponent],
+  imports: [RouterOutlet, NavMenuComponent, PageContainerDirective],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
+    class: 'block',
     '(window:message)': 'onMessage($event)'
   }
 })
@@ -30,7 +32,7 @@ export class AppComponent implements AfterViewInit {
       return;
     }
 
-    const loginUrl = `${this.authService.loginUrl}?prompt=none`;
+    const loginUrl = `${this.authService.loginUrl}?${SILENT_LOGIN_PROMPT}`;
     this.iframeUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(loginUrl));
     this.iframeVisible.set(true);
   }
@@ -41,7 +43,7 @@ export class AppComponent implements AfterViewInit {
     }
 
     const msg = event.data as { source?: string; isLoggedIn?: boolean } | null;
-    if (msg?.source !== 'bff-silent-login') {
+    if (msg?.source !== SILENT_LOGIN_SOURCE) {
       return;
     }
 

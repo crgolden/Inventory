@@ -1,7 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
+import { newCount, newText } from '@crgolden/modules/testing';
 import { CATALOG_PAGE_SIZE, catalogListResolver } from './catalog-list.resolver';
 import { CatalogPage, CatalogParams, CatalogService } from './catalog.service';
+import { CatalogSortDirections } from './catalog-sort-directions';
+import { CatalogSortColumns } from './catalog-api';
 
 const PAGE = { items: [], total: 0 } as CatalogPage;
 
@@ -43,6 +46,8 @@ describe('catalogListResolver', () => {
   });
 
   it('server-renders the page the URL asks for, so a shared deep link is not page one', async () => {
+    const requestedPage = newCount() + 1;
+    const term = newText();
     let received: CatalogParams | undefined;
 
     await run(
@@ -52,13 +57,13 @@ describe('catalogListResolver', () => {
           return of(PAGE);
         },
       },
-      { page: '3', orderBy: 'Brand', orderDir: 'desc', q: 'dyson' },
+      { page: String(requestedPage), orderBy: CatalogSortColumns.brand, orderDir: CatalogSortDirections.desc, q: term },
     );
 
-    expect(received?.page).toBe(3);
-    expect(received?.orderBy).toBe('Brand');
-    expect(received?.orderDir).toBe('desc');
-    expect(received?.search).toBe('dyson');
+    expect(received?.page).toBe(requestedPage);
+    expect(received?.orderBy).toBe(CatalogSortColumns.brand);
+    expect(received?.orderDir).toBe(CatalogSortDirections.desc);
+    expect(received?.search).toBe(term);
   });
 
   it('ignores a page that is not a positive whole number', async () => {
@@ -71,14 +76,14 @@ describe('catalogListResolver', () => {
           return of(PAGE);
         },
       },
-      { page: '-4' },
+      { page: String(-newCount()) },
     );
 
     expect(received?.page).toBe(1);
   });
 
   it('degrades to null so the route activates and the page reports the failure', async () => {
-    const result = await run({ getAll: () => throwError(() => new Error('boom')) });
+    const result = await run({ getAll: () => throwError(() => new Error(newText())) });
 
     expect(result).toBeNull();
   });

@@ -1,16 +1,12 @@
 import { Params } from '@angular/router';
-import { CatalogSortColumn } from './catalog.service';
+import { CatalogSortColumn, CatalogSortColumns } from './catalog-api';
+import { CatalogSortDirection, CatalogSortDirections } from './catalog-sort-directions';
 
-export const CATALOG_PAGE_SIZE = 20;
+export { CATALOG_PAGE_SIZE } from './catalog-page-size';
 
-export const DEFAULT_CATALOG_SORT: CatalogSortColumn = 'Name';
+export const DEFAULT_CATALOG_SORT: CatalogSortColumn = CatalogSortColumns.name;
 
-const SORT_COLUMNS: ReadonlySet<string> = new Set<CatalogSortColumn>([
-  'Name',
-  'Brand',
-  'Category',
-  'MsrpPrice',
-]);
+const SORT_COLUMNS: ReadonlySet<string> = new Set<CatalogSortColumn>(Object.values(CatalogSortColumns));
 
 export function catalogSearchFrom(params: Params): string {
   const value: unknown = params['q'];
@@ -24,8 +20,8 @@ export function catalogOrderByFrom(params: Params): CatalogSortColumn {
     : DEFAULT_CATALOG_SORT;
 }
 
-export function catalogOrderDirFrom(params: Params): 'asc' | 'desc' {
-  return params['orderDir'] === 'desc' ? 'desc' : 'asc';
+export function catalogOrderDirFrom(params: Params): CatalogSortDirection {
+  return params['orderDir'] === CatalogSortDirections.desc ? CatalogSortDirections.desc : CatalogSortDirections.asc;
 }
 
 export function catalogPageFrom(params: Params): number {

@@ -165,7 +165,7 @@ The Angular dev server proxies `/bff` and other API paths to `https://localhost:
 Inventory.Server/     # ASP.NET Core 10 BFF — OIDC session, API proxy, data protection
 inventory.client/     # Angular 22 SPA — signals, BFF session, chat and product UI
 Inventory.Tests.Unit/ # xUnit v3 — backend unit tests (Moq)
-Inventory.Tests.E2E/  # xUnit v3 — E2E tests (Playwright/Chromium)
+inventory.client/e2e/ # Playwright (TypeScript): browser E2E and the synthetic walker
 ```
 
 ## Commands
@@ -184,9 +184,8 @@ cd inventory.client && npm run build
 dotnet build Inventory.Tests.Unit --configuration Debug
 .\Inventory.Tests.Unit\bin\Debug\net10.0\Inventory.Tests.Unit.exe -trait "Category=Unit" -showLiveOutput
 
-# Backend E2E tests (Playwright; no Azure credentials needed — static-file Kestrel + Playwright API mocks)
-dotnet build Inventory.Tests.E2E --configuration Debug
-.\Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe -trait "Category=E2E" -showLiveOutput
+# Browser E2E tests (Playwright; signs in to the deployed Identity, needs PASSKEY_CREDENTIAL3)
+cd inventory.client && npm run playwright:install && npm run e2e:ci
 
 # Frontend unit tests (Vitest)
 cd inventory.client && npm test

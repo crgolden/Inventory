@@ -1,0 +1,18 @@
+{
+  "stepBudget": { "defaultSteps": 40, "maxSteps": 500 },
+  "passkeySlot": 1,
+  "productNamePrefix": "Synthetic Walker Product",
+  "modelNumberPrefix": "SYN",
+  "priceCeiling": 500,
+  "brandSuffixCeiling": 100,
+  "actionWeights": {
+    "go home": 1,
+    "browse the catalog": 3,
+    "open a catalog item": 2,
+    "browse my products": 3,
+    "view a product detail": 2,
+    "create a synthetic product": 2,
+    "edit a synthetic product": 2,
+    "delete a synthetic product": 2
+  }
+}

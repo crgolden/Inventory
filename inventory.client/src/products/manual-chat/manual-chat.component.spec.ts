@@ -1,10 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { HttpStatusCode, provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { By } from '@angular/platform-browser';
-import { ManualChatComponent } from './manual-chat.component';
+import {
+  CHAT_START_FAILED_MESSAGE,
+  ManualChatComponent,
+  STREAM_FAILED_MESSAGE,
+} from './manual-chat.component';
 import { ChatService } from './chat.service';
+import { CHATS_URL } from './chat-api';
+import { ChatRoles } from './chat.model';
 import { of, Subject, throwError } from 'rxjs';
+import { newCount, newHttpsAddress, newId, newText } from '@crgolden/modules/testing';
+import { HttpMethods } from '../../app/http-headers';
 
 describe('ManualChatComponent', () => {
   let fixture: ComponentFixture<ManualChatComponent>;
@@ -26,47 +34,50 @@ describe('ManualChatComponent', () => {
   afterEach(() => httpMock.verify());
 
   it('renders the empty-state prompt when there are no messages', () => {
-    const text = fixture.nativeElement.textContent as string;
-    expect(text).toContain('Ask me to find a user manual');
+    expect(fixture.debugElement.query(By.css('#manual-chat-empty'))).toBeTruthy();
   });
 
   it('send button is disabled when input is empty', () => {
-    const btn = fixture.debugElement.query(By.css('button.btn-primary'));
+    const btn = fixture.debugElement.query(By.css('#manual-chat-send'));
     expect(btn.nativeElement.disabled).toBe(true);
   });
 
   it('urlsFor extracts unique http(s) URLs from assistant content', () => {
-    const urls = component.urlsFor(
-      'Try https://example.com/a.pdf or https://example.com/b.pdf. Duplicate: https://example.com/a.pdf',
-    );
-    expect(urls).toEqual(['https://example.com/a.pdf', 'https://example.com/b.pdf']);
+    const first = newHttpsAddress();
+    const second = newHttpsAddress();
+    const urls = component.urlsFor(`${newText()} ${first} ${newText()} ${second} ${newText()} ${first}`);
+    expect(urls).toEqual([first, second]);
   });
 
   it('urlsFor strips trailing markdown/paren punctuation', () => {
-    const urls = component.urlsFor('See [link](https://example.com/manual.pdf).');
-    expect(urls).toEqual(['https://example.com/manual.pdf']);
+    const manual = newHttpsAddress();
+    const urls = component.urlsFor(`${newText()} [${newText()}](${manual}).`);
+    expect(urls).toEqual([manual]);
   });
 
   it('selectUrl emits manualUrlSelected', () => {
     const emitted: string[] = [];
     component.manualUrlSelected.subscribe((v) => emitted.push(v));
-    component.selectUrl('https://example.com/picked.pdf');
-    expect(emitted).toEqual(['https://example.com/picked.pdf']);
+    const picked = newHttpsAddress();
+    component.selectUrl(picked);
+    expect(emitted).toEqual([picked]);
   });
 
   it('first send() creates a chat then streams to the new chatId', () => {
     const chatService = TestBed.inject(ChatService);
     const streamSpy = vi.spyOn(chatService, 'streamMessage').mockReturnValue(of());
 
-    component.input.set('Find me the manual');
+    const question = newText();
+    const chatId = newId();
+    component.input.set(question);
     component.send();
 
-    const createReq = httpMock.expectOne('/manuals/api/chats');
-    expect(createReq.request.method).toBe('POST');
-    createReq.flush({ chatId: 'chat-xyz', title: null, createdAt: 1 });
+    const createReq = httpMock.expectOne(CHATS_URL);
+    expect(createReq.request.method).toBe(HttpMethods.post);
+    createReq.flush({ chatId, title: null, createdAt: newCount() });
 
-    expect(streamSpy).toHaveBeenCalledWith('chat-xyz', 'Find me the manual');
-    expect(component.chatId()).toBe('chat-xyz');
+    expect(streamSpy).toHaveBeenCalledWith(chatId, question);
+    expect(component.chatId()).toBe(chatId);
   });
 
   it('subsequent send() reuses the existing chat id', () => {
@@ -74,20 +85,23 @@ describe('ManualChatComponent', () => {
     const createSpy = vi.spyOn(chatService, 'createChat');
     const streamSpy = vi.spyOn(chatService, 'streamMessage').mockReturnValue(of());
 
-    component.chatId.set('already-exists');
-    component.input.set('Second question');
+    const existingChatId = newId();
+    const question = newText();
+    component.chatId.set(existingChatId);
+    component.input.set(question);
     component.send();
 
     expect(createSpy).not.toHaveBeenCalled();
-    expect(streamSpy).toHaveBeenCalledWith('already-exists', 'Second question');
+    expect(streamSpy).toHaveBeenCalledWith(existingChatId, question);
   });
 
   it('streamed deltas append to the last assistant message', () => {
     const chatService = TestBed.inject(ChatService);
-    vi.spyOn(chatService, 'streamMessage').mockReturnValue(of('Hello', ' world'));
+    const deltas = [newText(), ` ${newText()}`];
+    vi.spyOn(chatService, 'streamMessage').mockReturnValue(of(...deltas));
 
-    component.chatId.set('chat-1');
-    component.input.set('Hi');
+    component.chatId.set(newId());
+    component.input.set(newText());
     component.send();
 
     const last = component.messages().at(-1);
@@ -95,38 +109,38 @@ describe('ManualChatComponent', () => {
       throw new Error('send() left the message list empty, so there is no assistant reply to assert on.');
     }
 
-    expect(last.role).toBe('assistant');
-    expect(last.content).toBe('Hello world');
+    expect(last.role).toBe(ChatRoles.assistant);
+    expect(last.content).toBe(deltas.join(''));
   });
 
   it('a failed stream stops the spinner and tells the user, rather than going quiet', () => {
     const chatService = TestBed.inject(ChatService);
     vi.spyOn(chatService, 'streamMessage').mockReturnValue(
-      throwError(() => new Error('The manual stream sent a frame that is not JSON: {oops')),
+      throwError(() => new Error(crypto.randomUUID())),
     );
 
-    component.chatId.set('chat-1');
-    component.input.set('Hi');
+    component.chatId.set(newId());
+    component.input.set(newText());
     component.send();
     fixture.detectChanges();
 
     expect(component.streaming()).toBe(false);
     const alert = fixture.debugElement.query(By.css('#manual-chat-error'));
-    expect(alert.nativeElement.textContent).toContain('stopped unexpectedly');
+    expect(alert.nativeElement.textContent).toContain(STREAM_FAILED_MESSAGE);
   });
 
   it('a failed chat creation tells the user instead of leaving the send button disabled forever', () => {
-    component.input.set('Find me the manual');
+    component.input.set(newText());
     component.send();
 
     httpMock
-      .expectOne('/manuals/api/chats')
-      .flush(null, { status: 503, statusText: 'Service Unavailable' });
+      .expectOne(CHATS_URL)
+      .flush(null, { status: HttpStatusCode.ServiceUnavailable, statusText: newText() });
     fixture.detectChanges();
 
     expect(component.streaming()).toBe(false);
     const alert = fixture.debugElement.query(By.css('#manual-chat-error'));
-    expect(alert.nativeElement.textContent).toContain('Could not start a chat');
+    expect(alert.nativeElement.textContent).toContain(CHAT_START_FAILED_MESSAGE);
   });
 
   it('destroying the component tears the stream down instead of writing to a dead view', () => {
@@ -134,16 +148,17 @@ describe('ManualChatComponent', () => {
     const stream$ = new Subject<string>();
     vi.spyOn(chatService, 'streamMessage').mockReturnValue(stream$.asObservable());
 
-    component.chatId.set('chat-1');
-    component.input.set('Hi');
+    const firstDelta = newText();
+    component.chatId.set(newId());
+    component.input.set(newText());
     component.send();
-    stream$.next('Hello');
+    stream$.next(firstDelta);
 
     const before = component.messages().at(-1)?.content;
     fixture.destroy();
-    stream$.next(' world');
+    stream$.next(` ${newText()}`);
 
-    expect(before).toBe('Hello');
-    expect(component.messages().at(-1)?.content).toBe('Hello');
+    expect(before).toBe(firstDelta);
+    expect(component.messages().at(-1)?.content).toBe(firstDelta);
   });
 });

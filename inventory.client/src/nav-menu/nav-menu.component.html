@@ -1,51 +1,63 @@
 <header>
-  <nav
-    class="navbar navbar-expand-sm navbar-toggleable-sm navbar-dark navbar-app box-shadow mb-3"
-  >
-    <div class="container">
-      <a class="navbar-brand" [routerLink]="['/']">Inventory</a>
+  <nav class="mb-4 bg-chrome py-2 shadow-sm">
+    <div crgPageContainer class="flex flex-wrap items-center justify-between">
+      <a class="mr-4 py-1.25 text-lead text-on-fill/90 no-underline hover:text-on-fill focus:text-on-fill" [routerLink]="['/']">Inventory</a>
       <button
-        class="navbar-toggler"
+        class="cursor-pointer rounded-md border border-on-fill/10 bg-transparent px-3 py-1 text-lead text-on-fill/90 hover:text-on-fill sm:hidden"
         type="button"
-        data-bs-toggle="collapse"
-        data-bs-target=".navbar-collapse"
         aria-label="Toggle navigation"
+        aria-controls="nav-collapse"
         [attr.aria-expanded]="isExpanded()"
         (click)="toggle()"
       >
-        <span class="navbar-toggler-icon"></span>
+        <ng-icon name="lucideMenu" size="1.5em" aria-hidden="true" />
       </button>
       <div
-        class="navbar-collapse collapse d-sm-inline-flex justify-content-end"
-        [class.show]="isExpanded()"
+        id="nav-collapse"
+        class="flex grow basis-full items-center sm:basis-auto sm:justify-end max-sm:hidden max-sm:data-[open=true]:flex"
+        [attr.data-open]="isExpanded()"
       >
-        <ul class="navbar-nav flex-grow">
-          <li class="nav-item"
-              routerLinkActive="link-active"
+        <ul class="m-0 flex list-none flex-col p-0 sm:flex-row">
+          <li>
+            <a
+              id="nav-home"
+              class="block py-2 text-on-fill/90 no-underline hover:text-on-fill focus:text-on-fill sm:px-2 aria-[current=page]:border-b-2 aria-[current=page]:border-on-fill/70 aria-[current=page]:pb-[calc(0.5rem_-_2px)] aria-[current=page]:text-on-fill"
+              [routerLink]="['/']"
+              routerLinkActive
+              ariaCurrentWhenActive="page"
               [routerLinkActiveOptions]="{ exact: true }"
-          >
-            <a id="nav-home" class="nav-link" [routerLink]="['/']">Home</a>
+            >Home</a>
           </li>
 
-          <li class="nav-item"
-              routerLinkActive="link-active">
-            <a id="nav-catalog" class="nav-link" [routerLink]="['/catalog']">Catalog</a>
+          <li>
+            <a
+              id="nav-catalog"
+              class="block py-2 text-on-fill/90 no-underline hover:text-on-fill focus:text-on-fill sm:px-2 aria-[current=page]:border-b-2 aria-[current=page]:border-on-fill/70 aria-[current=page]:pb-[calc(0.5rem_-_2px)] aria-[current=page]:text-on-fill"
+              [routerLink]="['/catalog']"
+              routerLinkActive
+              ariaCurrentWhenActive="page"
+            >Catalog</a>
           </li>
 
           @if (isAuthenticated()) {
-            <li class="nav-item"
-                routerLinkActive="link-active">
-              <a id="nav-products" class="nav-link" [routerLink]="['/products']">My Products</a>
+            <li>
+              <a
+                id="nav-products"
+                class="block py-2 text-on-fill/90 no-underline hover:text-on-fill focus:text-on-fill sm:px-2 aria-[current=page]:border-b-2 aria-[current=page]:border-on-fill/70 aria-[current=page]:pb-[calc(0.5rem_-_2px)] aria-[current=page]:text-on-fill"
+                [routerLink]="['/products']"
+                routerLinkActive
+                ariaCurrentWhenActive="page"
+              >My Products</a>
             </li>
           } @else {
-            <li class="nav-item">
-              <a id="nav-login" class="nav-link" href="/bff/login">Login</a>
+            <li>
+              <a id="nav-login" class="block py-2 text-on-fill/90 no-underline hover:text-on-fill focus:text-on-fill sm:px-2" href="/bff/login">Login</a>
             </li>
           }
 
           @if (isAuthenticated()) {
-            <li class="nav-item">
-              <a id="nav-signout" class="nav-link" [href]="logoutUrl()">Signout</a>
+            <li>
+              <a id="nav-signout" class="block py-2 text-on-fill/90 no-underline hover:text-on-fill focus:text-on-fill sm:px-2" [href]="logoutUrl()">Signout</a>
             </li>
           }
         </ul>

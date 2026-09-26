@@ -1,11 +1,17 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Title } from '@angular/platform-browser';
+import {
+  ButtonGhostSmallDirective,
+  ButtonPrimaryDirective,
+  CardDirective,
+  PageContainerDirective,
+} from '@crgolden/modules/primitives';
 import { CatalogProduct } from '../catalog-product.model';
 
 @Component({
   selector: 'app-catalog-detail',
-  imports: [RouterLink],
+  imports: [RouterLink, ButtonGhostSmallDirective, ButtonPrimaryDirective, CardDirective, PageContainerDirective],
   templateUrl: './catalog-detail.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

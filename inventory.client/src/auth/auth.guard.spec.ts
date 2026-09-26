@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import { authGuard } from './auth.guard';
 import { AuthService } from './auth.service';
+import { BFF_LOGIN_URL } from './auth-contract';
 import { signal } from '@angular/core';
 
 describe('authGuard', () => {
@@ -33,6 +34,6 @@ describe('authGuard', () => {
     const result = run();
 
     expect(result).toBe(false);
-    expect(hrefSetter).toHaveBeenCalledWith('/bff/login');
+    expect(hrefSetter).toHaveBeenCalledWith(BFF_LOGIN_URL);
   });
 });

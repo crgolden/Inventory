@@ -11,9 +11,16 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
+import { ButtonGhostSmallDirective, ButtonSecondaryDirective, PageContainerDirective } from '@crgolden/modules/primitives';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideLayoutGrid, lucideSearch } from '@ng-icons/lucide';
 import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
-import { CatalogPage, CatalogSortColumn } from '../catalog.service';
+import { CatalogPage } from '../catalog.service';
+import { CatalogSortColumn, CatalogSortColumns } from '../catalog-api';
+import { CatalogSortDirection, CatalogSortDirections } from '../catalog-sort-directions';
 import { CatalogProduct } from '../catalog-product.model';
+import { viewProductId } from '../../view-product-ids';
+import { catalogNameId, catalogRowId } from '../../catalog-row-ids';
 import {
   CATALOG_PAGE_SIZE,
   DEFAULT_CATALOG_SORT,
@@ -25,11 +32,14 @@ import {
 
 const PAGE_SIZE = CATALOG_PAGE_SIZE;
 
+export const CATALOG_LOAD_ERROR = 'Could not load the catalog. Please try again.';
+
 @Component({
   selector: 'app-catalog-list',
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, NgIcon, ButtonGhostSmallDirective, ButtonSecondaryDirective, PageContainerDirective],
   templateUrl: './catalog-list.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  viewProviders: [provideIcons({ lucideLayoutGrid, lucideSearch })],
 })
 export class CatalogListComponent implements OnInit {
 
@@ -43,7 +53,7 @@ export class CatalogListComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly searchTerm = signal('');
   readonly orderBy = signal<CatalogSortColumn>(DEFAULT_CATALOG_SORT);
-  readonly orderDir = signal<'asc' | 'desc'>('asc');
+  readonly orderDir = signal<CatalogSortDirection>(CatalogSortDirections.asc);
   readonly page = signal(1);
 
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / PAGE_SIZE)));
@@ -53,6 +63,13 @@ export class CatalogListComponent implements OnInit {
   readonly showingTo = computed(() => (this.page() - 1) * PAGE_SIZE + this.items().length);
   readonly hasPrevPage = computed(() => this.page() > 1);
   readonly hasNextPage = computed(() => this.page() < this.totalPages());
+  protected readonly sortColumns = CatalogSortColumns;
+  protected readonly sortDirections = CatalogSortDirections;
+  readonly prevPageId = 'catalog-prev-page';
+  protected readonly viewProductId = viewProductId;
+  protected readonly catalogRowId = catalogRowId;
+  protected readonly catalogNameId = catalogNameId;
+  readonly nextPageId = 'catalog-next-page';
 
   private readonly search$ = new Subject<string>();
 
@@ -70,7 +87,7 @@ export class CatalogListComponent implements OnInit {
     this.route.data.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(data => {
       const resolved = (data['catalog'] ?? null) as CatalogPage | null;
       if (resolved === null) {
-        this.error.set('Could not load the catalog. Please try again.');
+        this.error.set(CATALOG_LOAD_ERROR);
         this.items.set([]);
         this.total.set(0);
         return;
@@ -91,10 +108,12 @@ export class CatalogListComponent implements OnInit {
   }
 
   sortParams(column: CatalogSortColumn): Params {
-    const orderDir = this.orderBy() === column && this.orderDir() === 'asc' ? 'desc' : 'asc';
+    const orderDir = this.orderBy() === column && this.orderDir() === CatalogSortDirections.asc
+      ? CatalogSortDirections.desc
+      : CatalogSortDirections.asc;
     return {
       orderBy: column === DEFAULT_CATALOG_SORT ? null : column,
-      orderDir: orderDir === 'asc' ? null : orderDir,
+      orderDir: orderDir === CatalogSortDirections.asc ? null : orderDir,
       page: null,
     };
   }

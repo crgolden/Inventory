@@ -1,6 +1,8 @@
 # Testing
 
-The Inventory test suite is split across three tiers: **backend unit tests** (xUnit v3, `Inventory.Tests.Unit`), **frontend unit tests** (Vitest, `inventory.client/`), and **browser-based E2E tests** (Playwright, `Inventory.Tests.E2E`). Unit and E2E tests are physically separate projects — the Unit project has no Playwright dependency and runs its collections in parallel; the E2E project owns `PlaywrightFixture` and runs sequentially against a single Kestrel/browser instance.
+The Inventory test suite is split across three tiers: **backend unit tests** (xUnit v3, `Inventory.Tests.Unit`), **frontend unit tests** (Vitest, `inventory.client/`), and **browser E2E tests** (Playwright, TypeScript, `inventory.client/e2e`).
+
+**Browser testing here is TypeScript only, and that is a structural decision rather than a preference.** Inventory is the fleet's one .NET BFF: it serves the UI and owns no behavior of its own, so it has nothing for an API-integration tier to drive, and a .NET browser tier would only re-drive the same pages the TypeScript suite already drives. Identity keeps a .NET Playwright suite because Razor Pages leaves it nowhere else to put one; every other front end drives its browser from TypeScript.
 
 Unit test coding standards (MockBehavior.Strict, argument verification, SetupSequence, no control-flow in tests, etc.) are in the workspace-level [Unit Test Standards](../AGENTS/TESTING.md#unit-test-standards). Note for Playwright E2E tests: a `for` or `foreach` is acceptable when it is test setup (e.g. sending N chat messages to prime state) rather than an assertion branch.
 
@@ -10,13 +12,13 @@ Unit test coding standards (MockBehavior.Strict, argument verification, SetupSeq
 |------|-------------|---------|-----------------|------------------------|------------|
 | Backend unit | `Category=Unit` | `Inventory.Tests.Unit` | No | No | Every push/PR |
 | Frontend unit | Vitest | `inventory.client` | No | No | Every push/PR |
-| E2E (regression) | `Category=E2E` | `Inventory.Tests.E2E` | No — test server is a static-file-only Kestrel host; all API routes are Playwright mocks | Yes (for static files) | Every push/PR |
+| Browser E2E | Playwright (`--project=chromium`) | `inventory.client/e2e` | No. With `CI` set, the BFF signs in against a mock OIDC provider and proxies to mock Products and Manuals; without it, to the local services | Served by `npm start`, which `playwright.config.ts` launches | Every push/PR |
 | Synthetic walker | Playwright (`--project=synthetic`) | `inventory.client/e2e/synthetic` | No — targets the deployed app directly | No | Scheduled only, never a merge gate |
 
 **The `Category=Smoke` tier no longer exists.** It was a stopgap until synthetic walkers existed; once they did it
 was duplicate coverage — the same product CRUD lifecycle, against the same deployed app, under the same account —
-that additionally needed a reCAPTCHA exemption to log in and had no sweep for the rows it left behind. It was
-deleted fleet-wide, along with `PlaywrightFixture`'s deployed-target mode. The walker replaces it.
+that additionally needed a reCAPTCHA exemption to log in and had no sweep for the rows it left behind. The walker
+replaces it.
 
 ---
 
@@ -67,28 +69,6 @@ assert that the four sibling events from the same logger — `ErrorValidatingLic
 through, and those are the ones that can fail. Widening the predicate to match the logger category
 instead of the event turns four of the six red. Background: `AGENTS/REPOS/Inventory.md`.
 
-### E2E Tests (critical pre-commit subset — ~5 tests, ~10 min)
-
-A `Category=Critical` trait is applied to the 5 highest-signal E2E tests — the ones most likely to catch a real regression. Run these before every check-in instead of the full suite:
-
-```powershell
-dotnet build Inventory.Tests.E2E --configuration Debug   # includes Angular dev build
-.\Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe -trait "Category=Critical" -showLiveOutput
-
-# Redirect output for in-flight inspection
-cmd /c "Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe -trait ""Category=Critical"" -showLiveOutput > C:\temp\inventory-e2e.txt 2>&1"
-```
-
-| Test | File |
-|------|------|
-| `Create_product_navigates_to_detail_on_success` | `ProductCrudTests.cs` |
-| `Edit_product_updates_name_and_returns_to_detail` | `ProductCrudTests.cs` |
-| `Delete_product_removes_it_from_the_list` | `ProductCrudTests.cs` |
-| `Sending_message_streams_response_and_shows_url_chip` | `ProductManualChatTests.cs` |
-| `Catalog_navigates_to_detail_page_when_View_clicked` | `CatalogTests.cs` |
-
-Run the full `Category=E2E` suite before merging a branch or after any infrastructure change.
-
 ### Frontend unit tests
 
 ```bash
@@ -97,69 +77,79 @@ npx vitest run           # one-shot
 npx vitest run --coverage  # with LCOV coverage report → coverage/lcov.info
 ```
 
-### E2E tests (regression — full suite)
+### Browser E2E tests
 
-```powershell
-dotnet build Inventory.Tests.E2E --configuration Debug
-.\Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe -trait "Category=E2E" -showLiveOutput
+```bash
+cd inventory.client
+npm run playwright:install   # once per machine
+npm run e2e:ci               # what CI runs: the chromium project only
+npm run e2e:ui               # same suite, Playwright's UI mode, for debugging one spec
 ```
+
+`playwright.config.ts` starts the BFF and the Angular server itself. **Set `SKIP_WEBSERVER=1` when they are
+already running locally**, or the run waits on ports that are already held.
+
+**With `CI` set the BFF starts from the Release build, never a fresh `dotnet run` build.** A Debug `dotnet run`
+builds the `inventory.client.esproj` reference first, a full Angular development build, inside the web server's
+60-second window; it overruns it and Playwright kills the half-built process before any test runs. `--no-build
+--configuration Release` launches the binary CI's and the gate's own build step produced, so E2E also exercises
+the exact artifact those steps verified.
+
+With `CI` set (CI itself, and the local gate), `playwright.config.ts` also starts three mock servers from
+`e2e/mocks/` and points the BFF at them; without it the BFF keeps its `appsettings.Development.json` targets, the local
+Identity, Products and Manuals, and `auth.setup.ts` signs in by passkey, so that run needs `PASSKEY_CREDENTIAL3`. The
+suite cleans up only through the UI: a journey that creates a product deletes it from the product list
+(`deleteProductThroughTheList` in `e2e/ci-products.ts`) before it completes. The catalog row a product creates has no
+delete lever in the UI, so against real services it stays.
 
 ### Run all tests in sequence
 
 ```powershell
 dotnet build Inventory.Tests.Unit --configuration Debug
 .\Inventory.Tests.Unit\bin\Debug\net10.0\Inventory.Tests.Unit.exe -showLiveOutput
-dotnet build Inventory.Tests.E2E --configuration Debug
-.\Inventory.Tests.E2E\bin\Debug\net10.0\Inventory.Tests.E2E.exe -showLiveOutput
-cd inventory.client && npx vitest run --coverage
+cd inventory.client && npx vitest run --coverage && npm run e2e:ci
 ```
 
 ---
 
 ## E2E test infrastructure
 
-`PlaywrightFixture` has a single mode: it starts the in-process host and points Playwright at it.
-
 ```
-PlaywrightFixture (IAsyncLifetime)
-  └── InventoryWebApplicationFactory (custom WebApplication host — NOT WebApplicationFactory<Program>)
-        └── Kestrel HTTPS (random loopback port) ← Playwright browser talks to this
-              web root = inventory.client/dist/inventory.client/browser/
-              UseDefaultFiles() + MapStaticAssets() — serves Angular SPA
-              No BFF, no Azure credentials, no Key Vault
-              All API calls (/bff/**, /products/api/**, /manuals/api/**, /catalog/api/**) are Playwright mocks
+playwright.config.ts
+  ├── webServer (CI set only): node e2e/mocks/oidc-server.ts, products-server.ts, manuals-server.ts
+  ├── webServer: dotnet run --project ../Inventory.Server   (https://localhost:7150; with CI set,
+  │              --no-build --configuration Release, the build the gate's own step made)
+  ├── webServer: npm start                                  (https://localhost:50212)
+  ├── project "setup"     -> auth.setup.ts, sign-in through the BFF (mock OIDC with CI set, passkey without)
+  ├── project "chromium"  -> everything but e2e/synthetic, reusing e2e/.auth/user.json
+  └── project "synthetic" -> the scheduled walker, never a merge gate
 ```
 
-Every API request is intercepted by a Playwright route mock; nothing reaches a deployed service.
-**The second mode this fixture used to carry — pointing at a deployed URL and performing a real OIDC
-login — was deleted with the smoke tier.** The deployed app is now exercised by the scheduled
-synthetic walker instead, which lives in the TypeScript suite. Removing that branch also removed
-`LoginAsync`, the storage-state plumbing, the `AdminEmail`/`AdminPassword` env reads, the
-`X-Synthetic-Marker` injection, and a 500-response collector that could no longer fire.
+**The BFF is the real SUT and everything it calls is a mock in CI.** The mocks are self-contained `node:http`
+servers that Node 24 runs as TypeScript directly (`node e2e/mocks/<name>.ts`). Node resolves only a full file name, so
+their relative imports carry the `.ts` extension and `tsconfig.e2e.json` sets `allowImportingTsExtensions`. Their ports and the switch live in
+`e2e/mocks/mock-dependencies.ts`, read by the config, the mocks and `auth.setup.ts`. The BFF reaches them through its
+ordinary configuration keys (`OidcAuthority`, `ProductsApiAddress`, `ManualsApiAddress`, a generated client id and
+secret) and `OpenIdConnectOptions:RequireHttpsMetadata = false`, the one setting that lets it take a plain-HTTP
+provider; production leaves it at its default, `true`.
 
 ### Authentication
 
-The fixture always uses a Playwright route mock for `/bff/user`. Real OIDC login is not attempted,
-because the Kestrel test server listens on a random port that cannot be pre-registered as a redirect
-URI in the Identity server. The mock returns a synthetic user:
+With `CI` set, `auth.setup.ts` sets the mock provider's identity cookie and walks `/bff/login`: the BFF runs its real
+OIDC code flow against the mock, which echoes the handler's `nonce`, signs the id token with its own JWKS key and answers
+`prompt=none` with `error=login_required` when no identity cookie is present, so the silent-login iframe completes on an
+anonymous page. The session is saved to `e2e/.auth/user.json`, which the `chromium` project reuses.
 
-```
-{ type: "sub",   value: "e2e-user-id" }
-{ type: "name",  value: "E2E Test User" }
-{ type: "email", value: "e2e@test.invalid" }
-{ type: "sid",   value: "e2e-session" }
-```
-
-**The real OIDC exchange is therefore covered only by the synthetic walker**, which signs in through
-the deployed Identity with a passkey. A break in the PKCE flow surfaces there and nowhere else in
-this repo.
+Without `CI`, the setup signs in to the local Identity by passkey. **A password cannot be substituted there.**
+reCAPTCHA v3 scores the browser environment rather than the person, so an automation-driven password sign-in fails
+whoever is typing, while `Login.cshtml.cs` evaluates the passkey branch *before* the captcha.
 
 ### Selector ids
 
-The fleet rule — select by `id`, never by class, position, XPath or copy — is in
-[AGENTS/TESTING.md](../AGENTS/TESTING.md#e2e-selector-strategy--select-by-id-never-by-position) and
-[AGENTS/CODE-STYLE.md](../AGENTS/CODE-STYLE.md) rule 10. This is Inventory's own id table, which both
-Playwright suites (`Inventory.Tests.E2E` in C# and `inventory.client/e2e` in TypeScript) select against.
+The fleet rule, select by `id` and never by class, position, XPath or copy, is in
+[AGENTS/TESTING.md](../AGENTS/TESTING.md#e2e-selector-strategy-select-by-id-never-by-position) and
+[AGENTS/CODE-STYLE.md](../AGENTS/CODE-STYLE.md) rule 10. This is Inventory's own id table, which
+`inventory.client/e2e` selects against.
 
 | Element | `id` |
 |---|---|
@@ -167,14 +157,18 @@ Playwright suites (`Inventory.Tests.E2E` in C# and `inventory.client/e2e` in Typ
 | Home hero CTAs | `browse-catalog-link`, `my-products-link`, `home-login-link` |
 | Home benefit cards | `benefit-card-{index}` |
 | Nav links | `nav-home`, `nav-catalog`, `nav-products`, `nav-login`, `nav-signout` |
+| Nav collapsible list (carries `data-open`) | `nav-collapse` |
+| User session table, row, claim cells | `user-session-table`, `user-session-row-{index}`, `user-session-claim-type-{index}`, `user-session-claim-value-{index}`, built by `src/user-session/user-session-ids.ts` |
 | My-Products heading / empty state / table / search | `products-heading`, `products-empty-state`, `products-table`, `product-search` |
-| My-Products row, name cell, actions | `product-row-{index}`, `product-name-{index}`, `view-product-{index}`, `edit-product-{index}`, `delete-product-{index}`, `confirm-delete-product-{index}` |
+| My-Products row, name cell, actions | `product-row-{index}`, `product-name-{index}`, `view-product-{index}`, `edit-product-{index}`, `delete-product-{index}`, `confirm-delete-product-{index}`. The row and action ids are built by `src/product-row-ids.ts` and `src/view-product-ids.ts`, which the template, the specs and the walker all import, so a renamed id cannot leave a selector behind |
 | Catalog heading / empty state / table | `catalog-heading`, `catalog-empty-state`, `catalog-table` |
-| Catalog row, name cell, View link | `catalog-row-{index}`, `catalog-name-{index}`, `view-product-{index}` |
+| Catalog row, name cell, View link | `catalog-row-{index}`, `catalog-name-{index}`, `view-product-{index}`. The row and name ids are built by `src/catalog-row-ids.ts` |
+| Catalog paging summary | `catalog-showing` |
+| Catalog sort headers and pager | `sort-by-name`, `catalog-prev-page`, `catalog-next-page`. The two pager ids are bound from `catalog-list.component.ts` rather than written in the template, because the `@if` anchor and `@else` disabled button share one id and ReSharper's HTML analysis does not evaluate Angular control flow ([Inventory.md](../AGENTS/REPOS/Inventory.md)) |
 | Detail headings | `product-detail-heading`, `catalog-detail-heading` |
 | Not-found headings | `product-not-found-heading`, `catalog-not-found-heading` |
 | Detail page actions | `view-manual-link`, `edit-product-link` |
-| Product form fields and submit | `name`, `brand`, `price`, `modelNumber`, `serialNumber`, `purchaseDate`, `category`, `description`, `manualUrl`, `product-form-submit` |
+| Product form fields, submit and error | `name`, `brand`, `pricePaid`, `modelNumber`, `serialNumber`, `msrpPrice`, `purchaseDate`, `category`, `description`, `manualUrl`, `product-form-submit`, `product-form-error` |
 | Manual finder | `manual-chat-toggle`, `manual-chat-panel`, `manual-chat-close`, `manual-chat-messages`, `manual-chat-input`, `manual-chat-send`, `url-chip-{messageIndex}-{urlIndex}` |
 
 Two consequences worth stating, because both replaced a selector that had gone wrong:
@@ -187,23 +181,44 @@ Two consequences worth stating, because both replaced a selector that had gone w
 
 ### TypeScript Playwright suite (`inventory.client/e2e`)
 
-**This suite is not run by push/PR CI** — the deploy workflow's only frontend test step is `npx vitest run --coverage`. Its
-`synthetic` project does run on a schedule (see **Synthetic walker** below), which makes the scheduled walk this suite's
-recurring exercise against rot. It also needs
-`E2E_USERNAME` / `E2E_PASSWORD` for `auth.setup.ts`, which drives a **real** OIDC login against the Identity server and
-saves the session to `e2e/.auth/user.json` for the authenticated projects to reuse. `playwright.config.ts` starts both
-servers itself (`dotnet run --project ../Inventory.Server` and `npm start`) unless `SKIP_WEBSERVER=1` is set, which is
-the switch to use when they are already running locally. The setup selects Identity's own
-login form with `input[name='Input.Email']` / `input[name='Input.Password']` + `#login-submit` — the fleet rule-10
-exception for model-bound inputs (`AGENTS/TESTING.md`): Razor derives `name` and `id` from the same property path, so
-the name selector is the one that doesn't add a second thing to update on rename. It previously used
-`getByLabel('Username')`, and Identity's label reads **"Email"** — a copy-bound selector that matched nothing, which is
-the defect rule 10 exists to catch.
+This suite runs on push/PR as the workflow's `Run browser E2E tests` step (`npm run e2e:ci`, the `chromium` project only, so
+a push never starts a walk). Its `synthetic` project runs on a schedule instead (see **Synthetic walker** below).
+
+**Without `CI`, `auth.setup.ts` signs in by passkey on slot 3**, through `loginWithPasskey({ slot: 3, … })` from
+`@crgolden/modules/synthetic-walker`. Slot 1 carries admin claims everywhere and is reserved for privileged flows;
+Inventory has no roles, so its suite signs in as a non-admin.
+
+`playwright.config.ts` starts the servers itself unless `SKIP_WEBSERVER=1` is set, which is the switch to use when they
+are already running locally. With `CI` set every server starts fresh (`reuseExistingServer: false`), so a run never
+adopts a stranger's BFF pointed somewhere else; the mock Products seeds enough catalog rows to overflow the scroll
+test's shortened viewport, and every other row a spec needs it creates itself.
+
+**The suite cleans up only through the UI.** `e2e/ci-products.ts` mints every product from generated values
+(`newProduct()`), and each journey that creates one deletes it through the product list before completing. The walker's
+API sweep (`e2e/product-sweep.ts`) belongs to the walker layer; generated brands and model numbers stop two runs
+colliding on Products' unique Brand + ModelNumber match key.
+
+**Specs seed through the API, not through the form.** `createProduct()` in `e2e/ci-products.ts` posts to
+`/products/api/inventory/items` and returns both the inventory-item id and the catalog-product id. Products creates or
+matches the catalog row inside that same request, before the 201 returns, so a spec can address its own catalog row with
+no polling. Driving the create form is reserved for the specs whose subject *is* the form.
+
+**`catalog.spec.ts` covers the catalog surface**: View on a row opens that product's detail page, an unknown id lands on
+`/catalog/not-found`, and Back returns the reader to where they were in the list. That last one is what pins
+`withInMemoryScrolling`, and it shortens the viewport rather than seeding rows; the scroll-measurement traps that make it
+discriminate are in [Inventory.md](../AGENTS/REPOS/Inventory.md).
+
+**`manual-chat-layout.spec.ts` routes its chat calls to a fixed SSE body.** Its subject is the panel's own layout: the
+message list must fit inside the panel, must scroll once it overflows, and the panel must not extend past the bottom of
+the viewport. jsdom has no layout, so Vitest cannot take it, and it needs a reply long enough to guarantee the overflow,
+which the fixed body supplies whether the BFF points at the mock Manuals or a local one.
 
 ### Synthetic walker
 
 `e2e/synthetic/walker.spec.ts` performs a **seeded random walk of the deployed app**: one real login through Identity
-(`/bff/login?returnUrl=…`), a sweep that deletes any leftover `Synthetic Walker Product` rows from a crashed prior run,
+(`/bff/login?returnUrl=…`), a silent-login check that clears only the Inventory host's cookies, reloads `/catalog`, waits
+for the `prompt=none` request and asserts `#nav-signout` is back (so the Identity session restores the BFF session),
+a sweep that deletes any leftover `Synthetic Walker Product` rows from a crashed prior run,
 then a weighted random sequence of actions — catalog and product browsing plus **scoped writes**: product
 create→edit→delete cycles under names `` `Synthetic Walker Product <seed>-<n>` ``, with a second sweep at run end so a
 normal run leaves zero rows. Edits never touch the `#name` prefix, or the orphan becomes unfindable. The manual-finder
@@ -222,7 +237,7 @@ Environment contract:
 |---|---|
 | `WalkerBaseUrl` | Deployed app URL; disables `webServer`, overrides `baseURL` |
 | `SYNTHETIC_SEED` | **Required** decimal uint32; the whole walk derives from it |
-| `SYNTHETIC_STEPS` | Optional step budget override (default 40) |
+| `SYNTHETIC_STEPS` | Optional step budget override; its default and ceiling are `stepBudget` in `inventory.client/e2e/synthetic/walker-settings.json` |
 | `PASSKEY_CREDENTIAL1` | The walker account's passkey, as the five-field JSON Playwright's virtual authenticator returns |
 
 Replay a failed walk with the seed from the job summary / failure message:
@@ -254,33 +269,16 @@ the guarantee is the decision sequence.
 - **GitHub disables scheduled workflows after 60 days without repo activity in public repos**; a push, a
   `workflow_dispatch`, or the Actions UI re-enables it. Schedules fire from `master` only.
 
-### Manuals API mocking
+### Manual chat coverage
 
-All `/manuals/api/**` requests are intercepted by Playwright before they reach the BFF proxy, backed by `InMemoryChatsStore` — a thread-safe in-memory store that mirrors the Manuals service data model. Each test calls `fixture.ChatStore.Clear()` before `NewProductsPageAsync()` to ensure a clean state.
+**The chat panel's behavior is Vitest's, not the browser suite's.** `manual-chat.component.spec.ts`,
+`manual-chat-panel.component.spec.ts`, `chat.service.spec.ts` and `product-form.component.spec.ts` cover the
+open/close toggle, SSE delta accumulation, URL extraction from assistant content, chip selection and the
+`manualUrl` patch, all against a stubbed `ChatService`. Asserting those again through a browser would add a
+slower copy of the same evidence.
 
-`InMemoryChatsStore` provides:
-- `MockManualUrl` *(const)* — canned URL (`https://example.com/manuals/test-manual.pdf`) embedded in both the completion and stream mock responses so the embedded `ManualChatPanelComponent`'s "Use this URL" chip has a deterministic target.
-- `CreateChat()` — creates a new in-memory chat
-- `CompleteMessage(chatId, input)` — stores user + assistant messages, sets auto-title on first message
-- `CompleteStream(chatId, input)` — same as `CompleteMessage` but also returns an SSE body with three deltas ending in `[DONE]`; the middle delta includes `MockManualUrl`
-- `GetMockResponse()` — returns the canned assistant response text used by both completion and stream routes
-
----
-
-## E2E test coverage
-
-### `E2E/ProductManualChatTests.cs` — `[Trait("Category", "E2E")]`
-
-Covers the embedded `ManualChatPanelComponent` on `/products/new`. All `/manuals/api/**` calls are Playwright-mocked via `InMemoryChatsStore`.
-
-| Test | What it verifies |
-|------|-----------------|
-| `Manual_chat_panel_toggle_is_visible_on_create_form` | The collapsed `.manual-chat-toggle` button renders on the create form; the expanded panel does not. |
-| `Manual_chat_panel_opens_and_closes` | Clicking the toggle opens the panel; the panel's close button collapses it again. |
-| `Sending_message_streams_response_and_shows_url_chip` | Sending a message triggers the SSE stream; a "Use this URL" chip appears with `title == InMemoryChatsStore.MockManualUrl`. |
-| `Clicking_url_chip_populates_manual_url_field` | Clicking a URL chip writes `MockManualUrl` into the form's `#manualUrl` input. |
-| `Message_list_scrolls_inside_panel_when_content_overflows` | The message list scroll container (not the page) handles overflow when the conversation grows past the panel height. |
-| `Submitting_form_after_chip_click_persists_manual_url_on_product` | After chip selection + form submit, the created product (in `InMemoryProductsStore`) has `ManualUrl == MockManualUrl`. |
+What a browser adds that jsdom cannot is **layout**. `manual-chat-layout.spec.ts` covers that, and it is the only
+spec here permitted to stub its upstream.
 
 ---
 
@@ -288,44 +286,40 @@ Covers the embedded `ManualChatPanelComponent` on `/products/new`. All `/manuals
 
 ### Build job (every push / PR)
 
-1. Build solution (`dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci`) — Angular uses `environment.ci.ts`. `dotnet publish` (step 9) rebuilds Angular without the override, producing the `production` bundle for the deployed artifact.
+1. Build solution (`dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci`), under which Angular uses `environment.ci.ts`. `dotnet publish` rebuilds Angular without the override, producing the `production` bundle for the deployed artifact.
 2. Backend unit tests with coverage (`dotnet coverlet … --filter-trait Category=Unit`, OpenCover → `coverage.opencover.xml`)
 3. Frontend unit tests with coverage (`npx vitest run --coverage`)
 4. Azure login (OIDC)
 5. Cache + install Playwright Chromium
-6. E2E tests with coverage (`dotnet-coverage collect … --filter-trait Category=E2E`)
-7. Upload TRX artifacts (`Inventory.Tests.E2E/bin/Release/net10.0/TestResults/`)
+6. Browser E2E tests (`npm run e2e:ci`)
+7. Assert the browser E2E run executed a nonzero test count
 8. Publish app + SonarCloud analysis
 
+**Step 7 is not ceremony.** An aborted Playwright run still writes `tests="0" failures="0"` to
+`playwright-results.xml`, which every reporter reads as a pass, so a suite that never started is
+indistinguishable from a suite that passed without it.
+
 There is no post-deploy job. The deployed app is exercised by the scheduled **synthetic walker**
-(`.github/workflows/synthetic.yml`), which runs from the TypeScript suite and signs in through Identity with a
-passkey. The `test-binaries` artifact that existed only to feed the old smoke job went with it.
+(`.github/workflows/synthetic.yml`), which runs from the same TypeScript suite under its own project.
 
 ### Playwright browser cache
 
-The build job caches the Playwright Chromium binary keyed on the hash of `Inventory.Tests.E2E/Inventory.Tests.E2E.csproj`. The cache is stored at `~\AppData\Local\ms-playwright` on Windows runners.
+The build job caches the Chromium binary at `~\AppData\Local\ms-playwright` on Windows runners, keyed on the
+`@playwright/test` version read out of `inventory.client/package-lock.json`. **That read must fail loudly**: if
+it yields nothing the key silently collapses to a constant, and every run restores a stale browser that no
+longer matches the installed Playwright.
 
 ### Playwright reporting
 
-`Inventory.Tests.E2E` records Playwright diagnostics for every E2E browser context, then keeps them only when the xUnit test fails. Retained failure folders are written under:
-
-```text
-Inventory.Tests.E2E/bin/<Configuration>/net10.0/TestResults/PlaywrightArtifacts/E2E/<test-name>/<context-id>/
-```
-
-Each retained folder contains:
-- `screenshot.png`
-- `trace.zip`
-- Playwright `.webm` video files
-- `browser-log.txt`
-- `metadata.json`
-- `failure.json`
+`playwright.config.ts` writes a `list` reporter to the log, an HTML report to `inventory.client/playwright-report/`
+and JUnit XML to `inventory.client/playwright-results.xml`; CI uploads the last two. Traces are captured
+`on-first-retry`, so a failure that reproduces on retry carries a trace and a first-attempt flake does not.
 
 CI uploads these artifacts separately from TRX:
 
 | Job | Artifact |
 |---|---|
-| Build E2E | `inventory-playwright-artifacts` |
+| Browser E2E | `inventory-browser-e2e-artifacts` |
 | Synthetic walker | `synthetic-playwright-report`, `synthetic-playwright-artifacts` |
 
 GitHub Actions artifacts are the only reporting destination. The workflow steps that used to mirror the same TRX outcomes to Azure DevOps test runs and Azure Monitor custom events are retired and removed.
@@ -342,8 +336,10 @@ Do not run Git commands when implementing or verifying Playwright reporting chan
 ## Local SonarCloud analysis
 
 Generate coverage files first, then run from `Inventory/`. Unit coverage is OpenCover (branch-bearing,
-via `coverlet.console` pinned in `dotnet-tools.json` — restore with `dotnet tool restore`); E2E coverage
-stays VS Coverage XML; the frontend emits LCOV. SonarCloud unions all three.
+via `coverlet.console` pinned in `dotnet-tools.json`, restored with `dotnet tool restore`) and the frontend
+emits LCOV. SonarCloud unions the two. **The browser E2E suite contributes no coverage report**: it drives a
+deployed BFF out of process, so nothing instruments it, and `inventory.client/e2e/**` sits in
+`sonar.coverage.exclusions` rather than `sonar.exclusions` so the specs are still analyzed as code.
 
 ```powershell
 # .NET unit (OpenCover) — the Inventory.Server BFF surface is tiny; real client logic is Vitest/LCOV
@@ -357,20 +353,19 @@ dotnet coverlet Inventory.Tests.Unit\bin\Release\net10.0 `
   --exclude-by-file "**/obj/**" --exclude-by-file "**/Program.cs" `
   --does-not-return-attribute DoesNotReturnAttribute --include "[Inventory.Server]*"
 
-# E2E (VS Coverage XML) → coverage-e2e.xml, and frontend LCOV via `npx vitest run --coverage` — see CI.
+# Frontend LCOV comes from `npx vitest run --coverage`. See CI.
 
 $env:SONAR_TOKEN = "<token>"
 & "$env:SystemDrive\sonar-scanner-8.0.1.6346-windows-x64\bin\sonar-scanner.bat" `
   "-Dsonar.projectKey=crgolden_Inventory" `
   "-Dsonar.organization=crgolden" `
   "-Dsonar.sources=Inventory.Server,inventory.client/src" `
-  "-Dsonar.tests=Inventory.Tests.Unit,Inventory.Tests.E2E" `
+  "-Dsonar.tests=Inventory.Tests.Unit" `
   "-Dsonar.exclusions=inventory.client/aspnetcore-https.js,inventory.client/start-os.js,**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
   "-Dsonar.coverage.exclusions=inventory.client/e2e/**,inventory.client/src/test-setup.ts" `
   "-Dsonar.test.inclusions=**/*.spec.ts" `
   "-Dsonar.cs.opencover.reportsPaths=coverage.opencover.xml" `
-  "-Dsonar.cs.vscoveragexml.reportsPaths=coverage-e2e.xml" `
   "-Dsonar.javascript.lcov.reportPaths=inventory.client/coverage/lcov.info"
 ```
 
-Required coverage files: `coverage.opencover.xml` (unit, OpenCover), `coverage-e2e.xml` (E2E, VS Coverage), `inventory.client/coverage/lcov.info`.
+Required coverage files: `coverage.opencover.xml` (unit, OpenCover) and `inventory.client/coverage/lcov.info`.

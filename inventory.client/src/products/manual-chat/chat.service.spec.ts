@@ -1,8 +1,33 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { HttpStatusCode, provideHttpClient, withXhr } from '@angular/common/http';
+import { newCount, newCountCeiling, newDisplayName, newId, newText } from '@crgolden/modules/testing';
 import { ChatService } from './chat.service';
+import {
+  CHATS_URL,
+  chatMessagesUrl,
+  chatStreamUrl,
+  chatUrl,
+  frameNotJsonMessage,
+  frameWithoutDeltaMessage,
+  MERGE_PATCH_CONTENT_TYPE,
+  SseFraming,
+} from './chat-api';
+import { CONTENT_TYPE_HEADER, HttpMethods } from '../../app/http-headers';
+import { ChatRoles } from './chat.model';
 import { firstValueFrom } from 'rxjs';
+
+function sseFrame(data: string): string {
+  return `${SseFraming.dataPrefix}${data}\n\n`;
+}
+
+function deltaFrame(content: unknown): string {
+  return sseFrame(JSON.stringify({ delta: { content } }));
+}
+
+function streamOf(...frames: string[]): string {
+  return [...frames, sseFrame(SseFraming.done)].join('');
+}
 
 describe('ChatService', () => {
   let service: ChatService;
@@ -19,77 +44,80 @@ describe('ChatService', () => {
   afterEach(() => httpMock.verify());
 
   it('getChat GETs the correct URL and returns a chat', async () => {
-    const promise = firstValueFrom(service.getChat('chat-123'));
-    const req = httpMock.expectOne('/manuals/api/chats/chat-123');
-    expect(req.request.method).toBe('GET');
-    req.flush({ chatId: 'chat-123', title: 'My Chat', createdAt: 1700000000 });
+    const chatId = newId();
+    const title = newDisplayName();
+    const promise = firstValueFrom(service.getChat(chatId));
+    const req = httpMock.expectOne(chatUrl(chatId));
+    expect(req.request.method).toBe(HttpMethods.get);
+    req.flush({ chatId, title, createdAt: newCountCeiling() });
     const result = await promise;
-    expect(result.chatId).toBe('chat-123');
-    expect(result.title).toBe('My Chat');
+    expect(result.chatId).toBe(chatId);
+    expect(result.title).toBe(title);
   });
 
-  it('createChat POSTs to /manuals/api/chats and returns created chat', async () => {
+  it('createChat POSTs to the chats collection and returns the created chat', async () => {
+    const chatId = newId();
     const promise = firstValueFrom(service.createChat());
-    const req = httpMock.expectOne('/manuals/api/chats');
-    expect(req.request.method).toBe('POST');
-    req.flush({ chatId: 'chat-new', title: null, createdAt: 1700000000 });
+    const req = httpMock.expectOne(CHATS_URL);
+    expect(req.request.method).toBe(HttpMethods.post);
+    req.flush({ chatId, title: null, createdAt: newCountCeiling() });
     const result = await promise;
-    expect(result.chatId).toBe('chat-new');
+    expect(result.chatId).toBe(chatId);
     expect(result.title).toBeNull();
   });
 
   it('updateChatTitle PATCHes the correct URL with merge-patch content type', async () => {
-    const promise = firstValueFrom(service.updateChatTitle('chat-123', 'New Title'));
-    const req = httpMock.expectOne('/manuals/api/chats/chat-123');
-    expect(req.request.method).toBe('PATCH');
-    expect(req.request.headers.get('Content-Type')).toContain('application/merge-patch+json');
-    expect(req.request.body).toEqual({ title: 'New Title' });
-    req.flush(null, { status: 204, statusText: 'No Content' });
+    const chatId = newId();
+    const title = newDisplayName();
+    const promise = firstValueFrom(service.updateChatTitle(chatId, title));
+    const req = httpMock.expectOne(chatUrl(chatId));
+    expect(req.request.method).toBe(HttpMethods.patch);
+    expect(req.request.headers.get(CONTENT_TYPE_HEADER)).toBe(MERGE_PATCH_CONTENT_TYPE);
+    expect(req.request.body).toEqual({ title });
+    req.flush(null, { status: HttpStatusCode.NoContent, statusText: newText() });
     await promise;
   });
 
   it('deleteChat DELETEs the correct URL', async () => {
-    const promise = firstValueFrom(service.deleteChat('chat-123'));
-    const req = httpMock.expectOne('/manuals/api/chats/chat-123');
-    expect(req.request.method).toBe('DELETE');
-    req.flush(null, { status: 204, statusText: 'No Content' });
+    const chatId = newId();
+    const promise = firstValueFrom(service.deleteChat(chatId));
+    const req = httpMock.expectOne(chatUrl(chatId));
+    expect(req.request.method).toBe(HttpMethods.delete);
+    req.flush(null, { status: HttpStatusCode.NoContent, statusText: newText() });
     await promise;
   });
 
   it('getChatMessages GETs the correct URL and returns messages', async () => {
-    const promise = firstValueFrom(service.getChatMessages('chat-123'));
-    const req = httpMock.expectOne('/manuals/api/chats/chat-123/messages');
-    expect(req.request.method).toBe('GET');
-    req.flush([
-      { role: 'user', text: 'Hello' },
-      { role: 'assistant', text: 'Hi there!' },
-    ]);
-    const messages = await promise;
-    expect(messages).toHaveLength(2);
-    expect(messages[0].role).toBe('user');
-    expect(messages[1].text).toBe('Hi there!');
+    const chatId = newId();
+    const history = [
+      { role: ChatRoles.user, text: newText() },
+      { role: ChatRoles.assistant, text: newText() },
+    ];
+    const promise = firstValueFrom(service.getChatMessages(chatId));
+    const req = httpMock.expectOne(chatMessagesUrl(chatId));
+    expect(req.request.method).toBe(HttpMethods.get);
+    req.flush(history);
+    expect(await promise).toEqual(history);
   });
 
   it('sendMessage POSTs to the correct URL with input body', async () => {
-    const promise = firstValueFrom(service.sendMessage('chat-123', 'Hello'));
-    const req = httpMock.expectOne('/manuals/api/chats/chat-123/messages');
-    expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ input: 'Hello' });
-    req.flush({ output: 'Hi there', chatId: 'chat-123' });
+    const chatId = newId();
+    const input = newText();
+    const output = newText();
+    const promise = firstValueFrom(service.sendMessage(chatId, input));
+    const req = httpMock.expectOne(chatMessagesUrl(chatId));
+    expect(req.request.method).toBe(HttpMethods.post);
+    expect(req.request.body).toEqual({ input });
+    req.flush({ output, chatId });
     const response = await promise;
-    expect(response.output).toBe('Hi there');
-    expect(response.chatId).toBe('chat-123');
+    expect(response.output).toBe(output);
+    expect(response.chatId).toBe(chatId);
   });
 
   it('streamMessage parses SSE deltas and completes on [DONE]', async () => {
-    const sseChunk = [
-      'data: {"delta":{"content":"Hello"}}\n\n',
-      'data: {"delta":{"content":" world"}}\n\n',
-      'data: [DONE]\n\n',
-    ].join('');
-
-    const encoder = new TextEncoder();
-    const encoded = encoder.encode(sseChunk);
+    const chatId = newId();
+    const contents = [newText(), ` ${newText()}`];
+    const encoded = new TextEncoder().encode(streamOf(...contents.map(deltaFrame)));
 
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(
@@ -99,23 +127,23 @@ describe('ChatService', () => {
             controller.close();
           },
         }),
-        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+        { status: HttpStatusCode.Ok },
       ),
     );
 
     const deltas: string[] = [];
     await new Promise<void>((resolve, reject) => {
-      service.streamMessage('chat-123', 'Hi').subscribe({
+      service.streamMessage(chatId, newText()).subscribe({
         next: (d) => deltas.push(d),
         complete: resolve,
         error: reject,
       });
     });
 
-    expect(deltas).toEqual(['Hello', ' world']);
+    expect(deltas).toEqual(contents);
     expect(fetchSpy).toHaveBeenCalledWith(
-      '/manuals/api/chats/chat-123/messages/stream',
-      expect.objectContaining({ method: 'POST' }),
+      chatStreamUrl(chatId),
+      expect.objectContaining({ method: HttpMethods.post }),
     );
     fetchSpy.mockRestore();
   });
@@ -130,13 +158,13 @@ describe('ChatService', () => {
             controller.close();
           },
         }),
-        { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+        { status: HttpStatusCode.Ok },
       ),
     );
 
     const deltas: string[] = [];
     const result = await new Promise<{ deltas: string[]; error: unknown }>((resolve) => {
-      service.streamMessage('chat-123', 'Hi').subscribe({
+      service.streamMessage(newId(), newText()).subscribe({
         next: (d) => deltas.push(d),
         complete: () => resolve({ deltas, error: null }),
         error: (err: unknown) => resolve({ deltas, error: err }),
@@ -148,28 +176,26 @@ describe('ChatService', () => {
   }
 
   it('streamMessage surfaces a frame that is not JSON instead of skipping it', async () => {
-    const { deltas, error } = await collectStream(
-      ['data: {"delta":{"content":"Hello"}}\n\n', 'data: {oops\n\n', 'data: [DONE]\n\n'].join(''),
-    );
+    const firstContent = newText();
+    const badFrame = `{${newText()}`;
+    const { deltas, error } = await collectStream(streamOf(deltaFrame(firstContent), sseFrame(badFrame)));
 
-    expect(deltas).toEqual(['Hello']);
-    expect((error as Error).message).toContain('not JSON');
+    expect(deltas).toEqual([firstContent]);
+    expect((error as Error).message).toBe(frameNotJsonMessage(badFrame));
   });
 
   it('streamMessage surfaces a well-formed frame that carries no delta.content', async () => {
-    const { deltas, error } = await collectStream(
-      ['data: {"choices":[{"text":"wrong shape"}]}\n\n', 'data: [DONE]\n\n'].join(''),
-    );
+    const wrongShape = JSON.stringify({ [newText()]: [{ [newText()]: newText() }] });
+    const { deltas, error } = await collectStream(streamOf(sseFrame(wrongShape)));
 
     expect(deltas).toEqual([]);
-    expect((error as Error).message).toContain('no delta.content');
+    expect((error as Error).message).toBe(frameWithoutDeltaMessage(wrongShape));
   });
 
   it('streamMessage rejects a delta whose content is not a string', async () => {
-    const { error } = await collectStream(
-      ['data: {"delta":{"content":42}}\n\n', 'data: [DONE]\n\n'].join(''),
-    );
+    const numericContent = JSON.stringify({ delta: { content: newCount() } });
+    const { error } = await collectStream(streamOf(sseFrame(numericContent)));
 
-    expect((error as Error).message).toContain('no delta.content');
+    expect((error as Error).message).toBe(frameWithoutDeltaMessage(numericContent));
   });
 });

@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { Observable, of, throwError } from 'rxjs';
+import { newText } from '@crgolden/modules/testing';
 import { productListResolver } from './product-list.resolver';
 import { InventoryItemView } from './inventory-item.model';
 import { ProductService } from './product.service';
@@ -30,7 +31,7 @@ describe('productListResolver', () => {
   });
 
   it('asks for the whole list when the URL names no search term', async () => {
-    let received: string | undefined = 'not-called';
+    let received: string | undefined = newText();
 
     await run({
       getAll: (search?: string) => {
@@ -43,7 +44,8 @@ describe('productListResolver', () => {
   });
 
   it('resolves the filtered list a shared link asks for, rather than the unfiltered one', async () => {
-    let received: string | undefined = 'not-called';
+    const term = newText();
+    let received: string | undefined;
 
     await run(
       {
@@ -52,14 +54,14 @@ describe('productListResolver', () => {
           return of(ITEMS);
         }
       },
-      { q: 'dyson' }
+      { q: term }
     );
 
-    expect(received).toBe('dyson');
+    expect(received).toBe(term);
   });
 
   it('degrades to null so the route activates and the page reports the failure', async () => {
-    const result = await run({ getAll: () => throwError(() => new Error('boom')) });
+    const result = await run({ getAll: () => throwError(() => new Error(newText())) });
 
     expect(result).toBeNull();
   });

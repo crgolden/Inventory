@@ -1,34 +1,32 @@
-<section class="py-5 text-center hero-section">
-  <div class="container">
-    <h1 id="home-heading" class="display-5 fw-bold">Your Complete Product Inventory</h1>
-    <p class="lead mb-4">
+<section class="border-b border-line bg-linear-135 from-canvas to-surface-2 py-12 text-center">
+  <div crgPageContainer>
+    <h1 id="home-heading" class="text-hero font-bold">Your Complete Product Inventory</h1>
+    <p class="mb-6 text-lead font-light">
       Keep track of everything you own — so you're ready for anything.
     </p>
-    <div class="d-flex gap-3 justify-content-center flex-wrap">
-      <a id="browse-catalog-link" class="btn btn-outline-primary btn-lg" [routerLink]="['/catalog']">Browse Catalog</a>
+    <div class="flex flex-wrap justify-center gap-4">
+      <a id="browse-catalog-link" crgButtonSecondary [routerLink]="['/catalog']">Browse Catalog</a>
       @if (authService.isAuthenticated()) {
-        <a id="my-products-link" class="btn btn-primary btn-lg" [routerLink]="['/products']">View My Products</a>
+        <a id="my-products-link" crgButtonPrimary [routerLink]="['/products']">View My Products</a>
       } @else {
-        <a id="home-login-link" class="btn btn-primary btn-lg" href="/bff/login">Get Started &mdash; Log In</a>
+        <a id="home-login-link" crgButtonPrimary href="/bff/login">Get Started &mdash; Log In</a>
       }
     </div>
   </div>
 </section>
 
-<section class="py-5">
-  <div class="container">
-    <h2 class="text-center mb-4">Why keep an inventory?</h2>
-    <div class="row row-cols-1 row-cols-md-3 g-4">
+<section class="py-12">
+  <div crgPageContainer>
+    <h2 class="mb-6 text-center">Why keep an inventory?</h2>
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
       @for (benefit of benefits; track benefit.title) {
-        <div class="col">
-          <div [attr.id]="'benefit-card-' + $index" class="card h-100 shadow-sm">
-            <div class="card-body">
-              <div class="icon-well mb-3 mx-auto">
-                <i [class]="'bi ' + benefit.icon + ' fs-4'"></i>
-              </div>
-              <h5 class="card-title">{{ benefit.title }}</h5>
-              <p class="card-text text-muted">{{ benefit.body }}</p>
+        <div [attr.id]="benefitCardId($index)" crgCard class="h-full">
+          <div class="p-4">
+            <div class="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-accent/8 text-minor text-accent">
+              <ng-icon [name]="benefit.icon" aria-hidden="true" />
             </div>
+            <h5 class="mb-2 text-lead font-medium">{{ benefit.title }}</h5>
+            <p class="text-text-muted">{{ benefit.body }}</p>
           </div>
         </div>
       }

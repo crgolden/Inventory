@@ -1,45 +1,28 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
-  inject,
   input,
-  OnInit,
   output,
   signal,
 } from '@angular/core';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { lucideSearch, lucideX } from '@ng-icons/lucide';
 import { ManualChatComponent } from './manual-chat.component';
 import { ProductContext } from './chat.model';
 
 @Component({
   selector: 'app-manual-chat-panel',
-  imports: [ManualChatComponent],
+  imports: [ManualChatComponent, NgIcon],
   templateUrl: './manual-chat-panel.component.html',
-  styleUrl: './manual-chat-panel.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  viewProviders: [provideIcons({ lucideSearch, lucideX })],
 })
-export class ManualChatPanelComponent implements OnInit {
-
-  private readonly destroyRef = inject(DestroyRef);
+export class ManualChatPanelComponent {
 
   readonly productContext = input<ProductContext | null>(null);
   readonly manualUrlSelected = output<string>();
 
   readonly isOpen = signal(false);
-  readonly isNarrow = signal(false);
-
-  ngOnInit(): void {
-    if (typeof globalThis.window === 'undefined' || typeof globalThis.matchMedia !== 'function') {
-      return;
-    }
-
-    const media = globalThis.matchMedia('(max-width: 767px)');
-    this.isNarrow.set(media.matches);
-
-    const listener = (event: MediaQueryListEvent) => this.isNarrow.set(event.matches);
-    media.addEventListener('change', listener);
-    this.destroyRef.onDestroy(() => media.removeEventListener('change', listener));
-  }
 
   open(): void {
     this.isOpen.set(true);
@@ -47,10 +30,6 @@ export class ManualChatPanelComponent implements OnInit {
 
   close(): void {
     this.isOpen.set(false);
-  }
-
-  toggle(): void {
-    this.isOpen.update(v => !v);
   }
 
   onUrlSelected(url: string): void {

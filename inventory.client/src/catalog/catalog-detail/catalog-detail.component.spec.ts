@@ -1,33 +1,44 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import {
+  LARGEST_PERCENT,
+  newCount,
+  newDisplayName,
+  newHttpsAddress,
+  newId,
+  newPercent,
+  newText,
+  newUtcInstant,
+} from '@crgolden/modules/testing';
 import { CatalogDetailComponent } from './catalog-detail.component';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes, ActivatedRoute } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { CatalogProduct } from '../catalog-product.model';
+import { AppPaths, CATALOG_URL } from '../../app/app-paths';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
-const testRoutes: Routes = [{ path: 'catalog', component: DummyComponent }];
+const testRoutes: Routes = [{ path: AppPaths.catalog, component: DummyComponent }];
 
 const mockProduct: CatalogProduct = {
-  id: 'aaaaaaaa-0000-0000-0000-000000000001',
-  name: 'Sony TV',
-  brand: 'Sony',
-  modelNumber: 'XR55A80K',
-  category: 'Electronics',
+  id: newId(),
+  name: newDisplayName(),
+  brand: newText(),
+  modelNumber: newText(),
+  category: newText(),
   manualUrl: null,
-  msrpPrice: 999.99,
-  createdAt: '2024-01-01T00:00:00Z',
+  msrpPrice: newCount() + newPercent() / LARGEST_PERCENT,
+  createdAt: newUtcInstant(),
   updatedAt: null,
 };
 
 const ownerPrivateFields = {
-  ownerId: 'PRIVATE-OWNER-DO-NOT-RENDER',
-  serialNumber: 'PRIVATE-SERIAL-DO-NOT-RENDER',
-  purchaseDate: 'PRIVATE-PURCHASE-DATE-DO-NOT-RENDER',
-  pricePaid: 'PRIVATE-PRICE-PAID-DO-NOT-RENDER',
-  description: 'PRIVATE-DESCRIPTION-DO-NOT-RENDER',
+  ownerId: newText(),
+  serialNumber: newText(),
+  purchaseDate: newText(),
+  pricePaid: newText(),
+  description: newText(),
 };
 
 describe('CatalogDetailComponent', () => {
@@ -55,33 +66,30 @@ describe('CatalogDetailComponent', () => {
   });
 
   it('renders the product name', () => {
-    const h2 = fixture.debugElement.query(By.css('h2'));
-    expect(h2.nativeElement.textContent).toContain('Sony TV');
+    const heading = fixture.debugElement.query(By.css('#catalog-detail-heading'));
+    expect(heading.nativeElement.textContent).toContain(mockProduct.name);
   });
 
   it('renders the universal catalog facts', () => {
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toContain('Sony');
-    expect(text).toContain('XR55A80K');
-    expect(text).toContain('Electronics');
-    expect(text).toContain('999.99');
+    expect(text).toContain(mockProduct.brand);
+    expect(text).toContain(mockProduct.modelNumber);
+    expect(text).toContain(mockProduct.category);
+    expect(text).toContain(String(mockProduct.msrpPrice));
   });
 
   it('shows a Back to Catalog link', () => {
-    const backLink = fixture.debugElement.query(By.css('a.btn-outline-secondary'));
-    expect(backLink).toBeTruthy();
-    expect(backLink.nativeElement.textContent).toContain('Back to Catalog');
+    const backLink = fixture.debugElement.query(By.css('#catalog-back-link'));
+    expect(backLink.nativeElement.getAttribute('href')).toBe(CATALOG_URL);
   });
 
-  it('does not show Edit or Delete buttons', () => {
-    const text = fixture.nativeElement.textContent as string;
-    expect(text).not.toContain('Edit');
-    expect(text).not.toContain('Delete');
+  it('offers no owner actions on the public page', () => {
+    expect(fixture.debugElement.query(By.css('#edit-product-link'))).toBeNull();
+    expect(fixture.debugElement.queryAll(By.css('button'))).toEqual([]);
   });
 
   it('does not show View Manual button when manualUrl is null', () => {
-    const manualBtn = fixture.debugElement.query(By.css('a.btn-primary'));
-    expect(manualBtn).toBeNull();
+    expect(fixture.debugElement.query(By.css('#catalog-view-manual-link'))).toBeNull();
   });
 });
 
@@ -111,7 +119,7 @@ describe('CatalogDetailComponent — resolved data carrying owner-private fields
 
   it('renders none of them, so the public page cannot leak another owner', () => {
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toContain('XR55A80K');
+    expect(text).toContain(mockProduct.modelNumber);
     for (const value of Object.values(ownerPrivateFields)) {
       expect(text).not.toContain(value);
     }
@@ -123,7 +131,7 @@ describe('CatalogDetailComponent — with manualUrl', () => {
 
   const productWithManual: CatalogProduct = {
     ...mockProduct,
-    manualUrl: 'https://example.com/sony-tv-manual.pdf',
+    manualUrl: newHttpsAddress(),
   };
 
   beforeEach(async () => {
@@ -148,9 +156,7 @@ describe('CatalogDetailComponent — with manualUrl', () => {
   });
 
   it('renders the View Manual button linking to manualUrl', () => {
-    const link = fixture.debugElement.query(By.css('a.btn-primary[target="_blank"]'));
-    expect(link).toBeTruthy();
+    const link = fixture.debugElement.query(By.css('#catalog-view-manual-link'));
     expect(link.nativeElement.getAttribute('href')).toBe(productWithManual.manualUrl);
-    expect(link.nativeElement.textContent).toContain('View Manual');
   });
 });

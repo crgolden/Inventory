@@ -3,7 +3,6 @@ namespace Inventory.Tests.Unit.Extensions;
 using System.Collections.Generic;
 using Inventory.Extensions;
 using Microsoft.Extensions.Configuration;
-using static Inventory.Tests.Unit.TestSupport.TestValues;
 
 [Trait("Category", "Unit")]
 public sealed class ConfigurationExtensionsTests
@@ -11,25 +10,64 @@ public sealed class ConfigurationExtensionsTests
     [Fact]
     public void GetRequired_ReturnsValue_WhenKeyExists()
     {
-        var settingKey = NewSettingToken();
-        var settingValue = NewSettingToken();
+        // Arrange
+        var settingKey = Generated.NewSettingToken();
+        var settingValue = Generated.NewSettingToken();
         IConfiguration config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { [settingKey] = settingValue })
             .Build();
 
-        Assert.Equal(settingValue, config.GetRequired<string>(settingKey));
+        // Act
+        var value = config.GetRequired<string>(settingKey);
+
+        // Assert
+        Assert.Equal(settingValue, value);
     }
 
     [Fact]
     public void GetRequired_ThrowsWithKeyNameInMessage_WhenKeyIsMissing()
     {
-        var missingKey = NewSettingToken();
+        // Arrange
+        var missingKey = Generated.NewSettingToken();
         IConfiguration config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>())
             .Build();
 
-        var ex = Assert.Throws<InvalidOperationException>(() => config.GetRequired<string>(missingKey));
+        // Act
+        var exception = Record.Exception(() => config.GetRequired<string>(missingKey));
 
-        Assert.Equal($"Invalid '{missingKey}'.", ex.Message);
+        // Assert
+        var ex = Assert.IsType<InvalidOperationException>(exception);
+        Assert.Contains(missingKey, ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetRequired_ThrowsRatherThanReturningZero_WhenAnIntKeyIsMissing()
+    {
+        // Arrange
+        var missingKey = Generated.NewSettingToken();
+        IConfiguration config = new ConfigurationBuilder().Build();
+
+        // Act
+        var exception = Record.Exception(() => config.GetRequired<int>(missingKey));
+
+        // Assert
+        var ex = Assert.IsType<InvalidOperationException>(exception);
+        Assert.Contains(missingKey, ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetRequired_ThrowsRatherThanReturningFalse_WhenABoolKeyIsMissing()
+    {
+        // Arrange
+        var missingKey = Generated.NewSettingToken();
+        IConfiguration config = new ConfigurationBuilder().Build();
+
+        // Act
+        var exception = Record.Exception(() => config.GetRequired<bool>(missingKey));
+
+        // Assert
+        var ex = Assert.IsType<InvalidOperationException>(exception);
+        Assert.Contains(missingKey, ex.Message, StringComparison.Ordinal);
     }
 }

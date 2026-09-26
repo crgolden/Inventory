@@ -1,33 +1,48 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ProductDetailComponent } from './product-detail.component';
+import {
+  LARGEST_PERCENT,
+  newCount,
+  newDisplayName,
+  newHttpsAddress,
+  newId,
+  newPercent,
+  newText,
+  newUtcInstant,
+} from '@crgolden/modules/testing';
+import { ProductDetailActionLabels, ProductDetailComponent } from './product-detail.component';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Routes, ActivatedRoute } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { InventoryItemView } from '../inventory-item.model';
+import { AppPaths, PRODUCTS_URL } from '../../app/app-paths';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes: Routes = [
-  { path: 'products', component: DummyComponent },
-  { path: 'products/not-found', component: DummyComponent },
-  { path: 'products/:id/edit', component: DummyComponent },
+  { path: AppPaths.products, component: DummyComponent },
+  { path: `${AppPaths.products}/${AppPaths.notFound}`, component: DummyComponent },
+  { path: `${AppPaths.products}/:${newText()}/${AppPaths.edit}`, component: DummyComponent },
 ];
 
+function newPrice(): number {
+  return newCount() + newPercent() / LARGEST_PERCENT;
+}
+
 const mockProduct: InventoryItemView = {
-  id: 'aaaaaaaa-0000-0000-0000-000000000001',
-  catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000001',
-  name: 'LG TV',
-  brand: 'LG',
-  modelNumber: 'OLED65C3',
-  category: 'Electronics',
+  id: newId(),
+  catalogProductId: newId(),
+  name: newDisplayName(),
+  brand: newText(),
+  modelNumber: newText(),
+  category: newText(),
   manualUrl: null,
-  msrpPrice: 1499.99,
-  serialNumber: 'SN-001',
-  purchaseDate: '2023-11-24T14:30:00Z',
-  pricePaid: 1299.99,
+  msrpPrice: newPrice(),
+  serialNumber: newText(),
+  purchaseDate: newUtcInstant(),
+  pricePaid: newPrice(),
   description: null,
-  createdAt: '2024-01-01T00:00:00Z',
+  createdAt: newUtcInstant(),
   updatedAt: null,
 };
 
@@ -56,29 +71,22 @@ describe('ProductDetailComponent', () => {
   });
 
   it('renders the product name', () => {
-    const h2 = fixture.debugElement.query(By.css('h2'));
-    expect(h2.nativeElement.textContent).toContain('LG TV');
+    const heading = fixture.debugElement.query(By.css('#product-detail-heading'));
+    expect(heading.nativeElement.textContent).toContain(mockProduct.name);
   });
 
   it('renders brand, model number, and serial number', () => {
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toContain('LG');
-    expect(text).toContain('OLED65C3');
-    expect(text).toContain('SN-001');
+    expect(text).toContain(mockProduct.brand);
+    expect(text).toContain(mockProduct.modelNumber);
+    expect(text).toContain(mockProduct.serialNumber);
   });
 
   it('without manualUrl, shows a "Find Manual" link that routes to the edit form', () => {
-    const links = fixture.debugElement.queryAll(By.css('a.btn-outline-primary'));
-    const findManual = links.find((l) =>
-      (l.nativeElement.textContent as string).includes('Find Manual'),
-    );
-    if (findManual === undefined) {
-      throw new Error('No "Find Manual" link rendered, so there is no href to assert on.');
-    }
+    const editLink = fixture.debugElement.query(By.css('#edit-product-link'));
 
-    expect(findManual.nativeElement.getAttribute('href')).toContain(
-      `/products/${mockProduct.id}/edit`,
-    );
+    expect(editLink.nativeElement.textContent.trim()).toBe(ProductDetailActionLabels.findManual);
+    expect(editLink.nativeElement.getAttribute('href')).toBe(`${PRODUCTS_URL}/${mockProduct.id}/${AppPaths.edit}`);
   });
 });
 
@@ -87,7 +95,7 @@ describe('ProductDetailComponent — with manualUrl', () => {
 
   const productWithManual: InventoryItemView = {
     ...mockProduct,
-    manualUrl: 'https://example.com/lg-tv-manual.pdf',
+    manualUrl: newHttpsAddress(),
   };
 
   beforeEach(async () => {
@@ -112,14 +120,12 @@ describe('ProductDetailComponent — with manualUrl', () => {
   });
 
   it('renders "View Manual" button linking to manualUrl', () => {
-    const link = fixture.debugElement.query(By.css('a.btn-primary[target="_blank"]'));
-    expect(link).toBeTruthy();
+    const link = fixture.debugElement.query(By.css('#view-manual-link'));
     expect(link.nativeElement.getAttribute('href')).toBe(productWithManual.manualUrl);
-    expect(link.nativeElement.textContent).toContain('View Manual');
   });
 
   it('shows a plain "Edit" action instead of "Find Manual"', () => {
-    const text = fixture.nativeElement.textContent as string;
-    expect(text).not.toContain('Find Manual');
+    const editLink = fixture.debugElement.query(By.css('#edit-product-link'));
+    expect(editLink.nativeElement.textContent.trim()).toBe(ProductDetailActionLabels.edit);
   });
 });

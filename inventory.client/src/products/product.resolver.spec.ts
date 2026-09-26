@@ -6,40 +6,42 @@ import {
   RouterStateSnapshot,
 } from '@angular/router';
 import { of, throwError, firstValueFrom, EmptyError, Observable } from 'rxjs';
-import { HttpErrorResponse } from '@angular/common/http';
+import { newCount, newDisplayName, newId, newText, newUtcInstant } from '@crgolden/modules/testing';
+import { HttpErrorResponse, HttpStatusCode } from '@angular/common/http';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { productResolver } from './product.resolver';
 import { ProductService } from './product.service';
 import { InventoryItemView } from './inventory-item.model';
+import { AppPaths, PRODUCTS_NOT_FOUND_URL, PRODUCTS_URL, ROUTE_ID_PARAMETER } from '../app/app-paths';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes = [
-  { path: 'products', component: DummyComponent },
-  { path: 'products/not-found', component: DummyComponent },
+  { path: AppPaths.products, component: DummyComponent },
+  { path: `${AppPaths.products}/${AppPaths.notFound}`, component: DummyComponent },
 ];
 
 const mockProduct: InventoryItemView = {
-  id: 'aaaaaaaa-0000-0000-0000-000000000001',
-  catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000001',
-  name: 'LG TV',
-  brand: 'LG',
-  modelNumber: 'OLED65C3',
+  id: newId(),
+  catalogProductId: newId(),
+  name: newDisplayName(),
+  brand: newText(),
+  modelNumber: newText(),
   category: null,
   manualUrl: null,
-  msrpPrice: 1499.99,
+  msrpPrice: newCount(),
   serialNumber: null,
   purchaseDate: null,
-  pricePaid: 1299.99,
+  pricePaid: newCount(),
   description: null,
-  createdAt: '2024-01-01T00:00:00Z',
+  createdAt: newUtcInstant(),
   updatedAt: null,
 };
 
 function makeSnapshot(id: string | null): ActivatedRouteSnapshot {
   return {
-    paramMap: { get: (key: string) => (key === 'id' ? id : null) },
+    paramMap: { get: (key: string) => (key === ROUTE_ID_PARAMETER ? id : null) },
   } as unknown as ActivatedRouteSnapshot;
 }
 
@@ -78,7 +80,7 @@ describe('productResolver', () => {
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
     expect(getById).not.toHaveBeenCalled();
-    expect(navigateSpy).toHaveBeenCalledWith(['/products/not-found']);
+    expect(navigateSpy).toHaveBeenCalledWith([PRODUCTS_NOT_FOUND_URL]);
   });
 
   it('navigates to /products/not-found when the id is absent from the owner-scoped projection', async () => {
@@ -93,11 +95,11 @@ describe('productResolver', () => {
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     const result$ = TestBed.runInInjectionContext(() =>
-      productResolver(makeSnapshot('someone-elses-id'), {} as RouterStateSnapshot),
+      productResolver(makeSnapshot(newId()), {} as RouterStateSnapshot),
     ) as Observable<InventoryItemView>;
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
-    expect(navigateSpy).toHaveBeenCalledWith(['/products/not-found']);
+    expect(navigateSpy).toHaveBeenCalledWith([PRODUCTS_NOT_FOUND_URL]);
   });
 
   it('navigates to /products/not-found when getById returns 404', async () => {
@@ -107,7 +109,7 @@ describe('productResolver', () => {
           provide: ProductService,
           useValue: {
             getById: () =>
-              throwError(() => new HttpErrorResponse({ status: 404, statusText: 'Not Found' })),
+              throwError(() => new HttpErrorResponse({ status: HttpStatusCode.NotFound, statusText: newText() })),
           },
         },
         provideRouter(testRoutes),
@@ -118,11 +120,11 @@ describe('productResolver', () => {
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     const result$ = TestBed.runInInjectionContext(() =>
-      productResolver(makeSnapshot('missing-id'), {} as RouterStateSnapshot),
+      productResolver(makeSnapshot(newId()), {} as RouterStateSnapshot),
     ) as Observable<InventoryItemView>;
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
-    expect(navigateSpy).toHaveBeenCalledWith(['/products/not-found']);
+    expect(navigateSpy).toHaveBeenCalledWith([PRODUCTS_NOT_FOUND_URL]);
   });
 
   it('navigates to /products when getById returns a non-404 error', async () => {
@@ -132,7 +134,7 @@ describe('productResolver', () => {
           provide: ProductService,
           useValue: {
             getById: () =>
-              throwError(() => new HttpErrorResponse({ status: 500, statusText: 'Server Error' })),
+              throwError(() => new HttpErrorResponse({ status: HttpStatusCode.InternalServerError, statusText: newText() })),
           },
         },
         provideRouter(testRoutes),
@@ -143,10 +145,10 @@ describe('productResolver', () => {
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     const result$ = TestBed.runInInjectionContext(() =>
-      productResolver(makeSnapshot('any-id'), {} as RouterStateSnapshot),
+      productResolver(makeSnapshot(newId()), {} as RouterStateSnapshot),
     ) as Observable<InventoryItemView>;
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
-    expect(navigateSpy).toHaveBeenCalledWith(['/products']);
+    expect(navigateSpy).toHaveBeenCalledWith([PRODUCTS_URL]);
   });
 });

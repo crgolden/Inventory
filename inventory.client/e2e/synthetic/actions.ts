@@ -1,88 +1,48 @@
 import { hasPrefix, isVisible, pickFromPrefix, prefixLocator, type WalkerAction } from '@crgolden/modules/synthetic-walker';
+import { newDisplayName, newText } from '@crgolden/modules/testing';
 import { expect, type Locator, type Page } from '@playwright/test';
+import walkerSettings from './walker-settings.json';
+import { sweepProducts } from '../product-sweep';
+import { productIdFromDetailPage, showOnlyProduct, type ListedProduct } from '../product-list';
+import { AppPaths, CATALOG_URL, NEW_PRODUCT_URL, PRODUCTS_URL } from '../../src/app/app-paths';
+import { VIEW_PRODUCT_ID_PREFIX, viewProductId } from '../../src/view-product-ids';
+import { PRODUCT_ROW_ID_PREFIX, confirmDeleteProductId, deleteProductId } from '../../src/product-row-ids';
+
+const ACTION_WEIGHTS: Readonly<Record<string, number | undefined>> = walkerSettings.actionWeights;
+
+function weightOf(actionName: string): number {
+  const weight = ACTION_WEIGHTS[actionName];
+  if (weight === undefined) {
+    throw new Error(`walker-settings.json names no weight for the '${actionName}' action.`);
+  }
+  return weight;
+}
 
 async function expectRendered(locator: Locator): Promise<void> {
   await expect(locator).toBeVisible();
 }
 
-export const SYNTHETIC_PRODUCT_PREFIX = 'Synthetic Walker Product';
+export const SYNTHETIC_PRODUCT_PREFIX = walkerSettings.productNamePrefix;
 
-const SYNTHETIC_BRAND = 'Synthetic';
-const SYNTHETIC_MODEL_PREFIX = 'SYN';
-const INVENTORY_ITEMS_BASE = '/products/api/inventory/items';
-const INVENTORY_ODATA_BASE = '/products/api/odata/InventoryItems';
-const CATALOG_ODATA_BASE = '/products/api/odata/CatalogProducts';
-const CATALOG_SWEEP_PAGE_SIZE = 100;
-const NOT_OURS_TO_REMOVE_STATUSES: ReadonlySet<number> = new Set([409, 404]);
-const CSRF_HEADER = { 'X-CSRF': '1' } as const;
-const MAX_SYNTHETIC_PRICE = 500;
-const MAX_SYNTHETIC_BRAND_SUFFIX = 100;
+const SYNTHETIC_MODEL_PREFIX = walkerSettings.modelNumberPrefix;
+const SYNTHETIC_PRICE_CEILING = walkerSettings.priceCeiling;
+const SYNTHETIC_BRAND_SUFFIX_CEILING = walkerSettings.brandSuffixCeiling;
 
 export async function sweepSyntheticProducts(page: Page): Promise<void> {
-  await sweepSyntheticInventoryItems(page);
-  await sweepSyntheticCatalogRows(page);
-}
-
-async function sweepSyntheticInventoryItems(page: Page): Promise<void> {
-  const listed = await page.request.get(
-    `${INVENTORY_ITEMS_BASE}?search=${encodeURIComponent(SYNTHETIC_PRODUCT_PREFIX)}`,
-    { headers: CSRF_HEADER },
-  );
-  if (!listed.ok()) {
-    throw new Error(
-      `Inventory sweep could not list its items: ${listed.status()} from ${INVENTORY_ITEMS_BASE}. ` +
-        'A sweep that cannot list is indistinguishable from a sweep with nothing to do.',
-    );
-  }
-  const items = (await listed.json()) as { id: string; name: string | null }[];
-  const synthetic = items.filter(item => item.name?.startsWith(SYNTHETIC_PRODUCT_PREFIX) === true);
-  for (const item of synthetic) {
-    const deleted = await page.request.delete(`${INVENTORY_ODATA_BASE}(${item.id})`, { headers: CSRF_HEADER });
-    if (!deleted.ok() && deleted.status() !== 404) {
-      throw new Error(`Inventory sweep could not delete ${item.id}: ${deleted.status()}.`);
-    }
-  }
-}
-
-async function sweepSyntheticCatalogRows(page: Page): Promise<void> {
-  const filter = `startswith(ModelNumber,'${SYNTHETIC_MODEL_PREFIX}-')`;
-  const listed = await page.request.get(
-    `${CATALOG_ODATA_BASE}?$filter=${encodeURIComponent(filter)}&$select=Id&$top=${CATALOG_SWEEP_PAGE_SIZE}`,
-    { headers: CSRF_HEADER },
-  );
-  if (!listed.ok()) {
-    throw new Error(
-      `Catalog sweep could not list its rows: ${listed.status()} from ${CATALOG_ODATA_BASE}. ` +
-        'A sweep that cannot list is indistinguishable from a sweep with nothing to do, and the residue it ' +
-        'exists to remove would grow with every run while this walk stayed green.',
-    );
-  }
-  const body = (await listed.json()) as { value?: { Id?: string }[] };
-  for (const row of body.value ?? []) {
-    if (row.Id === undefined) {
-      continue;
-    }
-    const deleted = await page.request.delete(`${CATALOG_ODATA_BASE}(${row.Id})`, { headers: CSRF_HEADER });
-    if (!deleted.ok() && !NOT_OURS_TO_REMOVE_STATUSES.has(deleted.status())) {
-      throw new Error(`Catalog sweep could not delete ${row.Id}: ${deleted.status()}.`);
-    }
-  }
-}
-
-async function showOnlyProductNamed(page: Page, name: string): Promise<void> {
-  await page.goto('/products');
-  await page.locator('#product-search').fill(name);
-  await expect(page.locator('#product-name-0')).toHaveText(name);
+  await sweepProducts(page, {
+    productNamePrefix: SYNTHETIC_PRODUCT_PREFIX,
+    modelNumberPrefix: SYNTHETIC_MODEL_PREFIX,
+  });
 }
 
 export function createInventoryActions(seed: number): readonly WalkerAction[] {
-  const createdNames: string[] = [];
-  const runToken = Date.now().toString(36);
+  const createdProducts: ListedProduct[] = [];
+  const runToken = newText();
+  const syntheticBrand = newDisplayName();
   let createdSequence = 0;
-  return [
+  const unweightedActions: readonly Omit<WalkerAction, 'weight'>[] = [
     {
       name: 'go home',
-      weight: 1,
       available: () => Promise.resolve(true),
       run: async page => {
         await page.goto('/');
@@ -91,88 +51,82 @@ export function createInventoryActions(seed: number): readonly WalkerAction[] {
     },
     {
       name: 'browse the catalog',
-      weight: 3,
       available: () => Promise.resolve(true),
       run: async page => {
-        await page.goto('/catalog');
+        await page.goto(CATALOG_URL);
         await expectRendered(page.locator('#catalog-heading'));
       },
     },
     {
       name: 'open a catalog item',
-      weight: 2,
-      available: async page => (await isVisible(page, '#catalog-heading')) && (await hasPrefix(page, 'view-product-')),
+      available: async page => (await isVisible(page, '#catalog-heading')) && (await hasPrefix(page, VIEW_PRODUCT_ID_PREFIX)),
       run: async (page, rng) => {
-        const viewLink = await pickFromPrefix(page, rng, 'view-product-');
+        const viewLink = await pickFromPrefix(page, rng, VIEW_PRODUCT_ID_PREFIX);
         await viewLink.click();
         await expectRendered(page.locator('#catalog-detail-heading'));
       },
     },
     {
       name: 'browse my products',
-      weight: 3,
       available: () => Promise.resolve(true),
       run: async page => {
-        await page.goto('/products');
+        await page.goto(PRODUCTS_URL);
         await expectRendered(page.locator('#products-heading'));
       },
     },
     {
       name: 'view a product detail',
-      weight: 2,
-      available: async page => (await isVisible(page, '#products-heading')) && (await hasPrefix(page, 'view-product-')),
+      available: async page => (await isVisible(page, '#products-heading')) && (await hasPrefix(page, VIEW_PRODUCT_ID_PREFIX)),
       run: async (page, rng) => {
-        const viewLink = await pickFromPrefix(page, rng, 'view-product-');
+        const viewLink = await pickFromPrefix(page, rng, VIEW_PRODUCT_ID_PREFIX);
         await viewLink.click();
         await expectRendered(page.locator('#product-detail-heading'));
       },
     },
     {
       name: 'create a synthetic product',
-      weight: 2,
       available: () => Promise.resolve(true),
       run: async (page, rng) => {
         createdSequence += 1;
         const name = `${SYNTHETIC_PRODUCT_PREFIX} ${seed}-${createdSequence}`;
-        await page.goto('/products/new');
+        await page.goto(NEW_PRODUCT_URL);
         await page.locator('#name').fill(name);
-        await page.locator('#brand').fill(SYNTHETIC_BRAND);
+        await page.locator('#brand').fill(syntheticBrand);
         await page.locator('#modelNumber').fill(`${SYNTHETIC_MODEL_PREFIX}-${runToken}-${createdSequence}`);
-        await page.locator('#pricePaid').fill(String(1 + rng.int(MAX_SYNTHETIC_PRICE - 1)));
+        await page.locator('#pricePaid').fill(String(1 + rng.int(SYNTHETIC_PRICE_CEILING - 1)));
         await page.locator('#product-form-submit').click();
-        await expect(page).toHaveURL(/\/products\/[^/]+$/);
-        await expect(page.locator('#product-detail-heading')).toHaveText(name);
-        createdNames.push(name);
+        const created: ListedProduct = { id: await productIdFromDetailPage(page), name };
+        await expect(page.locator('#product-detail-heading')).toHaveAttribute('data-product-id', created.id);
+        createdProducts.push(created);
       },
     },
     {
       name: 'edit a synthetic product',
-      weight: 2,
-      available: () => Promise.resolve(createdNames.length > 0),
+      available: () => Promise.resolve(createdProducts.length > 0),
       run: async (page, rng) => {
-        const name = rng.pick(createdNames);
-        await showOnlyProductNamed(page, name);
-        await page.locator('#view-product-0').click();
+        const product = rng.pick(createdProducts);
+        await showOnlyProduct(page, product);
+        await page.locator(`#${viewProductId(0)}`).click();
         await expectRendered(page.locator('#product-detail-heading'));
         await page.locator('#edit-product-link').click();
         await expect(page).toHaveURL(/\/products\/.+\/edit$/);
-        await page.locator('#brand').fill(`${SYNTHETIC_BRAND} ${1 + rng.int(MAX_SYNTHETIC_BRAND_SUFFIX - 1)}`);
+        await page.locator('#brand').fill(`${syntheticBrand} ${1 + rng.int(SYNTHETIC_BRAND_SUFFIX_CEILING - 1)}`);
         await page.locator('#product-form-submit').click();
-        await expect(page).toHaveURL(url => !url.pathname.endsWith('/edit'));
+        await expect(page).toHaveURL(url => !url.pathname.endsWith(`/${AppPaths.edit}`));
       },
     },
     {
       name: 'delete a synthetic product',
-      weight: 2,
-      available: () => Promise.resolve(createdNames.length > 0),
+      available: () => Promise.resolve(createdProducts.length > 0),
       run: async (page, rng) => {
-        const index = rng.int(createdNames.length);
-        const [name] = createdNames.splice(index, 1);
-        await showOnlyProductNamed(page, name);
-        await page.locator('#delete-product-0').click();
-        await page.locator('#confirm-delete-product-0').click();
-        await expect(prefixLocator(page, 'product-row-')).toHaveCount(0);
+        const index = rng.int(createdProducts.length);
+        const [product] = createdProducts.splice(index, 1);
+        await showOnlyProduct(page, product);
+        await page.locator(`#${deleteProductId(0)}`).click();
+        await page.locator(`#${confirmDeleteProductId(0)}`).click();
+        await expect(prefixLocator(page, PRODUCT_ROW_ID_PREFIX)).toHaveCount(0);
       },
     },
   ];
+  return unweightedActions.map(action => ({ ...action, weight: weightOf(action.name) }));
 }

@@ -1,55 +1,59 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ProductListComponent } from './product-list.component';
+import {
+  LARGEST_PERCENT,
+  newCount,
+  newDisplayName,
+  newId,
+  newPercent,
+  newText,
+  newUtcInstant,
+} from '@crgolden/modules/testing';
+import { PRODUCT_LIST_LOAD_ERROR, ProductListComponent } from './product-list.component';
 import { ProductService } from '../product.service';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, Data, Params, provideRouter, Router, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { BehaviorSubject, of, throwError } from 'rxjs';
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpStatusCode } from '@angular/common/http';
 import { InventoryItemView } from '../inventory-item.model';
+import { AppPaths } from '../../app/app-paths';
+import { PRODUCT_ROW_ID_PREFIX, confirmDeleteProductId, deleteProductId, productNameId } from '../../product-row-ids';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes: Routes = [
-  { path: 'products/new', component: DummyComponent },
-  { path: 'products/:id', component: DummyComponent },
-  { path: 'products/:id/edit', component: DummyComponent },
+  { path: `${AppPaths.products}/${AppPaths.newProduct}`, component: DummyComponent },
+  { path: `${AppPaths.products}/:${newText()}`, component: DummyComponent },
 ];
 
+function newPrice(): number {
+  return newCount() + newPercent() / LARGEST_PERCENT;
+}
+
+function newInventoryItem(overrides: Partial<InventoryItemView> = {}): InventoryItemView {
+  return {
+    id: newId(),
+    catalogProductId: newId(),
+    name: newDisplayName(),
+    brand: newText(),
+    modelNumber: null,
+    category: newText(),
+    manualUrl: null,
+    msrpPrice: newPrice(),
+    serialNumber: null,
+    purchaseDate: null,
+    pricePaid: newPrice(),
+    description: null,
+    createdAt: newUtcInstant(),
+    updatedAt: null,
+    ...overrides,
+  };
+}
+
 const mockProducts: InventoryItemView[] = [
-  {
-    id: 'aaaaaaaa-0000-0000-0000-000000000001',
-    catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000001',
-    name: 'TV',
-    brand: 'LG',
-    modelNumber: null,
-    category: 'Electronics',
-    manualUrl: null,
-    msrpPrice: 1099.99,
-    serialNumber: null,
-    purchaseDate: null,
-    pricePaid: 999.99,
-    description: null,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: null,
-  },
-  {
-    id: 'aaaaaaaa-0000-0000-0000-000000000002',
-    catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000002',
-    name: 'Vacuum',
-    brand: 'Dyson',
-    modelNumber: null,
-    category: 'Home',
-    manualUrl: null,
-    msrpPrice: null,
-    serialNumber: null,
-    purchaseDate: null,
-    pricePaid: null,
-    description: null,
-    createdAt: '2024-01-02T00:00:00Z',
-    updatedAt: null,
-  },
+  newInventoryItem(),
+  newInventoryItem({ msrpPrice: null, pricePaid: null }),
 ];
 
 describe('ProductListComponent', () => {
@@ -115,54 +119,57 @@ describe('ProductListComponent', () => {
   });
 
   it('renders a row for each product', () => {
-    const rows = fixture.debugElement.queryAll(By.css('tbody tr'));
-    expect(rows.length).toBe(2);
+    const rows = fixture.debugElement.queryAll(By.css(`[id^="${PRODUCT_ROW_ID_PREFIX}"]`));
+    expect(rows.length).toBe(mockProducts.length);
   });
 
   it('shows product name in row', () => {
-    const firstRow = fixture.debugElement.queryAll(By.css('tbody tr'))[0];
-    expect(firstRow.nativeElement.textContent).toContain('TV');
+    const nameCell = fixture.debugElement.query(By.css(`#${productNameId(0)}`));
+    expect(nameCell.nativeElement.textContent).toContain(mockProducts[0].name);
   });
 
   it('renders the search input', () => {
-    const input = fixture.debugElement.query(By.css('input[type="search"]'));
+    const input = fixture.debugElement.query(By.css('#product-search'));
     expect(input).toBeTruthy();
   });
 
   it('shows no-match message when the resolver answers an empty list', async () => {
-    queryParams$.next({ q: 'xyz' });
+    const unmatched = newText();
+    queryParams$.next({ q: unmatched });
     data$.next({ products: [] });
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    const emptyState = fixture.debugElement.query(By.css('.empty-state'));
-    expect(emptyState.nativeElement.textContent).toContain('xyz');
+    const emptyState = fixture.debugElement.query(By.css('#products-empty-state'));
+    expect(emptyState.nativeElement.textContent).toContain(unmatched);
   });
 
   it('puts the search term in the URL so a filtered list can be shared, and so the resolver re-runs', async () => {
+    const term = newText();
     const input: HTMLInputElement = fixture.debugElement.query(
       By.css('input[type="search"]'),
     ).nativeElement;
-    input.value = 'dyson';
+    input.value = term;
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    expect(queryParams$.value['q']).toBe('dyson');
+    expect(queryParams$.value['q']).toBe(term);
   });
 
   it('restores the search box from the URL rather than opening blank on a shared link', async () => {
-    queryParams$.next({ q: 'kettle' });
+    const term = newText();
+    queryParams$.next({ q: term });
     await vi.runAllTimersAsync();
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.searchTerm()).toBe('kettle');
+    expect(fixture.componentInstance.searchTerm()).toBe(term);
   });
 
   it('never fetches the list itself, on the first render or on a URL change', async () => {
-    queryParams$.next({ q: 'dyson' });
+    queryParams$.next({ q: newText() });
     data$.next({ products: mockProducts });
     await vi.runAllTimersAsync();
     fixture.detectChanges();
@@ -176,7 +183,7 @@ describe('ProductListComponent', () => {
     fixture.detectChanges();
 
     const alert = fixture.debugElement.query(By.css('#product-list-error'));
-    expect(alert.nativeElement.textContent).toContain('Could not load your products');
+    expect(alert.nativeElement.textContent).toContain(PRODUCT_LIST_LOAD_ERROR);
     expect(fixture.componentInstance.products()).toEqual([]);
   });
 
@@ -190,43 +197,44 @@ describe('ProductListComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.debugElement.query(By.css('#product-list-error'))).toBeNull();
-    expect(fixture.debugElement.queryAll(By.css('tbody tr')).length).toBe(2);
+    expect(fixture.debugElement.queryAll(By.css(`[id^="${PRODUCT_ROW_ID_PREFIX}"]`)).length).toBe(mockProducts.length);
   });
 
   it('clicking Delete shows inline confirmation', () => {
-    const deleteBtn = fixture.debugElement.queryAll(By.css('button.btn-outline-danger'))[0];
+    const deleteBtn = fixture.debugElement.query(By.css(`#${deleteProductId(0)}`));
     deleteBtn.nativeElement.click();
     fixture.detectChanges();
 
-    const confirmText = fixture.debugElement.query(By.css('.text-danger'));
-    expect(confirmText.nativeElement.textContent).toContain('Delete?');
+    expect(fixture.componentInstance.confirmingDeleteId()).toBe(mockProducts[0].id);
+    expect(fixture.debugElement.query(By.css(`#${confirmDeleteProductId(0)}`))).toBeTruthy();
   });
 
   it('confirming delete calls ProductService.delete', () => {
-    const deleteBtn = fixture.debugElement.queryAll(By.css('button.btn-outline-danger'))[0];
+    const deleteBtn = fixture.debugElement.query(By.css(`#${deleteProductId(0)}`));
     deleteBtn.nativeElement.click();
     fixture.detectChanges();
 
-    const yesBtn = fixture.debugElement.query(By.css('button.btn-danger'));
+    const yesBtn = fixture.debugElement.query(By.css(`#${confirmDeleteProductId(0)}`));
     yesBtn.nativeElement.click();
 
-    expect(mockService.delete).toHaveBeenCalledWith('aaaaaaaa-0000-0000-0000-000000000001');
+    expect(mockService.delete).toHaveBeenCalledWith(mockProducts[0].id);
   });
 
   it('a failed delete surfaces an error and leaves the row in place', () => {
+    const failedStatus = HttpStatusCode.InternalServerError;
     (mockService.delete as ReturnType<typeof vi.fn>).mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 500 })),
+      throwError(() => new HttpErrorResponse({ status: failedStatus })),
     );
 
-    const deleteBtn = fixture.debugElement.queryAll(By.css('button.btn-outline-danger'))[0];
+    const deleteBtn = fixture.debugElement.query(By.css(`#${deleteProductId(0)}`));
     deleteBtn.nativeElement.click();
     fixture.detectChanges();
-    fixture.debugElement.query(By.css('button.btn-danger')).nativeElement.click();
+    fixture.debugElement.query(By.css(`#${confirmDeleteProductId(0)}`)).nativeElement.click();
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.products().length).toBe(2);
+    expect(fixture.componentInstance.products()).toEqual(mockProducts);
     const alert = fixture.debugElement.query(By.css('#product-list-error'));
     expect(alert).toBeTruthy();
-    expect(alert.nativeElement.textContent).toContain('500');
+    expect(alert.nativeElement.textContent).toContain(String(failedStatus));
   });
 });

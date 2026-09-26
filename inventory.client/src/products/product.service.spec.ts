@@ -1,41 +1,52 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient, withInterceptorsFromDi, withXhr } from '@angular/common/http';
+import { HttpStatusCode, provideHttpClient, withInterceptorsFromDi, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
+import {
+  LARGEST_PERCENT,
+  newCount,
+  newDisplayName,
+  newId,
+  newPercent,
+  newText,
+  newUtcInstant,
+} from '@crgolden/modules/testing';
 import { ProductService } from './product.service';
+import { INVENTORY_ITEMS_URL, INVENTORY_ODATA_URL, SEARCH_PARAMETER } from './products-api';
 import { AddToInventoryRequest, InventoryItemView } from './inventory-item.model';
+import { HttpMethods } from '../app/http-headers';
 
-const ITEMS_URL = '/products/api/inventory/items';
-const ODATA_BASE = '/products/api/odata/InventoryItems';
+function newPrice(): number {
+  return newCount() + newPercent() / LARGEST_PERCENT;
+}
 
-const mockItem: InventoryItemView = {
-  id: 'aaaaaaaa-0000-0000-0000-000000000001',
-  catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000001',
-  name: 'LG OLED C3',
-  brand: 'LG',
-  modelNumber: 'OLED65C3PUA',
-  category: 'Electronics',
-  manualUrl: null,
-  msrpPrice: 1499.99,
-  serialNumber: 'SN-LG-001',
-  purchaseDate: '2023-11-24T14:30:00Z',
-  pricePaid: 1299.99,
-  description: '65-inch 4K OLED smart TV',
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: null,
-};
+function newInventoryItem(): InventoryItemView {
+  return {
+    id: newId(),
+    catalogProductId: newId(),
+    name: newDisplayName(),
+    brand: newText(),
+    modelNumber: newText(),
+    category: newText(),
+    manualUrl: null,
+    msrpPrice: newPrice(),
+    serialNumber: newText(),
+    purchaseDate: newUtcInstant(),
+    pricePaid: newPrice(),
+    description: newDisplayName(),
+    createdAt: newUtcInstant(),
+    updatedAt: null,
+  };
+}
 
-const otherItem: InventoryItemView = {
-  ...mockItem,
-  id: 'aaaaaaaa-0000-0000-0000-000000000002',
-  catalogProductId: 'bbbbbbbb-0000-0000-0000-000000000002',
-  name: 'Dyson V15',
-};
+const mockItem = newInventoryItem();
+
+const otherItem = newInventoryItem();
 
 const newRequest: AddToInventoryRequest = {
-  name: 'New Item',
-  brand: 'Acme',
-  modelNumber: 'AC-1',
+  name: newDisplayName(),
+  brand: newText(),
+  modelNumber: newText(),
   category: null,
   manualUrl: null,
   msrpPrice: null,
@@ -71,51 +82,50 @@ describe('ProductService', () => {
     it('requests the owner-scoped inventory projection, not the anonymous catalog', () => {
       service.getAll().subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL));
-      expect(req.request.method).toBe('GET');
+      const req = http.expectOne(r => r.urlWithParams.startsWith(INVENTORY_ITEMS_URL));
+      expect(req.request.method).toBe(HttpMethods.get);
       req.flush([mockItem]);
     });
 
     it('returns the items unwrapped, since the projection is a bare array', async () => {
       const promise = firstValueFrom(service.getAll());
 
-      http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL)).flush([mockItem]);
+      http.expectOne(r => r.urlWithParams.startsWith(INVENTORY_ITEMS_URL)).flush([mockItem]);
 
-      const items = await promise;
-      expect(items.length).toBe(1);
-      expect(items[0].id).toBe(mockItem.id);
-      expect(items[0].pricePaid).toBe(mockItem.pricePaid);
+      expect(await promise).toEqual([mockItem]);
     });
 
     it('passes the search term through as a plain query parameter', () => {
-      service.getAll('oled').subscribe();
+      const term = newText();
+      service.getAll(term).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL));
-      expect(params(req.request.urlWithParams).get('search')).toBe('oled');
+      const req = http.expectOne(r => r.urlWithParams.startsWith(INVENTORY_ITEMS_URL));
+      expect(params(req.request.urlWithParams).get(SEARCH_PARAMETER)).toBe(term);
       req.flush([]);
     });
 
     it('does not send a search parameter when the term is empty', () => {
       service.getAll('').subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL));
-      expect(params(req.request.urlWithParams).has('search')).toBe(false);
+      const req = http.expectOne(r => r.urlWithParams.startsWith(INVENTORY_ITEMS_URL));
+      expect(params(req.request.urlWithParams).has(SEARCH_PARAMETER)).toBe(false);
       req.flush([]);
     });
 
     it('does not send a search parameter when the term is only whitespace', () => {
       service.getAll('   ').subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL));
-      expect(params(req.request.urlWithParams).has('search')).toBe(false);
+      const req = http.expectOne(r => r.urlWithParams.startsWith(INVENTORY_ITEMS_URL));
+      expect(params(req.request.urlWithParams).has(SEARCH_PARAMETER)).toBe(false);
       req.flush([]);
     });
 
     it('trims whitespace from the search term', () => {
-      service.getAll('  dyson  ').subscribe();
+      const term = newText();
+      service.getAll(`  ${term}  `).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL));
-      expect(params(req.request.urlWithParams).get('search')).toBe('dyson');
+      const req = http.expectOne(r => r.urlWithParams.startsWith(INVENTORY_ITEMS_URL));
+      expect(params(req.request.urlWithParams).get(SEARCH_PARAMETER)).toBe(term);
       req.flush([]);
     });
   });
@@ -124,18 +134,15 @@ describe('ProductService', () => {
     it('selects the matching item out of the owner-scoped projection', async () => {
       const promise = firstValueFrom(service.getById(otherItem.id));
 
-      http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL)).flush([mockItem, otherItem]);
+      http.expectOne(r => r.urlWithParams.startsWith(INVENTORY_ITEMS_URL)).flush([mockItem, otherItem]);
 
-      const item = await promise;
-      expect(item).not.toBeNull();
-      expect(item?.id).toBe(otherItem.id);
-      expect(item?.name).toBe(otherItem.name);
+      expect(await promise).toEqual(otherItem);
     });
 
     it('emits null when the id is absent from the owner-scoped projection', async () => {
       const promise = firstValueFrom(service.getById(otherItem.id));
 
-      http.expectOne(r => r.urlWithParams.startsWith(ITEMS_URL)).flush([mockItem]);
+      http.expectOne(r => r.urlWithParams.startsWith(INVENTORY_ITEMS_URL)).flush([mockItem]);
 
       expect(await promise).toBeNull();
     });
@@ -145,16 +152,16 @@ describe('ProductService', () => {
     it('POSTs the composite request to the inventory items URL', () => {
       service.create(newRequest).subscribe();
 
-      const req = http.expectOne(ITEMS_URL);
-      expect(req.request.method).toBe('POST');
+      const req = http.expectOne(INVENTORY_ITEMS_URL);
+      expect(req.request.method).toBe(HttpMethods.post);
       expect(req.request.body).toEqual(newRequest);
-      req.flush(mockItem, { status: 201, statusText: 'Created' });
+      req.flush(mockItem, { status: HttpStatusCode.Created, statusText: newText() });
     });
 
     it('emits the new item id from the response body', async () => {
       const promise = firstValueFrom(service.create(newRequest));
 
-      http.expectOne(ITEMS_URL).flush(mockItem, { status: 201, statusText: 'Created' });
+      http.expectOne(INVENTORY_ITEMS_URL).flush(mockItem, { status: HttpStatusCode.Created, statusText: newText() });
 
       expect(await promise).toBe(mockItem.id);
     });
@@ -162,7 +169,7 @@ describe('ProductService', () => {
     it('emits null when the response carries no body', async () => {
       const promise = firstValueFrom(service.create(newRequest));
 
-      http.expectOne(ITEMS_URL).flush(null, { status: 201, statusText: 'Created' });
+      http.expectOne(INVENTORY_ITEMS_URL).flush(null, { status: HttpStatusCode.Created, statusText: newText() });
 
       expect(await promise).toBeNull();
     });
@@ -170,11 +177,12 @@ describe('ProductService', () => {
 
   describe('patch', () => {
     it('PATCHes the owner-scoped OData entity with only the changed fields', () => {
-      service.patch(mockItem.id, { serialNumber: 'SN-UPDATED' }).subscribe();
+      const change = { serialNumber: newText() };
+      service.patch(mockItem.id, change).subscribe();
 
-      const req = http.expectOne(`${ODATA_BASE}(${mockItem.id})`);
-      expect(req.request.method).toBe('PATCH');
-      expect(req.request.body).toEqual({ serialNumber: 'SN-UPDATED' });
+      const req = http.expectOne(`${INVENTORY_ODATA_URL}(${mockItem.id})`);
+      expect(req.request.method).toBe(HttpMethods.patch);
+      expect(req.request.body).toEqual(change);
       req.flush(null);
     });
   });
@@ -183,17 +191,17 @@ describe('ProductService', () => {
     it('sends DELETE to the owner-scoped OData entity URL', () => {
       service.delete(mockItem.id).subscribe();
 
-      const req = http.expectOne(`${ODATA_BASE}(${mockItem.id})`);
-      expect(req.request.method).toBe('DELETE');
-      req.flush(null, { status: 204, statusText: 'No Content' });
+      const req = http.expectOne(`${INVENTORY_ODATA_URL}(${mockItem.id})`);
+      expect(req.request.method).toBe(HttpMethods.delete);
+      req.flush(null, { status: HttpStatusCode.NoContent, statusText: newText() });
     });
 
     it('completes without error on 204', async () => {
       const promise = firstValueFrom(service.delete(mockItem.id));
 
       http
-        .expectOne(`${ODATA_BASE}(${mockItem.id})`)
-        .flush(null, { status: 204, statusText: 'No Content' });
+        .expectOne(`${INVENTORY_ODATA_URL}(${mockItem.id})`)
+        .flush(null, { status: HttpStatusCode.NoContent, statusText: newText() });
 
       await expect(promise).resolves.toBeNull();
     });

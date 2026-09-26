@@ -1,87 +1,89 @@
-<div class="container py-4" style="max-width: 640px;">
-  <h2 class="mb-4">{{ isEdit() ? 'Edit Product' : 'New Product' }}</h2>
+<div crgPageContainer class="py-6">
+  <div class="mx-auto max-w-form">
+    <h2 class="mb-6">{{ isEdit() ? 'Edit Product' : 'New Product' }}</h2>
 
-  @if (error()) {
-    <div class="alert alert-danger">{{ error() }}</div>
-  }
+    @if (error()) {
+      <div id="product-form-error" class="mb-4 rounded-md border border-danger/30 bg-danger/10 p-4 text-danger">{{ error() }}</div>
+    }
 
-  <form [formGroup]="form" (ngSubmit)="submit()">
-    <div class="mb-3">
-      <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
-      <input id="name" type="text" class="form-control" formControlName="name"
-        [class.is-invalid]="form.controls.name.invalid && form.controls.name.touched" />
-      @if (form.controls.name.invalid && form.controls.name.touched) {
-        <div class="invalid-feedback">Name is required.</div>
-      }
-    </div>
-
-    <div class="row mb-3">
-      <div class="col">
-        <label for="brand" class="form-label">Brand <span class="text-danger">*</span></label>
-        <input id="brand" type="text" class="form-control" formControlName="brand" />
+    <form id="product-form" [formGroup]="form" (ngSubmit)="submit()">
+      <div class="mb-4">
+        <label for="name" class="mb-2 block">Name <span class="text-danger">*</span></label>
+        <input id="name" type="text" formControlName="name"
+          [class.border-danger]="form.controls.name.invalid && form.controls.name.touched" />
+        @if (form.controls.name.invalid && form.controls.name.touched) {
+          <div class="mt-1 text-meta text-danger">Name is required.</div>
+        }
       </div>
-      <div class="col">
-        <label for="pricePaid" class="form-label">Price You Paid</label>
-        <div class="input-group">
-          <span class="input-group-text">$</span>
-          <input id="pricePaid" type="number" min="0" step="0.01" class="form-control"
-            formControlName="pricePaid" placeholder="0.00" />
+
+      <div class="mb-4 flex flex-wrap gap-x-6">
+        <div class="flex-1">
+          <label for="brand" class="mb-2 block">Brand <span class="text-danger">*</span></label>
+          <input id="brand" type="text" formControlName="brand" />
+        </div>
+        <div class="flex-1">
+          <label for="pricePaid" class="mb-2 block">Price You Paid</label>
+          <div class="flex">
+            <span class="flex items-center rounded-l-md border border-r-0 border-line bg-surface-2 px-3">$</span>
+            <input id="pricePaid" type="number" min="0" step="0.01" class="min-w-0 rounded-l-none"
+              formControlName="pricePaid" placeholder="0.00" />
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="row mb-3">
-      <div class="col">
-        <label for="modelNumber" class="form-label">Model Number <span class="text-danger">*</span></label>
-        <input id="modelNumber" type="text" class="form-control" formControlName="modelNumber" />
-      </div>
-      <div class="col">
-        <label for="serialNumber" class="form-label">Serial Number</label>
-        <input id="serialNumber" type="text" class="form-control" formControlName="serialNumber" />
-      </div>
-    </div>
-
-    <div class="row mb-3">
-      <div class="col">
-        <label for="msrpPrice" class="form-label">List Price (shared with everyone)</label>
-        <div class="input-group">
-          <span class="input-group-text">$</span>
-          <input id="msrpPrice" type="number" min="0" step="0.01" class="form-control"
-            formControlName="msrpPrice" placeholder="0.00" />
+      <div class="mb-4 flex flex-wrap gap-x-6">
+        <div class="flex-1">
+          <label for="modelNumber" class="mb-2 block">Model Number <span class="text-danger">*</span></label>
+          <input id="modelNumber" type="text" formControlName="modelNumber" />
+        </div>
+        <div class="flex-1">
+          <label for="serialNumber" class="mb-2 block">Serial Number</label>
+          <input id="serialNumber" type="text" formControlName="serialNumber" />
         </div>
       </div>
-    </div>
 
-    <div class="row mb-3">
-      <div class="col">
-        <label for="purchaseDate" class="form-label">Purchase Date &amp; Time</label>
-        <input id="purchaseDate" type="datetime-local" class="form-control" formControlName="purchaseDate" />
+      <div class="mb-4 flex flex-wrap gap-x-6">
+        <div class="flex-1">
+          <label for="msrpPrice" class="mb-2 block">List Price (shared with everyone)</label>
+          <div class="flex">
+            <span class="flex items-center rounded-l-md border border-r-0 border-line bg-surface-2 px-3">$</span>
+            <input id="msrpPrice" type="number" min="0" step="0.01" class="min-w-0 rounded-l-none"
+              formControlName="msrpPrice" placeholder="0.00" />
+          </div>
+        </div>
       </div>
-      <div class="col">
-        <label for="category" class="form-label">Category</label>
-        <input id="category" type="text" class="form-control" formControlName="category"
-          placeholder="e.g. Electronics, Vehicle" />
+
+      <div class="mb-4 flex flex-wrap gap-x-6">
+        <div class="flex-1">
+          <label for="purchaseDate" class="mb-2 block">Purchase Date &amp; Time</label>
+          <input id="purchaseDate" type="datetime-local" formControlName="purchaseDate" />
+        </div>
+        <div class="flex-1">
+          <label for="category" class="mb-2 block">Category</label>
+          <input id="category" type="text" formControlName="category"
+            placeholder="e.g. Electronics, Vehicle" />
+        </div>
       </div>
-    </div>
 
-    <div class="mb-3">
-      <label for="description" class="form-label">Description</label>
-      <textarea id="description" class="form-control" rows="3" formControlName="description"></textarea>
-    </div>
+      <div class="mb-4">
+        <label for="description" class="mb-2 block">Description</label>
+        <textarea id="description" rows="3" formControlName="description"></textarea>
+      </div>
 
-    <div class="mb-4">
-      <label for="manualUrl" class="form-label">Manual URL</label>
-      <input id="manualUrl" type="url" class="form-control" formControlName="manualUrl"
-        placeholder="https://..." />
-    </div>
+      <div class="mb-6">
+        <label for="manualUrl" class="mb-2 block">Manual URL</label>
+        <input id="manualUrl" type="url" formControlName="manualUrl"
+          placeholder="https://..." />
+      </div>
 
-    <div class="d-flex gap-2">
-      <button id="product-form-submit" type="submit" class="btn btn-primary" [disabled]="form.invalid">
-        {{ isEdit() ? 'Save Changes' : 'Create Product' }}
-      </button>
-      <a class="btn btn-outline-secondary" [routerLink]="['/products']">Cancel</a>
-    </div>
-  </form>
+      <div class="flex gap-2">
+        <button id="product-form-submit" type="submit" crgButtonPrimary [disabled]="form.invalid">
+          {{ isEdit() ? 'Save Changes' : 'Create Product' }}
+        </button>
+        <a crgButtonGhost [routerLink]="['/products']">Cancel</a>
+      </div>
+    </form>
+  </div>
 </div>
 
 <app-manual-chat-panel

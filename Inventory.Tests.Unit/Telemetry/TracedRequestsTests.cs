@@ -16,57 +16,92 @@ public sealed class TracedRequestsTests
     [MemberData(nameof(DeclaredStaticAssetExtensions))]
     public void ShouldTrace_IsFalseForAStaticAsset(string extension)
     {
-        Assert.False(TracedRequests.ShouldTrace(ContextFor(HashedAssetPath(extension))));
+        // Act
+        var shouldTrace = TracedRequests.ShouldTrace(ContextFor(HashedAssetPath(extension)));
+
+        // Assert
+        Assert.False(shouldTrace);
     }
 
     [Theory]
     [MemberData(nameof(UppercasedStaticAssetExtensions))]
     public void ShouldTrace_IsFalseWhenTheExtensionIsUppercased(string extension)
     {
-        Assert.False(TracedRequests.ShouldTrace(ContextFor(HashedAssetPath(extension))));
+        // Act
+        var shouldTrace = TracedRequests.ShouldTrace(ContextFor(HashedAssetPath(extension)));
+
+        // Assert
+        Assert.False(shouldTrace);
     }
 
     [Fact]
     public void ShouldTrace_IsFalseForTheHealthPrefixItself()
     {
-        Assert.False(TracedRequests.ShouldTrace(ContextFor(TracedRequests.HealthPathPrefix)));
+        // Act
+        var shouldTrace = TracedRequests.ShouldTrace(ContextFor(TracedRequests.HealthPathPrefix));
+
+        // Assert
+        Assert.False(shouldTrace);
     }
 
     [Fact]
     public void ShouldTrace_IsFalseForAPathBeneathTheHealthPrefix()
     {
+        // Arrange
         var path = $"{TracedRequests.HealthPathPrefix}/{Token()}";
 
-        Assert.False(TracedRequests.ShouldTrace(ContextFor(path)));
+        // Act
+        var shouldTrace = TracedRequests.ShouldTrace(ContextFor(path));
+
+        // Assert
+        Assert.False(shouldTrace);
     }
 
     [Fact]
     public void ShouldTrace_IsTrueForApplicationTraffic()
     {
+        // Arrange
         var path = $"/{Token()}/{Token()}";
 
-        Assert.True(TracedRequests.ShouldTrace(ContextFor(path)));
+        // Act
+        var shouldTrace = TracedRequests.ShouldTrace(ContextFor(path));
+
+        // Assert
+        Assert.True(shouldTrace);
     }
 
     [Fact]
     public void ShouldTrace_IsTrueForTheRootPath()
     {
-        Assert.True(TracedRequests.ShouldTrace(ContextFor("/")));
+        // Act
+        var shouldTrace = TracedRequests.ShouldTrace(ContextFor("/"));
+
+        // Assert
+        Assert.True(shouldTrace);
     }
 
     [Theory]
     [MemberData(nameof(DeclaredStaticAssetExtensions))]
     public void ShouldTrace_IsTrueForAPathThatMerelyContainsAnExtensionMidway(string extension)
     {
+        // Arrange
         var path = $"/{Token()}/{Token()}{extension}/{Token()}";
 
-        Assert.True(TracedRequests.ShouldTrace(ContextFor(path)));
+        // Act
+        var shouldTrace = TracedRequests.ShouldTrace(ContextFor(path));
+
+        // Assert
+        Assert.True(shouldTrace);
     }
 
     [Fact]
     public void ShouldTrace_IsTrueForAnEmptyPath()
     {
-        Assert.True(TracedRequests.ShouldTrace(new DefaultHttpContext()));
+        // Act
+        var shouldTrace = TracedRequests.ShouldTrace(new DefaultHttpContext());
+
+        // Assert
+        Assert.True(shouldTrace);
     }
 
     private static string Token() => Guid.NewGuid().ToString("N");

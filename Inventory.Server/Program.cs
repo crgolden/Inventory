@@ -1,31 +1,27 @@
-#pragma warning disable SA1200
 using System.Diagnostics;
 using System.Security.Claims;
 using Azure.Identity;
 using Duende.Bff;
 using Duende.Bff.DynamicFrontends;
 using Duende.Bff.Yarp;
-using Duende.IdentityModel;
 using Elastic.Ingest.Elasticsearch;
 using Elastic.Ingest.Elasticsearch.DataStreams;
 using Elastic.Serilog.Sinks;
 using Elastic.Transport;
+using Inventory.Authentication;
 using Inventory.Extensions;
 using Inventory.Logging;
 using Inventory.Telemetry;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Hosting.Server;
-using Microsoft.AspNetCore.Hosting.Server.Features;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Azure;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using OpenTelemetry.Instrumentation.AspNetCore;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
-#pragma warning restore SA1200
 
 Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateBootstrapLogger();
 
@@ -34,14 +30,14 @@ try
     var builder = WebApplication.CreateBuilder(args);
     var openIdConnectOptionsSection = builder.Configuration.GetRequiredSection(nameof(OpenIdConnectOptions));
     var openIdConnectOptions = openIdConnectOptionsSection.Get<OpenIdConnectOptions>() ?? throw new InvalidOperationException($"Invalid '{nameof(OpenIdConnectOptions)}' section.");
+    if (!string.Equals(openIdConnectOptions.ResponseType, OpenIdConnectResponseType.Code, StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException($"'{nameof(OpenIdConnectOptions)}:{nameof(OpenIdConnectOptions.ResponseType)}' must be '{OpenIdConnectResponseType.Code}'; '{openIdConnectOptions.ResponseType}' silently disables PKCE.");
+    }
+
     Uri oidcAuthority = builder.Configuration.GetRequired<Uri>("OidcAuthority"),
         manualsApiAddress = builder.Configuration.GetRequired<Uri>("ManualsApiAddress"),
         productsApiAddress = builder.Configuration.GetRequired<Uri>("ProductsApiAddress");
-    if (builder.Environment.IsDevelopment())
-    {
-        builder.Configuration.AddUserSecrets("5480cab8-b41b-4dae-8c41-dbc2c01a15e0");
-    }
-
     string inventoryClientId = builder.Configuration.GetRequired<string>("InventoryClientId"),
         inventoryClientSecret = builder.Configuration.GetRequired<string>("InventoryClientSecret");
     if (builder.Environment.IsProduction())
@@ -138,11 +134,13 @@ try
                 options.Scope.Add(scope);
             }
 
-            options.ResponseType = OidcConstants.ResponseTypes.Code;
+            options.ResponseType = openIdConnectOptions.ResponseType;
+            options.ResponseMode = openIdConnectOptions.ResponseMode;
             options.SaveTokens = openIdConnectOptions.SaveTokens;
             options.GetClaimsFromUserInfoEndpoint = openIdConnectOptions.GetClaimsFromUserInfoEndpoint;
             options.MapInboundClaims = openIdConnectOptions.MapInboundClaims;
             options.TokenValidationParameters = openIdConnectOptions.TokenValidationParameters;
+            options.RequireHttpsMetadata = openIdConnectOptions.RequireHttpsMetadata;
             if (builder.Environment.IsProduction())
             {
                 return;
@@ -152,28 +150,12 @@ try
             {
                 OnRedirectToIdentityProvider = context =>
                 {
-                    var server = context.HttpContext.RequestServices.GetRequiredService<IServer>();
-                    var serverAddresses = server.Features.GetRequiredFeature<IServerAddressesFeature>().Addresses;
-                    var address = serverAddresses.FirstOrDefault(a => a.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) ?? serverAddresses.FirstOrDefault();
-                    if (IsNullOrWhiteSpace(address))
-                    {
-                        return Task.CompletedTask;
-                    }
-
-                    context.ProtocolMessage.RedirectUri = address.TrimEnd('/') + options.CallbackPath;
+                    context.ProtocolMessage.RedirectUri = ListeningAddress.CallbackUri(context.HttpContext, options.CallbackPath) ?? context.ProtocolMessage.RedirectUri;
                     return Task.CompletedTask;
                 },
                 OnRedirectToIdentityProviderForSignOut = context =>
                 {
-                    var server = context.HttpContext.RequestServices.GetRequiredService<IServer>();
-                    var serverAddresses = server.Features.GetRequiredFeature<IServerAddressesFeature>().Addresses;
-                    var address = serverAddresses.FirstOrDefault(a => a.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) ?? serverAddresses.FirstOrDefault();
-                    if (IsNullOrWhiteSpace(address))
-                    {
-                        return Task.CompletedTask;
-                    }
-
-                    context.ProtocolMessage.PostLogoutRedirectUri = address.TrimEnd('/') + options.SignedOutCallbackPath;
+                    context.ProtocolMessage.PostLogoutRedirectUri = ListeningAddress.CallbackUri(context.HttpContext, options.SignedOutCallbackPath) ?? context.ProtocolMessage.PostLogoutRedirectUri;
                     return Task.CompletedTask;
                 }
             };
@@ -226,7 +208,7 @@ try
             return next(ctx);
         }
     });
-    webApplication.MapHealthChecks("/health").DisableHttpMetrics();
+    webApplication.MapHealthChecks(TracedRequests.HealthPathPrefix).DisableHttpMetrics();
     webApplication
         .UseAuthentication()
         .UseBff();

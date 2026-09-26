@@ -3,16 +3,14 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import buildQuery from 'odata-query';
 import { CatalogProduct } from './catalog-product.model';
-import { escapeODataLiteral, ODataCountResponse } from '../odata';
-
-const BASE = '/catalog/api/odata/CatalogProducts';
-
-export type CatalogSortColumn = 'Name' | 'Brand' | 'Category' | 'MsrpPrice';
+import { ODATA_COUNT, ODataCountResponse } from '../odata';
+import { CATALOG_ODATA_URL, CatalogSortColumn, nameContainsFilter } from './catalog-api';
+import { CatalogSortDirection } from './catalog-sort-directions';
 
 export interface CatalogParams {
   search?: string;
   orderBy: CatalogSortColumn;
-  orderDir: 'asc' | 'desc';
+  orderDir: CatalogSortDirection;
   page: number;
   pageSize: number;
 }
@@ -55,9 +53,7 @@ export class CatalogService {
 
   getAll(params: CatalogParams): Observable<CatalogPage> {
     const term = params.search?.trim();
-    const filter = term
-      ? `contains(tolower(Name), tolower('${escapeODataLiteral(term)}'))`
-      : undefined;
+    const filter = term ? nameContainsFilter(term) : undefined;
     const skip = (params.page - 1) * params.pageSize;
     const qs = buildQuery({
       filter,
@@ -67,11 +63,11 @@ export class CatalogService {
       count: true,
     });
     return this.http
-      .get<ODataCountResponse<ApiCatalogProduct>>(`${BASE}${qs}`)
-      .pipe(map(r => ({ items: r.value.map(fromApi), total: r['@odata.count'] ?? 0 })));
+      .get<ODataCountResponse<ApiCatalogProduct>>(`${CATALOG_ODATA_URL}${qs}`)
+      .pipe(map(r => ({ items: r.value.map(fromApi), total: r[ODATA_COUNT] ?? 0 })));
   }
 
   getById(id: string): Observable<CatalogProduct> {
-    return this.http.get<ApiCatalogProduct>(`${BASE}(${id})`).pipe(map(fromApi));
+    return this.http.get<ApiCatalogProduct>(`${CATALOG_ODATA_URL}(${id})`).pipe(map(fromApi));
   }
 }

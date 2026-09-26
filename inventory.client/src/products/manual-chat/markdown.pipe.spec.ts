@@ -1,5 +1,23 @@
 import { TestBed } from '@angular/core/testing';
+import { newText } from '@crgolden/modules/testing';
 import { MarkdownPipe } from './markdown.pipe';
+
+function rendered(html: string | null): HTMLElement {
+  if (html === null) {
+    throw new Error('The pipe returned null, so there is no markup to inspect.');
+  }
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  return container;
+}
+
+function textsOf(container: HTMLElement, selector: string): (string | null)[] {
+  return Array.from(container.querySelectorAll(selector)).map(element => element.textContent);
+}
+
+function listItemTexts(list: Element | null): (string | null)[] {
+  return Array.from(list?.children ?? []).map(item => (item instanceof HTMLLIElement ? item.textContent : null));
+}
 
 describe('MarkdownPipe', () => {
   let pipe: MarkdownPipe;
@@ -22,51 +40,64 @@ describe('MarkdownPipe', () => {
   });
 
   it('wraps plain text in a paragraph', () => {
-    const result = pipe.transform('Hello world');
-    expect(result).toContain('Hello world');
+    const text = `${newText()} ${newText()}`;
+
+    expect(textsOf(rendered(pipe.transform(text)), 'p')).toEqual([text]);
   });
 
   it('converts bold Markdown to strong element', () => {
-    const result = pipe.transform('**bold**');
-    expect(result).toContain('<strong>bold</strong>');
+    const word = newText();
+
+    expect(textsOf(rendered(pipe.transform(`**${word}**`)), 'strong')).toEqual([word]);
   });
 
   it('converts italic Markdown to em element', () => {
-    const result = pipe.transform('*italic*');
-    expect(result).toContain('<em>italic</em>');
+    const word = newText();
+
+    expect(textsOf(rendered(pipe.transform(`*${word}*`)), 'em')).toEqual([word]);
   });
 
   it('converts heading Markdown to heading element', () => {
-    const result = pipe.transform('### Section');
-    expect(result).toContain('<h3>Section</h3>');
+    const word = newText();
+
+    expect(textsOf(rendered(pipe.transform(`### ${word}`)), 'h3')).toEqual([word]);
   });
 
   it('converts unordered list Markdown to ul/li elements', () => {
-    const result = pipe.transform('- item one\n- item two');
-    expect(result).toContain('<ul>');
-    expect(result).toContain('<li>item one</li>');
-    expect(result).toContain('<li>item two</li>');
+    const items = [newText(), newText()];
+
+    const list = rendered(pipe.transform(items.map(item => `- ${item}`).join('\n'))).firstElementChild;
+
+    expect(list).toBeInstanceOf(HTMLUListElement);
+    expect(listItemTexts(list)).toEqual(items);
   });
 
   it('converts ordered list Markdown to ol/li elements', () => {
-    const result = pipe.transform('1. first\n2. second');
-    expect(result).toContain('<ol>');
-    expect(result).toContain('<li>first</li>');
+    const items = [newText(), newText()];
+
+    const list = rendered(pipe.transform(items.map((item, index) => `${index + 1}. ${item}`).join('\n'))).firstElementChild;
+
+    expect(list).toBeInstanceOf(HTMLOListElement);
+    expect(listItemTexts(list)).toEqual(items);
   });
 
   it('converts inline code to code element', () => {
-    const result = pipe.transform('use `dotnet test` to run');
-    expect(result).toContain('<code>dotnet test</code>');
+    const code = `${newText()} ${newText()}`;
+
+    expect(textsOf(rendered(pipe.transform(`${newText()} \`${code}\` ${newText()}`)), 'code')).toEqual([code]);
   });
 
   it('strips script tags (XSS protection)', () => {
-    const result = pipe.transform('<script>alert("xss")</script>text');
-    expect(result).not.toContain('<script>');
-    expect(result).not.toContain('alert');
+    const payload = newText();
+    const result = pipe.transform(`<script>${payload}</script>${newText()}`);
+
+    expect(rendered(result).querySelector('script')).toBeNull();
+    expect(result).not.toContain(payload);
   });
 
   it('strips inline event handlers (XSS protection)', () => {
-    const result = pipe.transform('<p onclick="alert(1)">click</p>');
-    expect(result).not.toContain('onclick');
+    const result = pipe.transform(`<p onclick="${newText()}">${newText()}</p>`);
+
+    expect(rendered(result).querySelector('[onclick]')).toBeNull();
   });
 });

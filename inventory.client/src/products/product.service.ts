@@ -7,10 +7,12 @@ import {
   InventoryItemEdit,
   InventoryItemView,
 } from './inventory-item.model';
-
-const INVENTORY_BASE = '/products/api/inventory/items';
-const ODATA_BASE = '/products/api/odata/InventoryItems';
-const CATALOG_ODATA_BASE = '/products/api/odata/CatalogProducts';
+import {
+  AUTHORIZED_CATALOG_ODATA_URL,
+  INVENTORY_ITEMS_URL,
+  INVENTORY_ODATA_URL,
+  SEARCH_PARAMETER,
+} from './products-api';
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
@@ -19,34 +21,34 @@ export class ProductService {
 
   getAll(search?: string): Observable<InventoryItemView[]> {
     const term = search?.trim();
-    const params = term ? new HttpParams().set('search', term) : new HttpParams();
-    return this.http.get<InventoryItemView[]>(INVENTORY_BASE, { params });
+    const params = term ? new HttpParams().set(SEARCH_PARAMETER, term) : new HttpParams();
+    return this.http.get<InventoryItemView[]>(INVENTORY_ITEMS_URL, { params });
   }
 
   getById(id: string): Observable<InventoryItemView | null> {
     return this.http
-      .get<InventoryItemView[]>(INVENTORY_BASE)
+      .get<InventoryItemView[]>(INVENTORY_ITEMS_URL)
       .pipe(map(items => items.find(item => item.id === id) ?? null));
   }
 
   create(request: AddToInventoryRequest): Observable<string | null> {
     return this.http
-      .post<InventoryItemView>(INVENTORY_BASE, request, { observe: 'response' })
+      .post<InventoryItemView>(INVENTORY_ITEMS_URL, request, { observe: 'response' })
       .pipe(map(response => response.body?.id ?? null));
   }
 
   patch(id: string, changes: Partial<InventoryItemEdit>): Observable<void> {
-    return this.http.patch<void>(`${ODATA_BASE}(${id})`, changes);
+    return this.http.patch<void>(`${INVENTORY_ODATA_URL}(${id})`, changes);
   }
 
   patchCatalogProduct(
     catalogProductId: string,
     changes: Partial<CatalogProductEdit>
   ): Observable<void> {
-    return this.http.patch<void>(`${CATALOG_ODATA_BASE}(${catalogProductId})`, changes);
+    return this.http.patch<void>(`${AUTHORIZED_CATALOG_ODATA_URL}(${catalogProductId})`, changes);
   }
 
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`${ODATA_BASE}(${id})`);
+    return this.http.delete<void>(`${INVENTORY_ODATA_URL}(${id})`);
   }
 }

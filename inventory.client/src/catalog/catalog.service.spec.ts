@@ -2,20 +2,36 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptorsFromDi, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
-import { CatalogService, CatalogParams } from './catalog.service';
+import {
+  LARGEST_PERCENT,
+  newCount,
+  newDisplayName,
+  newId,
+  newPercent,
+  newText,
+  newUtcInstant,
+} from '@crgolden/modules/testing';
+import { CatalogParams, CatalogService } from './catalog.service';
+import { CATALOG_ODATA_URL, CatalogSortColumns, nameContainsFilter } from './catalog-api';
 import { CatalogProduct } from './catalog-product.model';
+import { ODATA_COUNT } from '../odata';
+import { CatalogSortDirections } from './catalog-sort-directions';
+import { HttpMethods } from '../app/http-headers';
+import { ODataQueryOptions } from '../testing/odata-constants';
 
-const BASE = '/catalog/api/odata/CatalogProducts';
+function newPrice(): number {
+  return newCount() + newPercent() / LARGEST_PERCENT;
+}
 
 const mockApiProduct = {
-  Id: 'aaaaaaaa-0000-0000-0000-000000000001',
-  Name: 'LG OLED C3',
-  Brand: 'LG',
-  ModelNumber: 'OLED65C3PUA',
-  Category: 'Electronics',
+  Id: newId(),
+  Name: newDisplayName(),
+  Brand: newText(),
+  ModelNumber: newText(),
+  Category: newText(),
   ManualUrl: null,
-  MsrpPrice: 1499.99,
-  CreatedAt: '2024-01-01T00:00:00Z',
+  MsrpPrice: newPrice(),
+  CreatedAt: newUtcInstant(),
   UpdatedAt: null,
 };
 
@@ -32,10 +48,10 @@ const mockProduct: CatalogProduct = {
 };
 
 const defaultParams: CatalogParams = {
-  orderBy: 'Name',
-  orderDir: 'asc',
+  orderBy: CatalogSortColumns.name,
+  orderDir: CatalogSortDirections.asc,
   page: 1,
-  pageSize: 20,
+  pageSize: newCount(),
 };
 
 function params(urlWithParams: string): URLSearchParams {
@@ -64,113 +80,121 @@ describe('CatalogService', () => {
     it('requests the CatalogProducts set, not the owner-scoped inventory', () => {
       service.getAll(defaultParams).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
-      expect(req.request.method).toBe('GET');
-      req.flush({ '@odata.count': 0, value: [] });
+      const req = http.expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL));
+      expect(req.request.method).toBe(HttpMethods.get);
+      req.flush({ [ODATA_COUNT]: 0, value: [] });
     });
 
     it('sends $count=true', () => {
       service.getAll(defaultParams).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
-      expect(params(req.request.urlWithParams).get('$count')).toBe('true');
-      req.flush({ '@odata.count': 0, value: [] });
+      const req = http.expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL));
+      expect(params(req.request.urlWithParams).get(ODataQueryOptions.count)).toBe(String(true));
+      req.flush({ [ODATA_COUNT]: 0, value: [] });
     });
 
     it('sends $orderby with direction', () => {
       service.getAll(defaultParams).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
-      expect(params(req.request.urlWithParams).get('$orderby')).toBe('Name asc');
-      req.flush({ '@odata.count': 0, value: [] });
+      const req = http.expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL));
+      expect(params(req.request.urlWithParams).get(ODataQueryOptions.orderBy)).toBe(
+        `${CatalogSortColumns.name} ${CatalogSortDirections.asc}`,
+      );
+      req.flush({ [ODATA_COUNT]: 0, value: [] });
     });
 
-    it('sends $top and $skip for page 1', () => {
-      service.getAll({ ...defaultParams, page: 1, pageSize: 20 }).subscribe();
+    it('sends $top and $skip for the first page', () => {
+      const pageSize = newCount();
+      service.getAll({ ...defaultParams, page: 1, pageSize }).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
+      const req = http.expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL));
       const p = params(req.request.urlWithParams);
-      expect(p.get('$top')).toBe('20');
-      expect(p.get('$skip')).toBe('0');
-      req.flush({ '@odata.count': 0, value: [] });
+      expect(p.get(ODataQueryOptions.top)).toBe(String(pageSize));
+      expect(p.get(ODataQueryOptions.skip)).toBe(String(0));
+      req.flush({ [ODATA_COUNT]: 0, value: [] });
     });
 
-    it('sends correct $skip for page 2', () => {
-      service.getAll({ ...defaultParams, page: 2, pageSize: 20 }).subscribe();
+    it('skips the pages before the requested one', () => {
+      const pageSize = newCount();
+      const page = newCount() + 1;
+      service.getAll({ ...defaultParams, page, pageSize }).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
-      expect(params(req.request.urlWithParams).get('$skip')).toBe('20');
-      req.flush({ '@odata.count': 0, value: [] });
+      const req = http.expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL));
+      expect(params(req.request.urlWithParams).get(ODataQueryOptions.skip)).toBe(String((page - 1) * pageSize));
+      req.flush({ [ODATA_COUNT]: 0, value: [] });
     });
 
     it('applies tolower contains $filter when search is provided', () => {
-      service.getAll({ ...defaultParams, search: 'oled' }).subscribe();
+      const search = newText();
+      service.getAll({ ...defaultParams, search }).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
-      const filter = params(req.request.urlWithParams).get('$filter');
+      const req = http.expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL));
+      const filter = params(req.request.urlWithParams).get(ODataQueryOptions.filter);
       expect(filter).not.toBeNull();
-      expect(filter).toContain("contains(tolower(Name), tolower('oled'))");
-      req.flush({ '@odata.count': 0, value: [] });
+      expect(filter).toBe(nameContainsFilter(search));
+      req.flush({ [ODATA_COUNT]: 0, value: [] });
     });
 
     it('doubles an apostrophe so the OData string literal is not closed early', () => {
-      service.getAll({ ...defaultParams, search: "O'Brien" }).subscribe();
+      const before = newText();
+      const after = newText();
+      service.getAll({ ...defaultParams, search: `${before}'${after}` }).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
-      const filter = params(req.request.urlWithParams).get('$filter');
+      const req = http.expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL));
+      const filter = params(req.request.urlWithParams).get(ODataQueryOptions.filter);
       expect(filter).not.toBeNull();
-      expect(filter).toContain("tolower('O''Brien')");
-      req.flush({ '@odata.count': 0, value: [] });
+      expect(filter).toContain(`'${before}''${after}'`);
+      req.flush({ [ODATA_COUNT]: 0, value: [] });
     });
 
     it('trims whitespace from the search term', () => {
-      service.getAll({ ...defaultParams, search: '  dyson  ' }).subscribe();
+      const search = newText();
+      service.getAll({ ...defaultParams, search: `  ${search}  ` }).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
-      const filter = params(req.request.urlWithParams).get('$filter');
+      const req = http.expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL));
+      const filter = params(req.request.urlWithParams).get(ODataQueryOptions.filter);
       expect(filter).not.toBeNull();
-      expect(filter).toContain("tolower('dyson')");
-      req.flush({ '@odata.count': 0, value: [] });
+      expect(filter).toBe(nameContainsFilter(search));
+      req.flush({ [ODATA_COUNT]: 0, value: [] });
     });
 
     it('does not include $filter when search is empty', () => {
       service.getAll({ ...defaultParams, search: '' }).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
-      expect(params(req.request.urlWithParams).has('$filter')).toBe(false);
-      req.flush({ '@odata.count': 0, value: [] });
+      const req = http.expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL));
+      expect(params(req.request.urlWithParams).has(ODataQueryOptions.filter)).toBe(false);
+      req.flush({ [ODATA_COUNT]: 0, value: [] });
     });
 
     it('unwraps the OData envelope and maps PascalCase response to CatalogProduct', async () => {
       const promise = firstValueFrom(service.getAll(defaultParams));
 
       http
-        .expectOne(r => r.urlWithParams.startsWith(BASE))
+        .expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL))
         .flush({
-          '@odata.count': 1,
+          [ODATA_COUNT]: 1,
           value: [mockApiProduct],
         });
 
       const page = await promise;
-      expect(page.items.length).toBe(1);
-      expect(page.items[0]).toEqual(mockProduct);
+      expect(page.items).toEqual([mockProduct]);
     });
 
     it('drops owner-private fields the anonymous surface must never carry', async () => {
       const promise = firstValueFrom(service.getAll(defaultParams));
 
       http
-        .expectOne(r => r.urlWithParams.startsWith(BASE))
+        .expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL))
         .flush({
-          '@odata.count': 1,
+          [ODATA_COUNT]: 1,
           value: [
             {
               ...mockApiProduct,
-              OwnerId: 'cccccccc-0000-0000-0000-000000000001',
-              SerialNumber: 'SN-LEAKED',
-              PurchaseDate: '2023-11-24T14:30:00Z',
-              PricePaid: 1299.99,
-              Description: 'private note',
+              OwnerId: newId(),
+              SerialNumber: newText(),
+              PurchaseDate: newUtcInstant(),
+              PricePaid: newPrice(),
+              Description: newText(),
             },
           ],
         });
@@ -180,34 +204,37 @@ describe('CatalogService', () => {
     });
 
     it('returns the total count from @odata.count', async () => {
+      const total = newCount();
       const promise = firstValueFrom(service.getAll(defaultParams));
 
       http
-        .expectOne(r => r.urlWithParams.startsWith(BASE))
+        .expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL))
         .flush({
-          '@odata.count': 42,
+          [ODATA_COUNT]: total,
           value: [],
         });
 
       const page = await promise;
-      expect(page.total).toBe(42);
+      expect(page.total).toBe(total);
     });
 
     it('defaults total to 0 when @odata.count is absent', async () => {
       const promise = firstValueFrom(service.getAll(defaultParams));
 
-      http.expectOne(r => r.urlWithParams.startsWith(BASE)).flush({ value: [] });
+      http.expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL)).flush({ value: [] });
 
       const page = await promise;
       expect(page.total).toBe(0);
     });
 
     it('sends desc orderDir correctly', () => {
-      service.getAll({ ...defaultParams, orderBy: 'MsrpPrice', orderDir: 'desc' }).subscribe();
+      service.getAll({ ...defaultParams, orderBy: CatalogSortColumns.msrpPrice, orderDir: CatalogSortDirections.desc }).subscribe();
 
-      const req = http.expectOne(r => r.urlWithParams.startsWith(BASE));
-      expect(params(req.request.urlWithParams).get('$orderby')).toBe('MsrpPrice desc');
-      req.flush({ '@odata.count': 0, value: [] });
+      const req = http.expectOne(r => r.urlWithParams.startsWith(CATALOG_ODATA_URL));
+      expect(params(req.request.urlWithParams).get(ODataQueryOptions.orderBy)).toBe(
+        `${CatalogSortColumns.msrpPrice} ${CatalogSortDirections.desc}`,
+      );
+      req.flush({ [ODATA_COUNT]: 0, value: [] });
     });
   });
 
@@ -215,14 +242,14 @@ describe('CatalogService', () => {
     it('requests the keyed OData entity URL', () => {
       service.getById(mockProduct.id).subscribe();
 
-      const req = http.expectOne(`${BASE}(${mockProduct.id})`);
+      const req = http.expectOne(`${CATALOG_ODATA_URL}(${mockProduct.id})`);
       req.flush(mockApiProduct);
     });
 
     it('maps PascalCase API response to CatalogProduct', async () => {
       const promise = firstValueFrom(service.getById(mockProduct.id));
 
-      http.expectOne(`${BASE}(${mockProduct.id})`).flush(mockApiProduct);
+      http.expectOne(`${CATALOG_ODATA_URL}(${mockProduct.id})`).flush(mockApiProduct);
 
       const product = await promise;
       expect(product).toEqual(mockProduct);

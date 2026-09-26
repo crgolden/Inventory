@@ -1,0 +1,15 @@
+{
+  "shortViewport": { "width": 1280, "height": 400 },
+  "phoneViewport": { "width": 390, "height": 844 },
+  "wideViewport": { "width": 1280, "height": 900 },
+  "launchSettingsPath": "../Inventory.Server/Properties/launchSettings.json",
+  "scrollDistancePx": 200,
+  "catalogSweepPageSize": 100,
+  "independentlyPinnedBenefitCardCount": 6,
+  "localPasskeySlot": 3,
+  "mockOidcPort": 5301,
+  "mockProductsPort": 5302,
+  "mockManualsPort": 5303,
+  "mockIdentityCookie": "e2e_identity",
+  "authStateFile": "e2e/.auth/user.json"
+}

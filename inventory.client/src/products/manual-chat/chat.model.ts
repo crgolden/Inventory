@@ -9,8 +9,15 @@ export interface ChatHistoryMessage {
   text: string | null;
 }
 
+export const ChatRoles = {
+  user: 'user',
+  assistant: 'assistant',
+} as const;
+
+export type ChatRole = (typeof ChatRoles)[keyof typeof ChatRoles];
+
 export interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: ChatRole;
   content: string;
 }
 

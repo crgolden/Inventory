@@ -1,26 +1,26 @@
 <h1 id="tableLabel">User Session</h1>
 
 @if (isAnonymous()) {
-  <p><em>Loading...</em></p>
+  <p id="user-session-loading"><em>Loading...</em></p>
 }
 
 @if (isAuthenticated()) {
-  <table class='table table-striped' aria-labelledby="tableLabel">
+  <table id="user-session-table" class="w-full border-collapse" aria-labelledby="tableLabel">
     <thead>
     <tr>
-      <th>Type</th>
-      <th>Value(C)</th>
+      <th class="border-b border-line p-2 text-left">Type</th>
+      <th class="border-b border-line p-2 text-left">Value(C)</th>
     </tr>
     </thead>
     <tbody>
       @for (claim of claims() || []; track $index) {
-        <tr>
-          <td>{{ claim.type }}</td>
-          <td>{{ claim.value }}</td>
+        <tr [attr.id]="userSessionRowId($index)" class="odd:bg-surface-2">
+          <td [attr.id]="userSessionClaimTypeId($index)" class="border-b border-line p-2 text-left">{{ claim.type }}</td>
+          <td [attr.id]="userSessionClaimValueId($index)" class="border-b border-line p-2 text-left">{{ claim.value }}</td>
         </tr>
       }
       @empty {
-        <tr><td colspan="2">No claims available.</td></tr>
+        <tr class="odd:bg-surface-2"><td id="user-session-no-claims" class="border-b border-line p-2 text-left" colspan="2">No claims available.</td></tr>
       }
     </tbody>
   </table>

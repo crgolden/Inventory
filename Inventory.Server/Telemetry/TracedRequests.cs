@@ -20,7 +20,7 @@ internal static class TracedRequests
 
         var value = path.Value;
 
-        if (string.IsNullOrWhiteSpace(value))
+        if (IsNullOrWhiteSpace(value))
         {
             return true;
         }

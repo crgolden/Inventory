@@ -2,32 +2,32 @@
   <button
     id="manual-chat-toggle"
     type="button"
-    class="manual-chat-toggle btn btn-primary shadow"
+    class="fixed top-1/2 right-0 z-(--z-chat-toggle) inline-flex -translate-y-1/2 cursor-pointer items-center gap-[0.4rem] rounded-l-sm border border-accent bg-accent px-[0.45rem] py-[0.6rem] font-body font-semibold text-on-fill shadow-md transition-colors duration-200 [writing-mode:vertical-rl] hover:bg-accent-hover motion-reduce:transition-none"
     (click)="open()"
     aria-label="Open manual finder">
-    <span class="toggle-icon" aria-hidden="true">&#128270;</span>
-    <span class="toggle-label">Find Manual</span>
+    <ng-icon name="lucideSearch" aria-hidden="true" />
+    <span class="text-meta tracking-[0.02em]">Find Manual</span>
   </button>
 }
 
 @if (isOpen()) {
   <dialog
     id="manual-chat-panel"
-    class="manual-chat-panel shadow"
-    [class.panel-narrow]="isNarrow()"
+    class="fixed top-(--navbar-height) right-0 bottom-0 left-auto z-(--z-chat-panel) flex h-auto w-[420px] max-w-screen flex-col border-l border-line bg-surface text-text shadow-md max-md:top-0 max-md:left-0 max-md:w-screen max-md:border-l-0"
     open
     aria-label="Manual finder">
-    <div class="panel-header d-flex align-items-center justify-content-between border-bottom px-3 py-2">
+    <div class="flex shrink-0 items-center justify-between border-b border-line bg-canvas px-4 py-2">
       <h5 class="mb-0">Manual Finder</h5>
       <button
         id="manual-chat-close"
         type="button"
-        class="btn-close"
+        class="cursor-pointer border-0 bg-transparent p-1 text-text-muted hover:text-text"
         aria-label="Close manual finder"
         (click)="close()">
+        <ng-icon name="lucideX" aria-hidden="true" />
       </button>
     </div>
-    <div class="panel-body flex-grow-1 d-flex flex-column">
+    <div class="flex min-h-0 grow flex-col overflow-hidden">
       <app-manual-chat
         [productContext]="productContext()"
         (manualUrlSelected)="onUrlSelected($event)">

@@ -3,11 +3,12 @@ import { By } from '@angular/platform-browser';
 import { provideRouter, Routes } from '@angular/router';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { ProductNotFoundComponent } from './product-not-found.component';
+import { AppPaths, PRODUCTS_URL } from '../../app/app-paths';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
-const testRoutes: Routes = [{ path: 'products', component: DummyComponent }];
+const testRoutes: Routes = [{ path: AppPaths.products, component: DummyComponent }];
 
 describe('ProductNotFoundComponent', () => {
   let fixture: ComponentFixture<ProductNotFoundComponent>;
@@ -23,12 +24,11 @@ describe('ProductNotFoundComponent', () => {
   });
 
   it('renders the not-found heading', () => {
-    const h2 = fixture.debugElement.query(By.css('h2'));
-    expect(h2.nativeElement.textContent).toContain('Product Not Found');
+    expect(fixture.debugElement.query(By.css('#product-not-found-heading'))).toBeTruthy();
   });
 
   it('renders a link back to /products', () => {
-    const link: HTMLAnchorElement = fixture.debugElement.query(By.css('a')).nativeElement;
-    expect(link.textContent).toContain('Back to My Products');
+    const link: HTMLAnchorElement = fixture.debugElement.query(By.css('#product-not-found-back-link')).nativeElement;
+    expect(link.getAttribute('href')).toBe(PRODUCTS_URL);
   });
 });

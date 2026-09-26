@@ -4,7 +4,13 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Title } from '@angular/platform-browser';
+import {
+  ButtonGhostDirective,
+  ButtonPrimaryDirective,
+  PageContainerDirective,
+} from '@crgolden/modules/primitives';
 import { catchError, EMPTY, forkJoin, Observable, of } from 'rxjs';
+import { PRODUCTS_URL, ROUTE_ID_PARAMETER } from '../../app/app-paths';
 import { ProductService } from '../product.service';
 import {
   AddToInventoryRequest,
@@ -19,9 +25,20 @@ import {
   utcInstantToDateTimeLocalInput,
 } from '../../datetime-local';
 
+export function sharedFactsNotSavedMessage(status: number): string {
+  return `Your own details were saved, but the shared product facts were not (${status}).`;
+}
+
 @Component({
   selector: 'app-product-form',
-  imports: [ReactiveFormsModule, RouterLink, ManualChatPanelComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    ManualChatPanelComponent,
+    PageContainerDirective,
+    ButtonPrimaryDirective,
+    ButtonGhostDirective,
+  ],
   templateUrl: './product-form.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -70,7 +87,7 @@ export class ProductFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
+    const id = this.route.snapshot.paramMap.get(ROUTE_ID_PARAMETER);
     if (id) {
       this.editId.set(id);
       this.isEdit.set(true);
@@ -122,7 +139,7 @@ export class ProductFormComponent implements OnInit {
         return;
       }
 
-      void this.router.navigate(['/products', newId]);
+      void this.router.navigate([PRODUCTS_URL, newId]);
     });
   }
 
@@ -145,15 +162,13 @@ export class ProductFormComponent implements OnInit {
         ? of(null)
         : this.productService.patchCatalogProduct(catalogProductId, catalogChanges).pipe(
           catchError((err: HttpErrorResponse) => {
-            this.error.set(
-              `Your own details were saved, but the shared product facts were not (${err.status}).`
-            );
+            this.error.set(sharedFactsNotSavedMessage(err.status));
             return EMPTY;
           })
         );
 
     forkJoin([item$, catalog$]).subscribe(() => {
-      void this.router.navigate(['/products', id]);
+      void this.router.navigate([PRODUCTS_URL, id]);
     });
   }
 

@@ -1,17 +1,16 @@
-<div class="container py-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+<div crgPageContainer class="py-6">
+  <div class="mb-4 flex items-center justify-between">
     <h2 id="catalog-heading" class="mb-0">Product Catalog</h2>
   </div>
 
   @if (error(); as message) {
-    <div id="catalog-error" class="alert alert-danger" role="alert">{{ message }}</div>
+    <div id="catalog-error" class="mb-4 rounded-md border border-danger/30 bg-danger/10 p-4 text-danger" role="alert">{{ message }}</div>
   }
 
-  <div class="mb-3">
+  <div class="mb-4">
     <input
       id="catalog-search"
       type="search"
-      class="form-control"
       placeholder="Search by name&hellip;"
       [value]="searchTerm()"
       (input)="onSearch($any($event.target).value)"
@@ -19,79 +18,83 @@
   </div>
 
   @if (items().length === 0) {
-    <div id="catalog-empty-state" class="empty-state text-center py-5">
+    <div id="catalog-empty-state" class="py-12 text-center">
       @if (searchTerm()) {
-        <i class="bi bi-search fs-1 text-secondary mb-3 d-block"></i>
+        <div class="mb-4 flex justify-center text-text-muted">
+          <ng-icon name="lucideSearch" size="2.5rem" aria-hidden="true" />
+        </div>
         <h5>No products match</h5>
-        <p class="text-muted small">&ldquo;{{ searchTerm() }}&rdquo;</p>
+        <p class="text-meta text-text-muted">&ldquo;{{ searchTerm() }}&rdquo;</p>
       } @else {
-        <i class="bi bi-grid fs-1 text-secondary mb-3 d-block"></i>
+        <div class="mb-4 flex justify-center text-text-muted">
+          <ng-icon name="lucideLayoutGrid" size="2.5rem" aria-hidden="true" />
+        </div>
         <h5>No products in the catalog yet</h5>
       }
     </div>
   } @else {
-    <div class="table-responsive">
-      <table id="catalog-table" class="table table-hover align-middle">
-        <thead class="table-light">
+    <div class="overflow-x-auto">
+      <table id="catalog-table" class="w-full border-collapse align-middle">
+        <thead class="bg-surface-2">
           <tr>
-            <th>
+            <th class="border-b border-line p-2 text-left">
               <a
                 id="sort-by-name"
-                class="btn btn-link p-0 text-dark text-decoration-none fw-semibold"
+                class="font-semibold text-text no-underline"
                 [routerLink]="[]"
-                [queryParams]="sortParams('Name')"
+                [queryParams]="sortParams(sortColumns.name)"
                 queryParamsHandling="merge"
-                [attr.aria-current]="orderBy() === 'Name' ? 'true' : null">
+                [attr.aria-current]="orderBy() === sortColumns.name ? 'true' : null">
                 Name
-                @if (orderBy() === 'Name') { {{ orderDir() === 'asc' ? '▲' : '▼' }} }
+                @if (orderBy() === sortColumns.name) { {{ orderDir() === sortDirections.asc ? '▲' : '▼' }} }
               </a>
             </th>
-            <th>
+            <th class="border-b border-line p-2 text-left">
               <a
-                class="btn btn-link p-0 text-dark text-decoration-none fw-semibold"
+                class="font-semibold text-text no-underline"
                 [routerLink]="[]"
-                [queryParams]="sortParams('Brand')"
+                [queryParams]="sortParams(sortColumns.brand)"
                 queryParamsHandling="merge"
-                [attr.aria-current]="orderBy() === 'Brand' ? 'true' : null">
+                [attr.aria-current]="orderBy() === sortColumns.brand ? 'true' : null">
                 Brand
-                @if (orderBy() === 'Brand') { {{ orderDir() === 'asc' ? '▲' : '▼' }} }
+                @if (orderBy() === sortColumns.brand) { {{ orderDir() === sortDirections.asc ? '▲' : '▼' }} }
               </a>
             </th>
-            <th>
+            <th class="border-b border-line p-2 text-left">
               <a
-                class="btn btn-link p-0 text-dark text-decoration-none fw-semibold"
+                class="font-semibold text-text no-underline"
                 [routerLink]="[]"
-                [queryParams]="sortParams('Category')"
+                [queryParams]="sortParams(sortColumns.category)"
                 queryParamsHandling="merge"
-                [attr.aria-current]="orderBy() === 'Category' ? 'true' : null">
+                [attr.aria-current]="orderBy() === sortColumns.category ? 'true' : null">
                 Category
-                @if (orderBy() === 'Category') { {{ orderDir() === 'asc' ? '▲' : '▼' }} }
+                @if (orderBy() === sortColumns.category) { {{ orderDir() === sortDirections.asc ? '▲' : '▼' }} }
               </a>
             </th>
-            <th>
+            <th class="border-b border-line p-2 text-left">
               <a
                 id="sort-by-msrp-price"
-                class="btn btn-link p-0 text-dark text-decoration-none fw-semibold"
+                class="font-semibold text-text no-underline"
                 [routerLink]="[]"
-                [queryParams]="sortParams('MsrpPrice')"
+                [queryParams]="sortParams(sortColumns.msrpPrice)"
                 queryParamsHandling="merge"
-                [attr.aria-current]="orderBy() === 'MsrpPrice' ? 'true' : null">
+                [attr.aria-current]="orderBy() === sortColumns.msrpPrice ? 'true' : null">
                 List Price
-                @if (orderBy() === 'MsrpPrice') { {{ orderDir() === 'asc' ? '▲' : '▼' }} }
+                @if (orderBy() === sortColumns.msrpPrice) { {{ orderDir() === sortDirections.asc ? '▲' : '▼' }} }
               </a>
             </th>
-            <th></th>
+            <th class="border-b border-line p-2 text-left"></th>
           </tr>
         </thead>
         <tbody>
           @for (item of items(); track item.id) {
-            <tr [attr.id]="'catalog-row-' + $index">
-              <td [attr.id]="'catalog-name-' + $index">{{ item.name ?? '—' }}</td>
-              <td>{{ item.brand ?? '—' }}</td>
-              <td>{{ item.category ?? '—' }}</td>
-              <td>{{ item.msrpPrice !== null ? ('$' + item.msrpPrice) : '—' }}</td>
-              <td class="text-end">
-                <a [attr.id]="'view-product-' + $index" class="btn btn-sm btn-outline-primary" [routerLink]="['/catalog', item.id]">View</a>
+            <tr [attr.id]="catalogRowId($index)" class="hover:bg-surface-2" [attr.data-catalog-product-id]="item.id">
+              <td [attr.id]="catalogNameId($index)" class="border-b border-line p-2 text-left">{{ item.name ?? '—' }}</td>
+              <td class="border-b border-line p-2 text-left">{{ item.brand ?? '—' }}</td>
+              <td class="border-b border-line p-2 text-left">{{ item.category ?? '—' }}</td>
+              <td class="border-b border-line p-2 text-left">{{ item.msrpPrice !== null ? ('$' + item.msrpPrice) : '—' }}</td>
+              <td class="border-b border-line p-2 text-right">
+                <a [attr.id]="viewProductId($index)" crgButtonSecondary [routerLink]="['/catalog', item.id]">View</a>
               </td>
             </tr>
           }
@@ -99,36 +102,36 @@
       </table>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center mt-2">
-      <small class="text-muted">
+    <div class="mt-2 flex items-center justify-between">
+      <small id="catalog-showing" class="text-meta text-text-muted">
         Showing {{ showingFrom() }}&ndash;{{ showingTo() }} of {{ total() }}
       </small>
-      <div class="d-flex gap-2">
+      <div class="flex gap-2">
         @if (hasPrevPage()) {
           <a
-            id="catalog-prev-page"
-            class="btn btn-sm btn-outline-secondary"
+            [id]="prevPageId"
+            crgButtonGhostSmall
             [routerLink]="[]"
             [queryParams]="pageParams(page() - 1)"
             queryParamsHandling="merge">
             &laquo; Previous
           </a>
         } @else {
-          <button id="catalog-prev-page" type="button" class="btn btn-sm btn-outline-secondary" disabled>
+          <button [id]="prevPageId" type="button" crgButtonGhostSmall disabled>
             &laquo; Previous
           </button>
         }
         @if (hasNextPage()) {
           <a
-            id="catalog-next-page"
-            class="btn btn-sm btn-outline-secondary"
+            [id]="nextPageId"
+            crgButtonGhostSmall
             [routerLink]="[]"
             [queryParams]="pageParams(page() + 1)"
             queryParamsHandling="merge">
             Next &raquo;
           </a>
         } @else {
-          <button id="catalog-next-page" type="button" class="btn btn-sm btn-outline-secondary" disabled>
+          <button [id]="nextPageId" type="button" crgButtonGhostSmall disabled>
             Next &raquo;
           </button>
         }

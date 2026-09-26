@@ -6,35 +6,37 @@ import {
   RouterStateSnapshot,
 } from '@angular/router';
 import { of, throwError, firstValueFrom, EmptyError, Observable } from 'rxjs';
-import { HttpErrorResponse } from '@angular/common/http';
+import { newCount, newDisplayName, newId, newText, newUtcInstant } from '@crgolden/modules/testing';
+import { HttpErrorResponse, HttpStatusCode } from '@angular/common/http';
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { catalogResolver } from './catalog.resolver';
 import { CatalogService } from './catalog.service';
 import { CatalogProduct } from './catalog-product.model';
+import { AppPaths, CATALOG_NOT_FOUND_URL, CATALOG_URL, ROUTE_ID_PARAMETER } from '../app/app-paths';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes = [
-  { path: 'catalog', component: DummyComponent },
-  { path: 'catalog/not-found', component: DummyComponent },
+  { path: AppPaths.catalog, component: DummyComponent },
+  { path: `${AppPaths.catalog}/${AppPaths.notFound}`, component: DummyComponent },
 ];
 
 const mockProduct: CatalogProduct = {
-  id: 'aaaaaaaa-0000-0000-0000-000000000001',
-  name: 'LG TV',
-  brand: 'LG',
+  id: newId(),
+  name: newDisplayName(),
+  brand: newText(),
   modelNumber: null,
   category: null,
   manualUrl: null,
-  msrpPrice: 1299.99,
-  createdAt: '2024-01-01T00:00:00Z',
+  msrpPrice: newCount(),
+  createdAt: newUtcInstant(),
   updatedAt: null,
 };
 
 function makeSnapshot(id: string | null): ActivatedRouteSnapshot {
   return {
-    paramMap: { get: (key: string) => (key === 'id' ? id : null) },
+    paramMap: { get: (key: string) => (key === ROUTE_ID_PARAMETER ? id : null) },
   } as unknown as ActivatedRouteSnapshot;
 }
 
@@ -73,7 +75,7 @@ describe('catalogResolver', () => {
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
     expect(getById).not.toHaveBeenCalled();
-    expect(navigateSpy).toHaveBeenCalledWith(['/catalog/not-found']);
+    expect(navigateSpy).toHaveBeenCalledWith([CATALOG_NOT_FOUND_URL]);
   });
 
   it('navigates to /catalog/not-found when getById returns 404', async () => {
@@ -83,7 +85,7 @@ describe('catalogResolver', () => {
           provide: CatalogService,
           useValue: {
             getById: () =>
-              throwError(() => new HttpErrorResponse({ status: 404, statusText: 'Not Found' })),
+              throwError(() => new HttpErrorResponse({ status: HttpStatusCode.NotFound, statusText: newText() })),
           },
         },
         provideRouter(testRoutes),
@@ -94,11 +96,11 @@ describe('catalogResolver', () => {
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     const result$ = TestBed.runInInjectionContext(() =>
-      catalogResolver(makeSnapshot('missing-id'), {} as RouterStateSnapshot),
+      catalogResolver(makeSnapshot(newId()), {} as RouterStateSnapshot),
     ) as Observable<CatalogProduct>;
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
-    expect(navigateSpy).toHaveBeenCalledWith(['/catalog/not-found']);
+    expect(navigateSpy).toHaveBeenCalledWith([CATALOG_NOT_FOUND_URL]);
   });
 
   it('navigates to /catalog when getById returns a non-404 error', async () => {
@@ -108,7 +110,7 @@ describe('catalogResolver', () => {
           provide: CatalogService,
           useValue: {
             getById: () =>
-              throwError(() => new HttpErrorResponse({ status: 500, statusText: 'Server Error' })),
+              throwError(() => new HttpErrorResponse({ status: HttpStatusCode.InternalServerError, statusText: newText() })),
           },
         },
         provideRouter(testRoutes),
@@ -119,10 +121,10 @@ describe('catalogResolver', () => {
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     const result$ = TestBed.runInInjectionContext(() =>
-      catalogResolver(makeSnapshot('any-id'), {} as RouterStateSnapshot),
+      catalogResolver(makeSnapshot(newId()), {} as RouterStateSnapshot),
     ) as Observable<CatalogProduct>;
 
     await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
-    expect(navigateSpy).toHaveBeenCalledWith(['/catalog']);
+    expect(navigateSpy).toHaveBeenCalledWith([CATALOG_URL]);
   });
 });

@@ -10,18 +10,24 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { ButtonPrimaryDirective, ButtonSecondaryDirective } from '@crgolden/modules/primitives';
 import { ChatService } from './chat.service';
-import { ChatMessage, ProductContext } from './chat.model';
+import { ChatMessage, ChatRoles, ProductContext } from './chat.model';
 import { MarkdownPipe } from './markdown.pipe';
+import { MarkdownProseDirective } from './markdown-prose.directive';
 
 const URL_REGEX = /\bhttps?:\/\/[^\s)>\]"']+/g;
 
+export const CHAT_START_FAILED_MESSAGE = 'Could not start a chat. Please try again.';
+
+export const STREAM_FAILED_MESSAGE = 'The reply stopped unexpectedly. Please send your message again.';
+
 @Component({
   selector: 'app-manual-chat',
-  imports: [FormsModule, MarkdownPipe],
+  imports: [FormsModule, MarkdownPipe, MarkdownProseDirective, ButtonPrimaryDirective, ButtonSecondaryDirective],
   templateUrl: './manual-chat.component.html',
-  styleUrl: './manual-chat.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'flex min-h-0 flex-auto flex-col' },
 })
 export class ManualChatComponent {
 
@@ -72,7 +78,7 @@ export class ManualChatComponent {
       },
       error: () => {
         this.streaming.set(false);
-        this.error.set('Could not start a chat. Please try again.');
+        this.error.set(CHAT_START_FAILED_MESSAGE);
       },
     });
   }
@@ -100,8 +106,8 @@ export class ManualChatComponent {
   private dispatch(chatId: string, text: string): void {
     this.messages.update(msgs => [
       ...msgs,
-      { role: 'user', content: text },
-      { role: 'assistant', content: '' },
+      { role: ChatRoles.user, content: text },
+      { role: ChatRoles.assistant, content: '' },
     ]);
     this.input.set('');
     this.streaming.set(true);
@@ -125,7 +131,7 @@ export class ManualChatComponent {
       complete: () => this.streaming.set(false),
       error: () => {
         this.streaming.set(false);
-        this.error.set('The reply stopped unexpectedly. Please send your message again.');
+        this.error.set(STREAM_FAILED_MESSAGE);
       },
     });
   }

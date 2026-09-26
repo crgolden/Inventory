@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { AuthService } from '../auth/auth.service';
+import { userSessionClaimTypeId, userSessionClaimValueId, userSessionRowId } from './user-session-ids';
 
 @Component({
   selector: 'app-user-session',
@@ -12,6 +13,9 @@ export class UserSessionComponent implements OnInit {
 
   private readonly authService = inject(AuthService);
   private readonly titleService = inject(Title);
+  protected readonly userSessionRowId = userSessionRowId;
+  protected readonly userSessionClaimTypeId = userSessionClaimTypeId;
+  protected readonly userSessionClaimValueId = userSessionClaimValueId;
 
   ngOnInit(): void {
     this.titleService.setTitle('Inventory | User Session');

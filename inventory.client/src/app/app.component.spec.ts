@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AppComponent } from './app.component';
+import { BFF_LOGIN_URL, SILENT_LOGIN_SOURCE } from '../auth/auth-contract';
+import { AppPaths } from './app-paths';
 import { RouterOutlet } from '@angular/router';
 import { NavMenuComponent } from '../nav-menu/nav-menu.component';
 import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
@@ -8,13 +10,14 @@ import { provideRouter, Routes } from '@angular/router';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { AuthService } from '../auth/auth.service';
+import { newHttpsAddress, newText } from '@crgolden/modules/testing';
 
 @Component({ changeDetection: ChangeDetectionStrategy.OnPush, template: '' })
 class DummyComponent {}
 
 const testRoutes: Routes = [
   { path: '', component: DummyComponent },
-  { path: 'user-session', component: DummyComponent },
+  { path: AppPaths.userSession, component: DummyComponent },
 ];
 
 describe('AppComponent', () => {
@@ -34,7 +37,7 @@ describe('AppComponent', () => {
             isAuthenticated: signal(isAuthenticated),
             isAnonymous: signal(!isAuthenticated),
             logoutUrl: signal(null),
-            loginUrl: '/bff/login',
+            loginUrl: BFF_LOGIN_URL,
             refresh: vi.fn(),
           },
         },
@@ -84,9 +87,9 @@ describe('AppComponent', () => {
     expect(component.iframeVisible()).toBe(true);
 
     component.onMessage(
-      new MessageEvent('message', {
+      new MessageEvent(newText(), {
         origin: globalThis.location.origin,
-        data: { source: 'bff-silent-login', isLoggedIn: true },
+        data: { source: SILENT_LOGIN_SOURCE, isLoggedIn: true },
       }),
     );
     fixture.detectChanges();
@@ -100,9 +103,9 @@ describe('AppComponent', () => {
     const authService = TestBed.inject(AuthService);
 
     component.onMessage(
-      new MessageEvent('message', {
-        origin: 'https://attacker.example',
-        data: { source: 'bff-silent-login', isLoggedIn: true },
+      new MessageEvent(newText(), {
+        origin: new URL(newHttpsAddress()).origin,
+        data: { source: SILENT_LOGIN_SOURCE, isLoggedIn: true },
       }),
     );
     fixture.detectChanges();
@@ -116,9 +119,9 @@ describe('AppComponent', () => {
     const authService = TestBed.inject(AuthService);
 
     component.onMessage(
-      new MessageEvent('message', {
+      new MessageEvent(newText(), {
         origin: globalThis.location.origin,
-        data: { source: 'bff-silent-login', isLoggedIn: false },
+        data: { source: SILENT_LOGIN_SOURCE, isLoggedIn: false },
       }),
     );
     fixture.detectChanges();
@@ -133,8 +136,8 @@ describe('AppComponent', () => {
     const visibleBefore = component.iframeVisible();
 
     component.onMessage(
-      new MessageEvent('message', {
-        data: { source: 'something-else', isLoggedIn: true },
+      new MessageEvent(newText(), {
+        data: { source: newText(), isLoggedIn: true },
       }),
     );
 
