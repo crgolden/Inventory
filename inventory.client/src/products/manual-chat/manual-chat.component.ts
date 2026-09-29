@@ -18,6 +18,16 @@ import { MarkdownProseDirective } from './markdown-prose.directive';
 
 const URL_REGEX = /\bhttps?:\/\/[^\s)>\]"']+/g;
 
+const TRAILING_URL_PUNCTUATION = new Set(['.', ',', ';', ':', '!', '?', ')', '>', ']', '"', "'"]);
+
+function withoutTrailingPunctuation(url: string): string {
+  let end = url.length;
+  while (end > 0 && TRAILING_URL_PUNCTUATION.has(url.charAt(end - 1))) {
+    end--;
+  }
+  return url.slice(0, end);
+}
+
 export const CHAT_START_FAILED_MESSAGE = 'Could not start a chat. Please try again.';
 
 export const STREAM_FAILED_MESSAGE = 'The reply stopped unexpectedly. Please send your message again.';
@@ -47,7 +57,7 @@ export class ManualChatComponent {
 
   urlsFor(content: string): string[] {
     const matches = content.match(URL_REGEX) ?? [];
-    const cleaned = matches.map(u => u.replace(/[.,;:!?)>\]"']+$/, ''));
+    const cleaned = matches.map(withoutTrailingPunctuation);
     return Array.from(new Set(cleaned));
   }
 

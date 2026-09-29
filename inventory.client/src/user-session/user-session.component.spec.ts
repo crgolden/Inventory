@@ -69,7 +69,7 @@ describe('UserSessionComponent', () => {
     expect(tableElement).toBeTruthy();
 
     const rows = fixture.debugElement.queryAll(By.css(`[id^="${USER_SESSION_ROW_ID_PREFIX}"]`));
-    expect(rows.length).toBe(testClaims.length);
+    expect(rows).toHaveLength(testClaims.length);
 
     const renderedTypes = fixture.debugElement
       .queryAll(By.css(`[id^="${USER_SESSION_CLAIM_TYPE_ID_PREFIX}"]`))

@@ -73,32 +73,45 @@ async function patchTitle(request: IncomingMessage, response: ServerResponse, ch
   sendStatus(response, constants.HTTP_STATUS_NO_CONTENT);
 }
 
-createServer((request, response) => {
-  const path = new URL(request.url ?? '/', `http://localhost:${PORT}`).pathname;
-  const chatId = CHAT_KEY.exec(path)?.[1] ?? CHAT_MESSAGES.exec(path)?.[1] ?? CHAT_STREAM.exec(path)?.[1];
-  const chat = chatId === undefined ? undefined : chats.get(chatId);
-  if (path === CHATS_PATH && request.method === HttpMethods.post) {
+type ChatHandler = (request: IncomingMessage, response: ServerResponse, chat: Chat) => void;
+
+const CHAT_ROUTES: readonly (readonly [RegExp, string, ChatHandler])[] = [
+  [CHAT_KEY, HttpMethods.get, (_request, response, chat) => sendJson(response, constants.HTTP_STATUS_OK, summary(chat))],
+  [CHAT_KEY, HttpMethods.patch, (request, response, chat) => void patchTitle(request, response, chat)],
+  [CHAT_KEY, HttpMethods.delete, (_request, response, chat) => {
+    chats.delete(chat.chatId);
+    sendStatus(response, constants.HTTP_STATUS_NO_CONTENT);
+  }],
+  [CHAT_MESSAGES, HttpMethods.get, (_request, response, chat) => sendJson(response, constants.HTTP_STATUS_OK, chat.messages)],
+  [CHAT_MESSAGES, HttpMethods.post, (request, response, chat) =>
+    void appendExchange(request, chat).then(reply => sendJson(response, constants.HTTP_STATUS_OK, { output: reply, chatId: chat.chatId }))],
+  [CHAT_STREAM, HttpMethods.post, (request, response, chat) => void stream(request, response, chat)],
+];
+
+function routeChats(request: IncomingMessage, response: ServerResponse): void {
+  if (request.method === HttpMethods.post) {
     const created: Chat = { chatId: randomUUID(), title: null, createdAt: Date.now(), messages: [] };
     chats.set(created.chatId, created);
     sendJson(response, constants.HTTP_STATUS_CREATED, summary(created));
-  } else if (path === CHATS_PATH && request.method === HttpMethods.get) {
+  } else if (request.method === HttpMethods.get) {
     sendJson(response, constants.HTTP_STATUS_OK, [...chats.values()].map(summary));
-  } else if (chat === undefined) {
-    sendStatus(response, constants.HTTP_STATUS_NOT_FOUND);
-  } else if (CHAT_KEY.test(path) && request.method === HttpMethods.get) {
-    sendJson(response, constants.HTTP_STATUS_OK, summary(chat));
-  } else if (CHAT_KEY.test(path) && request.method === HttpMethods.patch) {
-    void patchTitle(request, response, chat);
-  } else if (CHAT_KEY.test(path) && request.method === HttpMethods.delete) {
-    chats.delete(chat.chatId);
-    sendStatus(response, constants.HTTP_STATUS_NO_CONTENT);
-  } else if (CHAT_MESSAGES.test(path) && request.method === HttpMethods.get) {
-    sendJson(response, constants.HTTP_STATUS_OK, chat.messages);
-  } else if (CHAT_MESSAGES.test(path) && request.method === HttpMethods.post) {
-    void appendExchange(request, chat).then(reply => sendJson(response, constants.HTTP_STATUS_OK, { output: reply, chatId: chat.chatId }));
-  } else if (CHAT_STREAM.test(path) && request.method === HttpMethods.post) {
-    void stream(request, response, chat);
   } else {
     sendStatus(response, constants.HTTP_STATUS_NOT_FOUND);
   }
+}
+
+createServer((request, response) => {
+  const path = new URL(request.url ?? '/', `http://localhost:${PORT}`).pathname;
+  if (path === CHATS_PATH) {
+    routeChats(request, response);
+    return;
+  }
+  const chatId = CHAT_KEY.exec(path)?.[1] ?? CHAT_MESSAGES.exec(path)?.[1] ?? CHAT_STREAM.exec(path)?.[1];
+  const chat = chatId === undefined ? undefined : chats.get(chatId);
+  const route = CHAT_ROUTES.find(([pattern, method]) => pattern.test(path) && request.method === method);
+  if (chat === undefined || route === undefined) {
+    sendStatus(response, constants.HTTP_STATUS_NOT_FOUND);
+    return;
+  }
+  route[2](request, response, chat);
 }).listen(PORT);

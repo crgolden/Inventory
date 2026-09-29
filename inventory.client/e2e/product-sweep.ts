@@ -38,10 +38,15 @@ async function sweepInventoryItems(page: Page, productNamePrefix: string): Promi
   }
   const items = (await listed.json()) as { id: string; name: string | null }[];
   const ours = items.filter(item => item.name?.startsWith(productNamePrefix) === true);
-  for (const item of ours) {
-    const deleted = await page.request.delete(`${INVENTORY_ODATA_URL}(${item.id})`, { headers: CSRF_HEADERS });
+  const deletions = await Promise.all(
+    ours.map(async item => ({
+      id: item.id,
+      deleted: await page.request.delete(`${INVENTORY_ODATA_URL}(${item.id})`, { headers: CSRF_HEADERS }),
+    })),
+  );
+  for (const { id, deleted } of deletions) {
     if (!deleted.ok() && deleted.status() !== constants.HTTP_STATUS_NOT_FOUND) {
-      throw new Error(`Inventory sweep could not delete ${item.id}: ${deleted.status()}.`);
+      throw new Error(`Inventory sweep could not delete ${id}: ${deleted.status()}.`);
     }
   }
 }
@@ -61,13 +66,16 @@ async function sweepCatalogRows(page: Page, modelNumberPrefix: string): Promise<
     );
   }
   const body = (await listed.json()) as { value?: { Id?: string }[] };
-  for (const row of body.value ?? []) {
-    if (row.Id === undefined) {
-      continue;
-    }
-    const deleted = await page.request.delete(`${AUTHORIZED_CATALOG_ODATA_URL}(${row.Id})`, { headers: CSRF_HEADERS });
+  const ids = (body.value ?? []).flatMap(row => (row.Id === undefined ? [] : [row.Id]));
+  const deletions = await Promise.all(
+    ids.map(async id => ({
+      id,
+      deleted: await page.request.delete(`${AUTHORIZED_CATALOG_ODATA_URL}(${id})`, { headers: CSRF_HEADERS }),
+    })),
+  );
+  for (const { id, deleted } of deletions) {
     if (!deleted.ok() && !NOT_OURS_TO_REMOVE_STATUSES.has(deleted.status())) {
-      throw new Error(`Catalog sweep could not delete ${row.Id}: ${deleted.status()}.`);
+      throw new Error(`Catalog sweep could not delete ${id}: ${deleted.status()}.`);
     }
   }
 }

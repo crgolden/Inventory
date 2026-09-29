@@ -27,6 +27,17 @@ const bffAgainstMocks = {
   OpenIdConnectOptions__RequireHttpsMetadata: 'false',
 };
 
+const syntheticProject = {
+  name: 'synthetic',
+  testDir: './e2e/synthetic',
+  timeout: 10 * 60_000,
+  retries: 0,
+  use: {
+    ...devices['Desktop Chrome'],
+    userAgent: `${devices['Desktop Chrome'].userAgent} crgolden-synthetic/1.0`,
+  },
+};
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -81,15 +92,6 @@ export default defineConfig({
       },
       dependencies: ['setup'],
     },
-    {
-      name: 'synthetic',
-      testDir: './e2e/synthetic',
-      timeout: 10 * 60_000,
-      retries: 0,
-      use: {
-        ...devices['Desktop Chrome'],
-        userAgent: `${devices['Desktop Chrome'].userAgent} crgolden-synthetic/1.0`,
-      },
-    },
+    ...(walkerBaseUrl ? [syntheticProject] : []),
   ],
 });

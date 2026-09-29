@@ -243,6 +243,7 @@ describe('CatalogService', () => {
       service.getById(mockProduct.id).subscribe();
 
       const req = http.expectOne(`${CATALOG_ODATA_URL}(${mockProduct.id})`);
+      expect(req.request.method).toBe(HttpMethods.get);
       req.flush(mockApiProduct);
     });
 

@@ -15,7 +15,7 @@ Register-GateSteps @('node_modules install markers', 'Restore local tools',
     'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec', 'npm run lint:css', 'Begin Sonar analysis', 'Build with dotnet',
     'jb inspectcode', 'Run unit tests with coverage', 'Run UI tests', 'Vitest bail plant', 'Fix LCOV paths',
     'Install browser E2E Playwright browsers', 'Run browser E2E tests', 'Browser E2E executed a nonzero test count',
-    'npm run lint:utilities', 'End Sonar analysis')
+    'npm run lint:utilities', 'End Sonar analysis', 'Fail on open Sonar issues')
 $repo = $PSScriptRoot
 $client = Join-Path $repo 'inventory.client'
 $scratch = $gateOutput
@@ -28,6 +28,7 @@ $sonarBranch = "branch-local-$($env:COMPUTERNAME.ToLowerInvariant())"
 $beginSonar = "Begin Sonar analysis (branch $sonarBranch)"
 $build = 'Build with dotnet (Release, AngularConfiguration=ci, RestoreLockedMode)'
 $endSonar = 'End Sonar analysis (quality gate waited)'
+$sonarIssues = 'Fail on open Sonar issues'
 $unitStep = 'Run unit tests with coverage (Category=Unit)'
 $uiStep = 'Run UI tests (npx vitest run --coverage)'
 $env:TZ = 'UTC'
@@ -69,12 +70,14 @@ if (-not (Test-StepCarried 'npm run lint:css')) {
 }
 Set-Location $repo
 
-$sonarCarried = Test-StepCarried $endSonar
+$sonarCarried = Test-StepCarried $sonarIssues
 if ($sonarCarried) {
     $null = Test-StepCarried $beginSonar
     $null = Test-StepCarried $build
+    $null = Test-StepCarried $endSonar
 }
 else {
+    $sonarStartedAt = [DateTimeOffset]::UtcNow
     $env:JAVA_HOME = "$env:SystemDrive\sonar-scanner-8.0.1.6346-windows-x64\jre"
     $global:LASTEXITCODE = $null
     dotnet-sonarscanner begin /k:"crgolden_Inventory" /o:"crgolden" /d:sonar.token="$env:SONAR_TOKEN" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.opencover.reportsPaths="coverage.opencover.xml" /d:sonar.javascript.lcov.reportPaths="coverage/lcov.info" /d:sonar.exclusions="**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js" /d:sonar.test.inclusions="**/*.spec.ts" /d:sonar.qualitygate.wait=true /d:sonar.scanner.skipJreProvisioning=true /d:sonar.branch.name="$sonarBranch"
@@ -87,7 +90,7 @@ else {
 
 if (-not (Test-StepCarried 'jb inspectcode')) {
     if (Test-Path $sarif) { Remove-Item $sarif -Force }
-    dotnet jb inspectcode "$repo\Inventory.slnx" --no-build -e=WARNING --output="$sarif" --exclude="**/coverage/**;**/dist/**;**/node_modules/**;**/bin/**;**/obj/**"
+    dotnet jb inspectcode "$repo\Inventory.slnx" --no-build -e=WARNING --caches-home="$(New-InspectCodeCaches $gateOutput)" --output="$sarif" --exclude="**/coverage/**;**/dist/**;**/node_modules/**;**/bin/**;**/obj/**"
     Test-Sarif $sarif
 }
 
@@ -138,9 +141,7 @@ if (-not (Test-StepCarried 'Fix LCOV paths for SonarQube')) {
     Write-Row 'Fix LCOV paths for SonarQube' 'PASS' ''
 }
 
-$global:LASTEXITCODE = $null
-npm run playwright:install
-$null = Test-Exit 'Install browser E2E Playwright browsers'
+Install-PlaywrightBrowsers 'Install browser E2E Playwright browsers' { npx playwright install --dry-run chromium } { npm run playwright:install }
 
 $e2eStep = 'Run browser E2E tests (npm run e2e:ci, CI=true, mock dependencies)'
 if (-not (Test-StepCarried $e2eStep)) {
@@ -168,6 +169,7 @@ if (-not $sonarCarried) {
     $global:LASTEXITCODE = $null
     dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
     $null = Test-Exit $endSonar
+    Test-SonarIssues $sonarIssues 'crgolden_Inventory' $sonarBranch $sonarStartedAt
 }
 
 Write-Row 'Upload test results / dotnet publish / upload artifact / deploy' 'NOT RUN' 'delivery steps, not checks'

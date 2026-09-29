@@ -112,7 +112,7 @@ describe('CatalogListComponent', () => {
 
   it('renders a row for each catalog item', () => {
     const rows = fixture.debugElement.queryAll(By.css(`[id^="${CATALOG_ROW_ID_PREFIX}"]`));
-    expect(rows.length).toBe(mockProducts.length);
+    expect(rows).toHaveLength(mockProducts.length);
   });
 
   it('shows product name in row', () => {
@@ -149,8 +149,8 @@ describe('CatalogListComponent', () => {
 
   it('offers every column header as a link rather than a click handler', () => {
     const headers = fixture.debugElement.queryAll(By.css('thead a'));
-    expect(headers.length).toBe(Object.values(CatalogSortColumns).length);
-    expect(fixture.debugElement.queryAll(By.css('thead button')).length).toBe(0);
+    expect(headers).toHaveLength(Object.values(CatalogSortColumns).length);
+    expect(fixture.debugElement.queryAll(By.css('thead button'))).toHaveLength(0);
   });
 
   it('the default column offers descending once it is the active ascending sort', () => {
@@ -235,7 +235,7 @@ describe('CatalogListComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.debugElement.query(By.css('#catalog-error'))).toBeNull();
-    expect(fixture.debugElement.queryAll(By.css(`[id^="${CATALOG_ROW_ID_PREFIX}"]`)).length).toBe(mockProducts.length);
+    expect(fixture.debugElement.queryAll(By.css(`[id^="${CATALOG_ROW_ID_PREFIX}"]`))).toHaveLength(mockProducts.length);
   });
 
   it('Next Page becomes a link carrying the next page when the total exceeds one page', () => {

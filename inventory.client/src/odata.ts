@@ -9,5 +9,5 @@ export interface ODataCountResponse<T> extends ODataResponse<T> {
 }
 
 export function escapeODataLiteral(value: string): string {
-  return value.replace(/'/g, "''");
+  return value.replaceAll("'", "''");
 }

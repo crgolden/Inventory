@@ -14,7 +14,7 @@ export function portArgument(): number {
   const [portText] = scriptArguments();
   const port = Number(portText);
   if (!Number.isInteger(port)) {
-    throw new Error('A mock server takes its port as its first argument; playwright.config.ts passes it from e2e-settings.json.');
+    throw new TypeError('A mock server takes its port as its first argument; playwright.config.ts passes it from e2e-settings.json.');
   }
   return port;
 }

@@ -108,7 +108,7 @@ public sealed class TracedRequestsTests
 
     private static string HashedAssetPath(string extension) => $"/{Token()}-{Token()}{extension}";
 
-    private static HttpContext ContextFor(string path)
+    private static DefaultHttpContext ContextFor(string path)
     {
         var context = new DefaultHttpContext();
         context.Request.Path = new PathString(path);

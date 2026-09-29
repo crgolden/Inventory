@@ -1,7 +1,7 @@
 import { ApplicationConfig, inject, provideAppInitializer, provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { routes } from './app.routes';
-import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideNgIconsConfig } from '@ng-icons/core';
 import { appInterceptor} from './app.interceptor';
 import { AuthService } from '../auth/auth.service';
@@ -11,7 +11,7 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'enabled' })),
     provideHttpClient(
-      withFetch(), withInterceptors([appInterceptor])
+      withInterceptors([appInterceptor])
     ),
     provideAppInitializer(() => {
       const authService = inject(AuthService);

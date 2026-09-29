@@ -88,7 +88,8 @@ function decodeBasicClientId(encoded: string): string | undefined {
 }
 
 function clientIdOf(request: IncomingMessage, form: URLSearchParams): string | null {
-  const basic = request.headers.authorization?.match(/^Basic\s+(.+)$/i);
+  const authorization = request.headers.authorization;
+  const basic = authorization === undefined ? null : /^Basic +(\S+)$/i.exec(authorization);
   const encodedClientId = basic?.[1] === undefined ? undefined : decodeBasicClientId(basic[1]);
   return encodedClientId === undefined ? form.get(OidcParameters.clientId) : decodeURIComponent(encodedClientId);
 }

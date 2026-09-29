@@ -2,9 +2,7 @@
 
 [![Build and deploy ASP.Net Core app to Azure Web App - crgolden-inventory](https://github.com/crgolden/Inventory/actions/workflows/master_crgolden-inventory.yml/badge.svg)](https://github.com/crgolden/Inventory/actions/workflows/master_crgolden-inventory.yml)
 
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=crgolden_Inventory&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=crgolden_Inventory)
-
-[![Synthetic walker](https://github.com/crgolden/Inventory/actions/workflows/synthetic.yml/badge.svg)](https://github.com/crgolden/Inventory/actions/workflows/synthetic.yml)
+[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=crgolden_Inventory)](https://sonarcloud.io/summary/new_code?id=crgolden_Inventory)
 
 A full-stack single-page application built with **Angular 22** and **ASP.NET Core 10**, using the [Backend-for-Frontend (BFF)](https://www.duendesoftware.com/products/bff) security pattern to handle OIDC authentication on the server side.
 

@@ -41,7 +41,7 @@ describe('HomeComponent', () => {
   it('renders a card for every benefit', async () => {
     await setup(false);
     const cards = fixture.debugElement.queryAll(By.css(`[id^="${BENEFIT_CARD_ID_PREFIX}"]`));
-    expect(cards.length).toBe(fixture.componentInstance.benefits.length);
+    expect(cards).toHaveLength(fixture.componentInstance.benefits.length);
   });
 
   it('shows login CTA when anonymous', async () => {

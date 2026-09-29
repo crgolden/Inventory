@@ -7,8 +7,6 @@ import { DuendeBffQueryParameters } from '../duende-bff-constants';
 import { CATALOG_URL, PRODUCTS_URL } from '../../src/app/app-paths';
 import { BFF_LOGIN_URL, SILENT_LOGIN_PROMPT } from '../../src/auth/auth-contract';
 
-const walkerBaseUrl = process.env['WalkerBaseUrl']?.replace(/\/$/, '');
-
 function collectFrameRefusals(page: Page): string[] {
   const refusals: string[] = [];
   page.on('console', message => {
@@ -19,10 +17,7 @@ function collectFrameRefusals(page: Page): string[] {
   return refusals;
 }
 
-async function expectSilentLoginToComplete(page: Page): Promise<void> {
-  const refusals = collectFrameRefusals(page);
-  await page.goto(CATALOG_URL);
-  await expect(page.locator('#catalog-heading')).toBeVisible();
+async function expectTheSilentLoginFrameToPostItsOutcome(page: Page, refusals: string[]): Promise<void> {
   await expect
     .poll(async () => refusals.length > 0 || (await page.locator('#bff-silent-login').count()) === 0, {
       message: 'the silent-login iframe neither posted its outcome nor was refused',
@@ -30,6 +25,13 @@ async function expectSilentLoginToComplete(page: Page): Promise<void> {
     .toBe(true);
   expect(refusals, 'the browser refused the silent-login frame, so the check could never finish').toEqual([]);
   await expect(page.locator('#bff-silent-login')).toHaveCount(0);
+}
+
+async function expectSilentLoginToComplete(page: Page): Promise<void> {
+  const refusals = collectFrameRefusals(page);
+  await page.goto(CATALOG_URL);
+  await expect(page.locator('#catalog-heading')).toBeVisible();
+  await expectTheSilentLoginFrameToPostItsOutcome(page, refusals);
 }
 
 async function expectSilentLoginToRestoreTheSession(page: Page): Promise<void> {
@@ -46,14 +48,13 @@ async function expectSilentLoginToRestoreTheSession(page: Page): Promise<void> {
   );
   await page.reload();
   await silentLoginRequest;
+  await expectTheSilentLoginFrameToPostItsOutcome(page, refusals);
 
-  await expect(page.locator('#nav-signout')).toBeVisible();
-  expect(refusals, 'the browser refused the silent-login frame, so the session could not be restored').toEqual([]);
+  await expect(page.locator('#nav-signout'), 'the silent login finished without restoring the session').toBeVisible();
 }
 
 test.describe('Synthetic walker', () => {
   test('walks the deployed app with a seeded random journey', async ({ page }, testInfo) => {
-    test.skip(!walkerBaseUrl, 'Synthetic walks target the deployed app only; set WalkerBaseUrl to run.');
     const seed = resolveSeed();
     const steps = resolveStepBudget(walkerSettings.stepBudget);
     await expectSilentLoginToComplete(page);

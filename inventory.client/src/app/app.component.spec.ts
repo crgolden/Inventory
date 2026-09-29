@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AppComponent } from './app.component';
-import { BFF_LOGIN_URL, SILENT_LOGIN_SOURCE } from '../auth/auth-contract';
+import { BFF_LOGIN_URL, SILENT_LOGIN_PROMPT, SILENT_LOGIN_SOURCE } from '../auth/auth-contract';
 import { AppPaths } from './app-paths';
 import { RouterOutlet } from '@angular/router';
 import { NavMenuComponent } from '../nav-menu/nav-menu.component';
@@ -37,7 +37,6 @@ describe('AppComponent', () => {
             isAuthenticated: signal(isAuthenticated),
             isAnonymous: signal(!isAuthenticated),
             logoutUrl: signal(null),
-            loginUrl: BFF_LOGIN_URL,
             refresh: vi.fn(),
           },
         },
@@ -69,9 +68,14 @@ describe('AppComponent', () => {
   it('shows silent login iframe when unauthenticated', async () => {
     await setup(false);
     expect(component.iframeVisible()).toBe(true);
-    expect(component.iframeUrl()).not.toBeNull();
     const iframe = fixture.debugElement.query(By.css('#bff-silent-login'));
     expect(iframe).toBeTruthy();
+  });
+
+  it('points the silent login iframe at the BFF login with the silent prompt', async () => {
+    await setup(false);
+    const iframe = fixture.debugElement.query(By.css('#bff-silent-login'));
+    expect(iframe.nativeElement.getAttribute('src')).toBe(`${BFF_LOGIN_URL}?${SILENT_LOGIN_PROMPT}`);
   });
 
   it('does not show silent login iframe when authenticated', async () => {

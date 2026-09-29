@@ -39,6 +39,6 @@ test.describe('Home page (unauthenticated)', () => {
 
     await page.goto(PRODUCTS_URL);
 
-    await loginRequest;
+    expect(new URL((await loginRequest).url()).pathname).toBe(BFF_LOGIN_URL);
   });
 });

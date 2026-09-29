@@ -237,8 +237,8 @@ create→edit→delete cycles under names `` `Synthetic Walker Product <seed>-<n
 normal run leaves zero rows. Edits never touch the `#name` prefix, or the orphan becomes unfindable. The manual-finder
 chat (`#manual-chat-send`) is deliberately excluded — it calls Azure OpenAI. It runs on a schedule from
 `.github/workflows/synthetic.yml` (twice daily, plus `workflow_dispatch` with a `seed` input) and is **never a merge
-gate**. Tests skip unless `WalkerBaseUrl` is set — the config's fleet-standard switch that also disables `webServer` and
-points `baseURL` at the deployed app.
+gate**. The `synthetic` project exists only when `WalkerBaseUrl` is set, the config's fleet-standard switch that also
+disables `webServer` and points `baseURL` at the deployed app, so a run without it has no walker to collect.
 
 **This walker is also what replaced the post-deploy smoke tier**, which was deleted fleet-wide. Smoke ran the same
 product CRUD lifecycle against the same deployed app under the same account, but needed a reCAPTCHA exemption to log

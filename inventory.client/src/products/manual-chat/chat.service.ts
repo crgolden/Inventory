@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, type Subscriber } from 'rxjs';
 import { Chat, ChatHistoryMessage, ChatResponse } from './chat.model';
 import { CONTENT_TYPE_HEADER, CSRF_HEADER, CSRF_HEADER_VALUE, HttpMethods } from '../../app/http-headers';
 import {
@@ -29,6 +29,72 @@ function isStreamDelta(value: unknown): value is StreamDelta {
     && delta !== null
     && 'content' in delta
     && typeof delta.content === 'string';
+}
+
+type StreamFrame =
+  | { kind: 'content'; content: string }
+  | { kind: 'done' }
+  | { kind: 'failed'; message: string }
+  | { kind: 'ignored' };
+
+function readFrame(line: string): StreamFrame {
+  if (!line.startsWith(SseFraming.dataPrefix)) {
+    return { kind: 'ignored' };
+  }
+  const data = line.slice(SseFraming.dataPrefix.length).trim();
+  if (data === SseFraming.done) {
+    return { kind: 'done' };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    return { kind: 'failed', message: frameNotJsonMessage(data) };
+  }
+  return isStreamDelta(parsed)
+    ? { kind: 'content', content: parsed.delta.content }
+    : { kind: 'failed', message: frameWithoutDeltaMessage(data) };
+}
+
+function emitFramesUntilTheStreamEnds(lines: string[], subscriber: Subscriber<string>): boolean {
+  for (const line of lines) {
+    const frame = readFrame(line);
+    if (frame.kind === 'done') {
+      subscriber.complete();
+      return true;
+    }
+    if (frame.kind === 'failed') {
+      subscriber.error(new Error(frame.message));
+      return true;
+    }
+    if (frame.kind === 'content') {
+      subscriber.next(frame.content);
+    }
+  }
+  return false;
+}
+
+async function pumpStream(body: ReadableStream<Uint8Array>, subscriber: Subscriber<string>): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let pendingLine: string | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      subscriber.complete();
+      return;
+    }
+
+    const chunk = decoder.decode(value, { stream: true });
+    const lines: string[] = (pendingLine === null ? chunk : pendingLine + chunk).split('\n');
+    const remainder: string | undefined = lines.pop();
+    pendingLine = remainder === undefined || remainder.length === 0 ? null : remainder;
+
+    if (emitFramesUntilTheStreamEnds(lines, subscriber)) {
+      return;
+    }
+  }
 }
 
 @Injectable({ providedIn: 'root' })
@@ -87,44 +153,7 @@ export class ChatService {
             return;
           }
 
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let pendingLine: string | null = null;
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            const lines: string[] = (pendingLine === null ? chunk : pendingLine + chunk).split('\n');
-            const remainder: string | undefined = lines.pop();
-            pendingLine = remainder === undefined || remainder.length === 0 ? null : remainder;
-
-            for (const line of lines) {
-              if (!line.startsWith(SseFraming.dataPrefix)) continue;
-              const data = line.slice(SseFraming.dataPrefix.length).trim();
-              if (data === SseFraming.done) {
-                subscriber.complete();
-                return;
-              }
-              let parsed: unknown;
-              try {
-                parsed = JSON.parse(data);
-              } catch {
-                subscriber.error(new Error(frameNotJsonMessage(data)));
-                return;
-              }
-
-              if (!isStreamDelta(parsed)) {
-                subscriber.error(new Error(frameWithoutDeltaMessage(data)));
-                return;
-              }
-
-              subscriber.next(parsed.delta.content);
-            }
-          }
-
-          subscriber.complete();
+          await pumpStream(response.body, subscriber);
         })
         .catch(err => {
           if ((err as Error).name !== 'AbortError') {

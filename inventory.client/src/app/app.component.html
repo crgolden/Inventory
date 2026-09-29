@@ -3,7 +3,7 @@
 <div crgPageContainer>
   <router-outlet></router-outlet>
   @if (iframeVisible()) {
-    <iframe id="bff-silent-login" class="fixed -top-[9999px] -left-[9999px] size-0 border-0" title="Silent Login" [src]="iframeUrl()"></iframe>
+    <iframe id="bff-silent-login" class="fixed -top-[9999px] -left-[9999px] size-0 border-0" title="Silent Login" src="/bff/login?prompt=none"></iframe>
   }
 </div>
 </body>

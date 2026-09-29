@@ -3,13 +3,7 @@ import { computed, Injectable, Signal, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { catchError, map, Observable, of, shareReplay, Subject, switchMap, take } from 'rxjs';
 import { Claim } from './claim';
-import {
-  BFF_LOGIN_URL,
-  BFF_SILENT_LOGIN_URL,
-  BFF_USER_PATH,
-  LOGOUT_URL_CLAIM_TYPE,
-  NAME_CLAIM_TYPE,
-} from './auth-contract';
+import { BFF_USER_PATH, LOGOUT_URL_CLAIM_TYPE, NAME_CLAIM_TYPE } from './auth-contract';
 
 export type { Claim } from './claim';
 export type Session = Claim[];
@@ -46,9 +40,6 @@ export class AuthService {
     if (!s) return null;
     return s.find(x => x.type === LOGOUT_URL_CLAIM_TYPE)?.value ?? null;
   });
-
-  public readonly silentLoginUrl: string = BFF_SILENT_LOGIN_URL;
-  public readonly loginUrl: string = BFF_LOGIN_URL;
 
   public initialize(): Observable<Session> {
     this._refresh$.next();

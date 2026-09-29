@@ -120,7 +120,7 @@ describe('ProductListComponent', () => {
 
   it('renders a row for each product', () => {
     const rows = fixture.debugElement.queryAll(By.css(`[id^="${PRODUCT_ROW_ID_PREFIX}"]`));
-    expect(rows.length).toBe(mockProducts.length);
+    expect(rows).toHaveLength(mockProducts.length);
   });
 
   it('shows product name in row', () => {
@@ -197,7 +197,7 @@ describe('ProductListComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.debugElement.query(By.css('#product-list-error'))).toBeNull();
-    expect(fixture.debugElement.queryAll(By.css(`[id^="${PRODUCT_ROW_ID_PREFIX}"]`)).length).toBe(mockProducts.length);
+    expect(fixture.debugElement.queryAll(By.css(`[id^="${PRODUCT_ROW_ID_PREFIX}"]`))).toHaveLength(mockProducts.length);
   });
 
   it('clicking Delete shows inline confirmation', () => {

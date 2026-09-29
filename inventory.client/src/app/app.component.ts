@@ -1,10 +1,10 @@
 import { AfterViewInit, Component, inject, ChangeDetectionStrategy, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { DomSanitizer, SafeResourceUrl, Title } from '@angular/platform-browser';
+import { Title } from '@angular/platform-browser';
 import { PageContainerDirective } from '@crgolden/modules/primitives';
 import { NavMenuComponent } from '../nav-menu/nav-menu.component';
 import { AuthService } from '../auth/auth.service';
-import { SILENT_LOGIN_PROMPT, SILENT_LOGIN_SOURCE } from '../auth/auth-contract';
+import { SILENT_LOGIN_SOURCE } from '../auth/auth-contract';
 
 @Component({
   selector: 'app-root',
@@ -20,10 +20,8 @@ export class AppComponent implements AfterViewInit {
 
   private readonly authService: AuthService = inject(AuthService);
   private readonly titleService: Title = inject(Title);
-  private readonly sanitizer: DomSanitizer = inject(DomSanitizer);
 
   public readonly iframeVisible = signal(false);
-  public readonly iframeUrl = signal<SafeResourceUrl | null>(null);
 
   ngAfterViewInit(): void {
     this.titleService.setTitle('Inventory | Home');
@@ -32,8 +30,6 @@ export class AppComponent implements AfterViewInit {
       return;
     }
 
-    const loginUrl = `${this.authService.loginUrl}?${SILENT_LOGIN_PROMPT}`;
-    this.iframeUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(loginUrl));
     this.iframeVisible.set(true);
   }
 

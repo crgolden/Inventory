@@ -120,7 +120,7 @@ public sealed class DuendeLicenseNoticeTests
     private static IReadOnlyList<LogEvent> WriteThroughFilter(string sourceContext, EventId eventId, LogLevel logLevel)
     {
         var sink = new CapturingSink();
-        var messageTemplate = Guid.NewGuid().ToString("N");
+        var notice = Guid.NewGuid().ToString("N");
         using (var serilogLogger = new LoggerConfiguration()
                    .MinimumLevel.Verbose()
                    .Filter.ByExcluding(DuendeLicenseNotice.IsNoLicenseConfiguredNotice)
@@ -130,7 +130,7 @@ public sealed class DuendeLicenseNoticeTests
         {
             loggerFactory
                 .CreateLogger(sourceContext)
-                .Log(logLevel, eventId, messageTemplate);
+                .Log(logLevel, eventId, notice, exception: null, static (state, _) => state);
         }
 
         return sink.Events;

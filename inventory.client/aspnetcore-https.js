@@ -26,7 +26,7 @@ function resolveAbsoluteDotnetPathWithoutSearchingPath() {
   const exe = process.platform === 'win32' ? 'dotnet.exe' : 'dotnet';
   const knownInstallRootsByPlatform = [
     process.env.DOTNET_ROOT,
-    process.platform === 'win32' ? path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'dotnet') : null,
+    process.platform === 'win32' ? path.join(process.env.ProgramFiles ?? String.raw`C:\Program Files`, 'dotnet') : null,
     process.platform === 'win32' ? path.join(process.env.LOCALAPPDATA ?? '', 'Microsoft', 'dotnet') : null,
     '/usr/local/share/dotnet',
     '/opt/homebrew/share/dotnet',

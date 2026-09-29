@@ -68,7 +68,7 @@ function compareOrdinal(left: string, right: string): number {
   return left < right ? -1 : 1;
 }
 
-function compareNullable(left: unknown, right: unknown): number {
+function compareNullable(left: string | number | null | undefined, right: string | number | null | undefined): number {
   if (left === right) {
     return 0;
   }
@@ -82,7 +82,7 @@ function compareNullable(left: unknown, right: unknown): number {
 }
 
 function nameContains(name: string | null, term: string | null): boolean {
-  return term === null || (name !== null && name.toLowerCase().includes(term));
+  return term === null || (name?.toLowerCase().includes(term) ?? false);
 }
 
 function matchKey(brand: string | null, modelNumber: string | null): string | null {
@@ -173,11 +173,11 @@ async function patchCatalogRecord(request: IncomingMessage, response: ServerResp
 }
 
 function unescapeODataLiteral(literal: string | undefined): string | null {
-  return literal?.replace(/''/g, "'") ?? null;
+  return literal?.replaceAll("''", "'") ?? null;
 }
 
 function modelNumberStartsWith(modelNumber: string | null, prefix: string | null): boolean {
-  return prefix === null || (modelNumber !== null && modelNumber.startsWith(prefix));
+  return prefix === null || (modelNumber?.startsWith(prefix) ?? false);
 }
 
 function listCatalog(response: ServerResponse, query: URLSearchParams): void {
@@ -225,27 +225,57 @@ function getCatalogRecord(response: ServerResponse, id: string): void {
   sendJson(response, constants.HTTP_STATUS_OK, pascalCase(record));
 }
 
-createServer((request, response) => {
-  const url = new URL(request.url ?? '/', localOrigin(PORT));
-  const itemKey = INVENTORY_ITEM_KEY.exec(url.pathname)?.[1];
-  const catalogKey = CATALOG_PRODUCT_KEY.exec(url.pathname)?.[1];
+function routeInventoryItems(request: IncomingMessage, response: ServerResponse, url: URL): boolean {
   if (url.pathname === INVENTORY_ITEMS_PATH && request.method === HttpMethods.get) {
     listItems(response, url.searchParams);
-  } else if (url.pathname === INVENTORY_ITEMS_PATH && request.method === HttpMethods.post) {
+    return true;
+  }
+  if (url.pathname === INVENTORY_ITEMS_PATH && request.method === HttpMethods.post) {
     void addItem(request, response);
-  } else if (itemKey !== undefined && request.method === HttpMethods.patch) {
+    return true;
+  }
+  const itemKey = INVENTORY_ITEM_KEY.exec(url.pathname)?.[1];
+  if (itemKey === undefined) {
+    return false;
+  }
+  if (request.method === HttpMethods.patch) {
     void patchItem(request, response, itemKey);
-  } else if (itemKey !== undefined && request.method === HttpMethods.delete) {
+    return true;
+  }
+  if (request.method === HttpMethods.delete) {
     sendStatus(response, items.delete(itemKey) ? constants.HTTP_STATUS_NO_CONTENT : constants.HTTP_STATUS_NOT_FOUND);
-  } else if (url.pathname === CATALOG_PRODUCTS_ODATA_PATH && request.method === HttpMethods.get) {
+    return true;
+  }
+  return false;
+}
+
+function routeCatalog(request: IncomingMessage, response: ServerResponse, url: URL): boolean {
+  if (url.pathname === CATALOG_PRODUCTS_ODATA_PATH && request.method === HttpMethods.get) {
     listCatalog(response, url.searchParams);
-  } else if (catalogKey !== undefined && request.method === HttpMethods.get) {
+    return true;
+  }
+  const catalogKey = CATALOG_PRODUCT_KEY.exec(url.pathname)?.[1];
+  if (catalogKey === undefined) {
+    return false;
+  }
+  if (request.method === HttpMethods.get) {
     getCatalogRecord(response, catalogKey);
-  } else if (catalogKey !== undefined && request.method === HttpMethods.patch) {
+    return true;
+  }
+  if (request.method === HttpMethods.patch) {
     void patchCatalogRecord(request, response, catalogKey);
-  } else if (catalogKey !== undefined && request.method === HttpMethods.delete) {
+    return true;
+  }
+  if (request.method === HttpMethods.delete) {
     deleteCatalogRecord(response, catalogKey);
-  } else {
+    return true;
+  }
+  return false;
+}
+
+createServer((request, response) => {
+  const url = new URL(request.url ?? '/', localOrigin(PORT));
+  if (!routeInventoryItems(request, response, url) && !routeCatalog(request, response, url)) {
     sendStatus(response, constants.HTTP_STATUS_NOT_FOUND);
   }
 }).listen(PORT);
