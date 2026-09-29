@@ -230,7 +230,8 @@ which the fixed body supplies whether the BFF points at the mock Manuals or a lo
 
 `e2e/synthetic/walker.spec.ts` performs a **seeded random walk of the deployed app**: one real login through Identity
 (`/bff/login?returnUrl=…`), a silent-login check that clears only the Inventory host's cookies, reloads `/catalog`, waits
-for the `prompt=none` request and asserts `#nav-signout` is back (so the Identity session restores the BFF session),
+for the `prompt=none` request and then for the frame's `/bff/silent-login-callback` response, and asserts `#nav-signout`
+is back (so the Identity session restores the BFF session),
 a sweep that deletes any leftover `Synthetic Walker Product` rows from a crashed prior run,
 then a weighted random sequence of actions — catalog and product browsing plus **scoped writes**: product
 create→edit→delete cycles under names `` `Synthetic Walker Product <seed>-<n>` ``, with a second sweep at run end so a

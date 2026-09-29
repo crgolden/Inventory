@@ -3,35 +3,33 @@ import { expect, test, type Page } from '@playwright/test';
 import { createInventoryActions, sweepSyntheticProducts } from './actions';
 import walkerSettings from './walker-settings.json';
 import { ChromiumConsoleMessages } from '../chromium-constants';
-import { DuendeBffQueryParameters } from '../duende-bff-constants';
+import { DuendeBffPaths, DuendeBffQueryParameters } from '../duende-bff-constants';
 import { CATALOG_URL, PRODUCTS_URL } from '../../src/app/app-paths';
 import { BFF_LOGIN_URL, SILENT_LOGIN_PROMPT } from '../../src/auth/auth-contract';
 
-function collectFrameRefusals(page: Page): string[] {
-  const refusals: string[] = [];
-  page.on('console', message => {
-    if (message.type() === 'error' && message.text().includes(ChromiumConsoleMessages.frameRefusalPrefix)) {
-      refusals.push(message.text());
-    }
-  });
-  return refusals;
+function awaitSilentLoginOutcome(page: Page): Promise<string | null> {
+  const callbackServed = page
+    .waitForResponse(response => new URL(response.url()).pathname === DuendeBffPaths.silentLoginCallback)
+    .then(() => null);
+  const frameRefused = page
+    .waitForEvent(
+      'console',
+      message => message.type() === 'error' && message.text().includes(ChromiumConsoleMessages.frameRefusalPrefix),
+    )
+    .then(message => message.text());
+  return Promise.race([callbackServed, frameRefused]);
 }
 
-async function expectTheSilentLoginFrameToPostItsOutcome(page: Page, refusals: string[]): Promise<void> {
-  await expect
-    .poll(async () => refusals.length > 0 || (await page.locator('#bff-silent-login').count()) === 0, {
-      message: 'the silent-login iframe neither posted its outcome nor was refused',
-    })
-    .toBe(true);
-  expect(refusals, 'the browser refused the silent-login frame, so the check could never finish').toEqual([]);
+async function expectTheSilentLoginFrameToPostItsOutcome(page: Page, outcome: Promise<string | null>): Promise<void> {
+  expect(await outcome, 'the browser refused the silent-login frame, so the check could never finish').toBeNull();
   await expect(page.locator('#bff-silent-login')).toHaveCount(0);
 }
 
 async function expectSilentLoginToComplete(page: Page): Promise<void> {
-  const refusals = collectFrameRefusals(page);
+  const outcome = awaitSilentLoginOutcome(page);
   await page.goto(CATALOG_URL);
   await expect(page.locator('#catalog-heading')).toBeVisible();
-  await expectTheSilentLoginFrameToPostItsOutcome(page, refusals);
+  await expectTheSilentLoginFrameToPostItsOutcome(page, outcome);
 }
 
 async function expectSilentLoginToRestoreTheSession(page: Page): Promise<void> {
@@ -42,13 +40,13 @@ async function expectSilentLoginToRestoreTheSession(page: Page): Promise<void> {
   await page.context().clearCookies({ domain: new RegExp(`^\\.?${inventoryHost}$`) });
   expect(await page.context().cookies(page.url()), 'the Inventory session cookie survived clearCookies').toEqual([]);
 
-  const refusals = collectFrameRefusals(page);
+  const outcome = awaitSilentLoginOutcome(page);
   const silentLoginRequest = page.waitForRequest(
     request => request.url().includes(BFF_LOGIN_URL) && request.url().includes(SILENT_LOGIN_PROMPT),
   );
   await page.reload();
   await silentLoginRequest;
-  await expectTheSilentLoginFrameToPostItsOutcome(page, refusals);
+  await expectTheSilentLoginFrameToPostItsOutcome(page, outcome);
 
   await expect(page.locator('#nav-signout'), 'the silent login finished without restoring the session').toBeVisible();
 }
