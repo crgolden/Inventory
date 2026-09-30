@@ -120,6 +120,7 @@
               "e2e/**/*.ts",
               "scripts/**/*.mjs",
               "*.ts",
+              "*.mts",
               "*.js",
               "*.mjs",
               "*.cjs"

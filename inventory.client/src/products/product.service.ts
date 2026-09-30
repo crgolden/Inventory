@@ -25,10 +25,8 @@ export class ProductService {
     return this.http.get<InventoryItemView[]>(INVENTORY_ITEMS_URL, { params });
   }
 
-  getById(id: string): Observable<InventoryItemView | null> {
-    return this.http
-      .get<InventoryItemView[]>(INVENTORY_ITEMS_URL)
-      .pipe(map(items => items.find(item => item.id === id) ?? null));
+  getById(id: string): Observable<InventoryItemView> {
+    return this.http.get<InventoryItemView>(`${INVENTORY_ITEMS_URL}/${id}`);
   }
 
   create(request: AddToInventoryRequest): Observable<string | null> {

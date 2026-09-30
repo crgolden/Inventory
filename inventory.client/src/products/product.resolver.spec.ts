@@ -83,25 +83,6 @@ describe('productResolver', () => {
     expect(navigateSpy).toHaveBeenCalledWith([PRODUCTS_NOT_FOUND_URL]);
   });
 
-  it('navigates to /products/not-found when the id is absent from the owner-scoped projection', async () => {
-    TestBed.configureTestingModule({
-      providers: [
-        { provide: ProductService, useValue: { getById: () => of(null) } },
-        provideRouter(testRoutes),
-      ],
-    });
-
-    const router = TestBed.inject(Router);
-    const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
-
-    const result$ = TestBed.runInInjectionContext(() =>
-      productResolver(makeSnapshot(newId()), {} as RouterStateSnapshot),
-    ) as Observable<InventoryItemView>;
-
-    await expect(firstValueFrom(result$)).rejects.toBeInstanceOf(EmptyError);
-    expect(navigateSpy).toHaveBeenCalledWith([PRODUCTS_NOT_FOUND_URL]);
-  });
-
   it('navigates to /products/not-found when getById returns 404', async () => {
     TestBed.configureTestingModule({
       providers: [

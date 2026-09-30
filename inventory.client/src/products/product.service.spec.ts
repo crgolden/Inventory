@@ -41,8 +41,6 @@ function newInventoryItem(): InventoryItemView {
 
 const mockItem = newInventoryItem();
 
-const otherItem = newInventoryItem();
-
 const newRequest: AddToInventoryRequest = {
   name: newDisplayName(),
   brand: newText(),
@@ -131,20 +129,30 @@ describe('ProductService', () => {
   });
 
   describe('getById', () => {
-    it('selects the matching item out of the owner-scoped projection', async () => {
-      const promise = firstValueFrom(service.getById(otherItem.id));
+    it('requests the one owner-scoped item by its own URL, never the whole inventory', () => {
+      service.getById(mockItem.id).subscribe();
 
-      http.expectOne(r => r.urlWithParams.startsWith(INVENTORY_ITEMS_URL)).flush([mockItem, otherItem]);
-
-      expect(await promise).toEqual(otherItem);
+      const req = http.expectOne(`${INVENTORY_ITEMS_URL}/${mockItem.id}`);
+      expect(req.request.method).toBe(HttpMethods.get);
+      req.flush(mockItem);
     });
 
-    it('emits null when the id is absent from the owner-scoped projection', async () => {
-      const promise = firstValueFrom(service.getById(otherItem.id));
+    it('returns the item as the API sent it', async () => {
+      const promise = firstValueFrom(service.getById(mockItem.id));
 
-      http.expectOne(r => r.urlWithParams.startsWith(INVENTORY_ITEMS_URL)).flush([mockItem]);
+      http.expectOne(`${INVENTORY_ITEMS_URL}/${mockItem.id}`).flush(mockItem);
 
-      expect(await promise).toBeNull();
+      expect(await promise).toEqual(mockItem);
+    });
+
+    it('surfaces a 404 as an error for the resolver to route', async () => {
+      const promise = firstValueFrom(service.getById(mockItem.id));
+
+      http
+        .expectOne(`${INVENTORY_ITEMS_URL}/${mockItem.id}`)
+        .flush(null, { status: HttpStatusCode.NotFound, statusText: newText() });
+
+      await expect(promise).rejects.toMatchObject({ status: HttpStatusCode.NotFound });
     });
   });
 

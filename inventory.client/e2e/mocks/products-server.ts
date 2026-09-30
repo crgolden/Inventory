@@ -26,6 +26,7 @@ import { ODataQueryOptions } from './odata-constants.ts';
 const PORT = portArgument();
 const SEEDED_CATALOG_ROWS = CATALOG_PAGE_SIZE + randomIntBetween(1, CATALOG_PAGE_SIZE);
 const INVENTORY_ITEM_KEY = /^\/odata\/InventoryItems\(([^)]+)\)$/;
+const INVENTORY_ITEM_VIEW_KEY = /^\/inventory\/items\/([^/]+)$/;
 const CATALOG_PRODUCT_KEY = /^\/odata\/CatalogProducts\(([^)]+)\)$/;
 const NAME_CONTAINS_FILTER = /^contains\(tolower\(Name\), tolower\('((?:[^']|'')*)'\)\)$/;
 const MODEL_NUMBER_STARTS_WITH_FILTER = /^startswith\(ModelNumber,'((?:[^']|'')*)'\)$/;
@@ -122,6 +123,15 @@ function listItems(response: ServerResponse, query: URLSearchParams): void {
     .filter(entry => nameContains(entry.name, term))
     .sort((left, right) => compareNullable(left.name, right.name));
   sendJson(response, constants.HTTP_STATUS_OK, listed);
+}
+
+function getItem(response: ServerResponse, id: string): void {
+  const item = items.get(id);
+  if (item === undefined) {
+    sendStatus(response, constants.HTTP_STATUS_NOT_FOUND);
+    return;
+  }
+  sendJson(response, constants.HTTP_STATUS_OK, view(item));
 }
 
 async function addItem(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -232,6 +242,11 @@ function routeInventoryItems(request: IncomingMessage, response: ServerResponse,
   }
   if (url.pathname === INVENTORY_ITEMS_PATH && request.method === HttpMethods.post) {
     void addItem(request, response);
+    return true;
+  }
+  const itemViewKey = INVENTORY_ITEM_VIEW_KEY.exec(url.pathname)?.[1];
+  if (itemViewKey !== undefined && request.method === HttpMethods.get) {
+    getItem(response, itemViewKey);
     return true;
   }
   const itemKey = INVENTORY_ITEM_KEY.exec(url.pathname)?.[1];
