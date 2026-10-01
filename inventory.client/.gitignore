@@ -36,6 +36,10 @@ yarn-error.log
 /coverage
 /libpeerconnection.log
 testem.log
+**/.features-gen/**/*.spec.js
+**/.features-gen/**/*.spec.js.map
+/cucumber-report
+/.vitest
 /typings
 __screenshots__/
 

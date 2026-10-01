@@ -32,6 +32,14 @@ function newMinuteAlignedInstant(firstMonth: number, lastMonthExclusive: number)
   ).toISOString();
 }
 
+function renderedOrFail(instant: string): string {
+  const rendered = utcInstantToDateTimeLocalInput(instant);
+  if (rendered === null) {
+    throw new Error('The conversion returned null, so there is no rendered value to compare.');
+  }
+  return rendered;
+}
+
 describe('utcInstantToDateTimeLocalInput', () => {
   it('renders the instant as the wall clock the viewer would read on their own machine', () => {
     const wallClock = newTwoDigitWallClock();
@@ -42,10 +50,7 @@ describe('utcInstantToDateTimeLocalInput', () => {
 
   it('displaces the wall clock from the instant by exactly the zone offset', () => {
     const instant = newMinuteAlignedInstant(DateMonthIndexes.january, DateMonthIndexes.pastDecember);
-    const rendered = utcInstantToDateTimeLocalInput(instant);
-    if (rendered === null) {
-      throw new Error('The conversion returned null, so there is no rendered value to compare.');
-    }
+    const rendered = renderedOrFail(instant);
 
     const shiftMinutes = (new Date(`${rendered}Z`).getTime() - new Date(instant).getTime()) / MS_PER_MINUTE;
     const zoneOffsetMinutes = new Date(instant).getTimezoneOffset();

@@ -169,7 +169,7 @@ jobs:
             /d:sonar.cs.opencover.reportsPaths="coverage.opencover.xml" `
             /d:sonar.javascript.lcov.reportPaths="coverage/lcov.info" `
             /d:sonar.exclusions="**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
-            /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js" `
+            /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup*.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js,gate.ps1" `
             /d:sonar.test.inclusions="**/*.spec.ts" `
             /d:sonar.qualitygate.wait=true `
             /d:sonar.scanner.skipJreProvisioning=true
@@ -202,18 +202,6 @@ jobs:
             --does-not-return-attribute DoesNotReturnAttribute `
             --include "[Inventory.Server]*"
 
-      - name: Run UI tests
-        working-directory: inventory.client
-        run: npx vitest run --coverage
-
-      - name: Fix LCOV paths for SonarQube
-        if: github.actor != 'dependabot[bot]'
-        shell: powershell
-        run: |
-          (Get-Content "inventory.client/coverage/lcov.info") `
-            -replace '\\', '/' |
-            Set-Content "inventory.client/coverage/lcov.info"
-
       - name: Get Playwright version
         id: playwright-version
         if: github.actor != 'dependabot[bot]'
@@ -232,6 +220,22 @@ jobs:
           path: ~\AppData\Local\ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
+      - name: Install Playwright browsers
+        working-directory: inventory.client
+        run: npm run playwright:install
+
+      - name: Run UI tests
+        working-directory: inventory.client
+        run: npx vitest run --coverage
+
+      - name: Fix LCOV paths for SonarQube
+        if: github.actor != 'dependabot[bot]'
+        shell: powershell
+        run: |
+          (Get-Content "inventory.client/coverage/lcov.info") `
+            -replace '\\', '/' |
+            Set-Content "inventory.client/coverage/lcov.info"
+
       - name: Upload test results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         if: always() && github.actor != 'dependabot[bot]'
@@ -241,17 +245,14 @@ jobs:
           path: |
             Inventory.Tests.Unit/bin/Release/net10.0/TestResults/
 
-      - name: Install browser E2E Playwright browsers
-        working-directory: inventory.client
-        run: npm run playwright:install
-
       - name: Run browser E2E tests
+        id: browser-e2e
         working-directory: inventory.client
         env:
           ASPNETCORE_ENVIRONMENT: CI
         run: npm run e2e:ci
 
-      - name: Assert browser E2E executed a nonzero test count
+      - name: Assert browser E2E executed at least its floor
         working-directory: inventory.client
         if: always()
         shell: pwsh
@@ -261,14 +262,31 @@ jobs:
             Write-Output "::error::$results is missing - the browser E2E suite never reported."
             exit 1
           }
+          $floor = [int](Get-Content e2e/e2e-settings.json -Raw | ConvertFrom-Json).executedTestFloor
           $xml = [xml](Get-Content $results)
           $tests = [int]($xml.testsuites.tests ?? 0)
           $skipped = [int]($xml.testsuites.skipped ?? 0)
-          Write-Output "Browser E2E executed $tests tests (skipped $skipped)" >> $env:GITHUB_STEP_SUMMARY
-          if ($tests -eq 0 -or $skipped -ge $tests) {
-            Write-Output "::error::Browser E2E executed 0 tests - a vacuous green."
+          $executed = $tests - $skipped
+          Write-Output "Browser E2E executed $executed (tests $tests, skipped $skipped), floor $floor" >> $env:GITHUB_STEP_SUMMARY
+          if ($floor -le 0 -or $executed -lt $floor) {
+            Write-Output "::error::Browser E2E executed $executed tests, below its floor of $floor."
             exit 1
           }
+
+      - name: Publish E2E scenario results
+        working-directory: inventory.client
+        if: ${{ !cancelled() && (steps.browser-e2e.outcome == 'success' || steps.browser-e2e.outcome == 'failure') && github.actor != 'dependabot[bot]' }}
+        shell: pwsh
+        env:
+          PGHOST: ${{ vars.TEST_RESULTS_PGHOST }}
+          PGDATABASE: ${{ vars.TEST_RESULTS_PGDATABASE }}
+          PGUSER: ${{ vars.TEST_RESULTS_PGUSER }}
+          PGSSLMODE: ${{ vars.TEST_RESULTS_PGSSLMODE }}
+          PGPASSWORD: ${{ secrets.TEST_RESULTS_PGPASSWORD }}
+        run: |
+          $messages = (Get-Content e2e/e2e-settings.json -Raw | ConvertFrom-Json).cucumberMessagesFile
+          npx --no publish-bdd-results --app ${{ vars.TEST_RESULTS_APP }} $messages
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Check template classes against the built CSS
         working-directory: inventory.client
@@ -282,6 +300,7 @@ jobs:
           path: |
             inventory.client/playwright-report/
             inventory.client/playwright-results.xml
+            inventory.client/cucumber-report/
           if-no-files-found: ignore
 
       - name: dotnet publish

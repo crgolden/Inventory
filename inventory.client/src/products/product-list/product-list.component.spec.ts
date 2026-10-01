@@ -159,6 +159,19 @@ describe('ProductListComponent', () => {
     expect(queryParams$.value['q']).toBe(term);
   });
 
+  it('drops a pending search once a navigation starts, so typing never cancels a click that leaves the list', async () => {
+    const router = TestBed.inject(Router);
+    const input: HTMLInputElement = fixture.debugElement.query(By.css('#product-search')).nativeElement;
+    input.value = newText();
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    void router.navigateByUrl(`/${AppPaths.products}/${AppPaths.newProduct}`);
+    await vi.runAllTimersAsync();
+
+    expect(queryParams$.value['q']).toBeUndefined();
+  });
+
   it('restores the search box from the URL rather than opening blank on a shared link', async () => {
     const term = newText();
     queryParams$.next({ q: term });

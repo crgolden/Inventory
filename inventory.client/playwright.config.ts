@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 import { newId } from '@crgolden/modules/testing';
+import { cucumberReporter, defineBddProject } from 'playwright-bdd';
 import { bffPort } from './e2e/bff-launch';
+import { CucumberReporterTypes } from './e2e/cucumber-constants';
 import e2eSettings from './e2e/e2e-settings.json';
 import { AGAINST_MOCKS, localOrigin } from './e2e/mocks/mock-dependencies';
 
@@ -44,7 +46,13 @@ export default defineConfig({
   forbidOnly: !!process.env['CI'],
   retries: 0,
   workers: 1,
-  reporter: [['list'], ['html', { open: 'never' }], ['junit', { outputFile: 'playwright-results.xml' }]],
+  reporter: [
+    ['list'],
+    ['html', { open: 'never' }],
+    ['junit', { outputFile: 'playwright-results.xml' }],
+    cucumberReporter(CucumberReporterTypes.message, { outputFile: e2eSettings.cucumberMessagesFile }),
+    cucumberReporter(CucumberReporterTypes.html, { outputFile: e2eSettings.cucumberHtmlFile }),
+  ],
 
   use: {
     baseURL: walkerBaseUrl ?? 'https://localhost:50212',
@@ -84,8 +92,7 @@ export default defineConfig({
       use: { storageState: e2eSettings.authStateFile },
     },
     {
-      name: 'chromium',
-      testIgnore: /synthetic/,
+      ...defineBddProject({ name: 'chromium', features: e2eSettings.bddFeatures, steps: e2eSettings.bddSteps }),
       use: {
         ...devices['Desktop Chrome'],
         storageState: e2eSettings.authStateFile,

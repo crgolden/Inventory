@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { PRODUCTS_URL } from '../src/app/app-paths';
 import { productRowId } from '../src/product-row-ids';
+import { PRODUCT_SEARCH_PARAM } from '../src/products/product-query';
 
 export interface ListedProduct {
   readonly id: string;
@@ -10,6 +11,7 @@ export interface ListedProduct {
 export async function showOnlyProduct(page: Page, product: ListedProduct): Promise<void> {
   await page.goto(PRODUCTS_URL);
   await page.locator('#product-search').fill(product.name);
+  await expect(page).toHaveURL((url) => url.searchParams.get(PRODUCT_SEARCH_PARAM) === product.name);
   await expect(page.locator(`#${productRowId(0)}`)).toHaveAttribute('data-product-id', product.id);
 }
 

@@ -13,8 +13,8 @@ $GateDelta = @('plant:inventory.client/src/zz-bail-plant.spec.ts')
 
 Register-GateSteps @('node_modules install markers', 'Restore local tools',
     'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec', 'npm run lint:css', 'Begin Sonar analysis', 'Build with dotnet',
-    'jb inspectcode', 'Run unit tests with coverage', 'Run UI tests', 'Vitest bail plant', 'Fix LCOV paths',
-    'Install browser E2E Playwright browsers', 'Run browser E2E tests', 'Browser E2E executed a nonzero test count',
+    'jb inspectcode', 'Run unit tests with coverage', 'Install Playwright browsers', 'Run UI tests', 'Vitest bail plant',
+    'Fix LCOV paths', 'Run browser E2E tests', 'Browser E2E executed at least its floor',
     'npm run lint:utilities', 'End Sonar analysis', 'Fail on open Sonar issues')
 $repo = $PSScriptRoot
 $client = Join-Path $repo 'inventory.client'
@@ -80,7 +80,7 @@ else {
     $sonarStartedAt = [DateTimeOffset]::UtcNow
     $env:JAVA_HOME = "$env:SystemDrive\sonar-scanner-8.0.1.6346-windows-x64\jre"
     $global:LASTEXITCODE = $null
-    dotnet-sonarscanner begin /k:"crgolden_Inventory" /o:"crgolden" /d:sonar.token="$env:SONAR_TOKEN" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.opencover.reportsPaths="coverage.opencover.xml" /d:sonar.javascript.lcov.reportPaths="coverage/lcov.info" /d:sonar.exclusions="**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js" /d:sonar.test.inclusions="**/*.spec.ts" /d:sonar.qualitygate.wait=true /d:sonar.scanner.skipJreProvisioning=true /d:sonar.branch.name="$sonarBranch"
+    dotnet-sonarscanner begin /k:"crgolden_Inventory" /o:"crgolden" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.opencover.reportsPaths="coverage.opencover.xml" /d:sonar.javascript.lcov.reportPaths="coverage/lcov.info" /d:sonar.exclusions="**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup*.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js,gate.ps1" /d:sonar.test.inclusions="**/*.spec.ts" /d:sonar.qualitygate.wait=true /d:sonar.scanner.skipJreProvisioning=true /d:sonar.branch.name="$sonarBranch"
     $null = Test-Exit $beginSonar
 
     $global:LASTEXITCODE = $null
@@ -107,6 +107,8 @@ if (-not (Test-StepCarried $unitStep)) {
 }
 
 Set-Location $client
+Install-PlaywrightBrowsers 'Install Playwright browsers' { npx playwright install --dry-run chromium } { npm run playwright:install }
+
 if (-not (Test-StepCarried $uiStep)) {
     $global:LASTEXITCODE = $null
     npx vitest run --coverage
@@ -141,8 +143,6 @@ if (-not (Test-StepCarried 'Fix LCOV paths for SonarQube')) {
     Write-Row 'Fix LCOV paths for SonarQube' 'PASS' ''
 }
 
-Install-PlaywrightBrowsers 'Install browser E2E Playwright browsers' { npx playwright install --dry-run chromium } { npm run playwright:install }
-
 $e2eStep = 'Run browser E2E tests (npm run e2e:ci, CI=true, mock dependencies)'
 if (-not (Test-StepCarried $e2eStep)) {
     $results = Join-Path $client 'playwright-results.xml'
@@ -151,12 +151,15 @@ if (-not (Test-StepCarried $e2eStep)) {
     $global:LASTEXITCODE = $null
     npm run e2e:ci
     $null = Test-Exit $e2eStep
-    if (-not (Test-Path $results)) { Stop-Gate 'Browser E2E executed a nonzero test count' 'playwright-results.xml missing' }
+    $floorStep = 'Browser E2E executed at least its floor'
+    if (-not (Test-Path $results)) { Stop-Gate $floorStep 'playwright-results.xml missing' }
+    $floor = [int](Get-Content (Join-Path $client 'e2e\e2e-settings.json') -Raw | ConvertFrom-Json).executedTestFloor
     $xml = [xml](Get-Content $results -Raw)
     $tests = [int]$xml.testsuites.tests
     $skipped = [int]$xml.testsuites.skipped
-    if ($tests -eq 0 -or $skipped -ge $tests) { Stop-Gate 'Browser E2E executed a nonzero test count' "tests $tests, skipped $skipped" }
-    Write-Row 'Browser E2E executed a nonzero test count' 'PASS' "tests $tests, skipped $skipped"
+    $executed = $tests - $skipped
+    if ($floor -le 0 -or $executed -lt $floor) { Stop-Gate $floorStep "executed $executed (tests $tests, skipped $skipped), floor $floor" }
+    Write-Row $floorStep 'PASS' "executed $executed (tests $tests, skipped $skipped), floor $floor"
 }
 if (-not (Test-StepCarried 'npm run lint:utilities')) {
     $global:LASTEXITCODE = $null
@@ -167,10 +170,10 @@ Set-Location $repo
 
 if (-not $sonarCarried) {
     $global:LASTEXITCODE = $null
-    dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
+    dotnet-sonarscanner end
     $null = Test-Exit $endSonar
     Test-SonarIssues $sonarIssues 'crgolden_Inventory' $sonarBranch $sonarStartedAt
 }
 
-Write-Row 'Upload test results / dotnet publish / upload artifact / deploy' 'NOT RUN' 'delivery steps, not checks'
+Write-Row 'Upload test results / Publish E2E scenario results / dotnet publish / upload artifact / deploy' 'NOT RUN' 'delivery steps, not checks'
 Complete-Gate

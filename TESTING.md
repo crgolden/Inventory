@@ -1,6 +1,6 @@
 # Testing
 
-The Inventory test suite is split across three tiers: **backend unit tests** (xUnit v3, `Inventory.Tests.Unit`), **frontend unit tests** (Vitest, `inventory.client/`), and **browser E2E tests** (Playwright, TypeScript, `inventory.client/e2e`).
+The Inventory test suite is split across three tiers: **backend unit tests** (xUnit v3, `Inventory.Tests.Unit`), **frontend unit tests** (Vitest, `inventory.client/`: jsdom specs plus browser-mode specs in real Chromium), and **browser E2E tests** (Gherkin features run by Playwright through `playwright-bdd`, `inventory.client/e2e`).
 
 **Browser testing here is TypeScript only, and that is a structural decision rather than a preference.** Inventory is the fleet's one .NET BFF: it serves the UI and owns no behavior of its own, so it has nothing for an API-integration tier to drive, and a .NET browser tier would only re-drive the same pages the TypeScript suite already drives. Identity keeps a .NET Playwright suite because Razor Pages leaves it nowhere else to put one; every other front end drives its browser from TypeScript.
 
@@ -11,8 +11,9 @@ Unit test coding standards (MockBehavior.Strict, argument verification, SetupSeq
 | Tier | Trait / tool | Project | Requires Azure? | Requires Angular build? | Runs in CI |
 |------|-------------|---------|-----------------|------------------------|------------|
 | Backend unit | `Category=Unit` | `Inventory.Tests.Unit` | No | No | Every push/PR |
-| Frontend unit | Vitest | `inventory.client` | No | No | Every push/PR |
-| Browser E2E | Playwright (`--project=chromium`) | `inventory.client/e2e` | No. With `CI` set, the BFF signs in against a mock OIDC provider and proxies to mock Products and Manuals; without it, to the local services | Served by `npm start`, which `playwright.config.ts` launches | Every push/PR |
+| Frontend unit | Vitest project `unit` (jsdom, `src/**/*.spec.ts`) | `inventory.client` | No | No | Every push/PR |
+| Frontend unit in a real browser | Vitest project `browser` (Chromium through `@vitest/browser-playwright`, `src/**/*.browser.spec.ts`) | `inventory.client` | No | No | Every push/PR |
+| Browser E2E | Gherkin features (`e2e/features/*.feature`), `playwright-bdd`, Playwright `--project=chromium` | `inventory.client/e2e` | No. With `CI` set, the BFF signs in against a mock OIDC provider and proxies to mock Products and Manuals; without it, to the local services | Served by `npm start`, which `playwright.config.ts` launches | Every push/PR |
 | Synthetic walker | Playwright (`--project=synthetic`) | `inventory.client/e2e/synthetic` | No — targets the deployed app directly | No | Scheduled only, never a merge gate |
 
 **The `Category=Smoke` tier no longer exists.** It was a stopgap until synthetic walkers existed; once they did it
@@ -119,7 +120,8 @@ playwright.config.ts
   │              --no-build --configuration Release, the build the gate's own step made)
   ├── webServer: npm start                                  (https://localhost:50212)
   ├── project "setup"     -> auth.setup.ts, sign-in through the BFF (mock OIDC with CI set, passkey without)
-  ├── project "chromium"  -> everything but e2e/synthetic, reusing e2e/.auth/user.json
+  ├── project "chromium"  -> e2e/features/*.feature, compiled by bddgen into .features-gen/chromium,
+  │                          steps in e2e/steps/, reusing e2e/.auth/user.json
   └── project "synthetic" -> the scheduled walker, never a merge gate
 ```
 
@@ -216,15 +218,53 @@ attempt and keeps the failed one, so the attempt that failed is the one that car
 matches the catalog row inside that same request, before the 201 returns, so a spec can address its own catalog row with
 no polling. Driving the create form is reserved for the specs whose subject *is* the form.
 
-**`catalog.spec.ts` covers the catalog surface**: View on a row opens that product's detail page, an unknown id lands on
-`/catalog/not-found`, and Back returns the reader to where they were in the list. That last one is what pins
-`withInMemoryScrolling`, and it shortens the viewport rather than seeding rows; the scroll-measurement traps that make it
-discriminate are in [Inventory.md](../AGENTS/REPOS/Inventory.md).
+### Gherkin features
 
-**`manual-chat-layout.spec.ts` routes its chat calls to a fixed SSE body.** Its subject is the panel's own layout: the
-message list must fit inside the panel, must scroll once it overflows, and the panel must not extend past the bottom of
-the viewport. jsdom has no layout, so Vitest cannot take it, and it needs a reply long enough to guarantee the overflow,
-which the fixed body supplies whether the BFF points at the mock Manuals or a local one.
+Every browser E2E test is a scenario in `e2e/features/`, written as the user sees it ([AGENTS/TESTING.md](../AGENTS/TESTING.md#writing-e2e-scenarios)):
+
+| Feature | Scenarios |
+|---|---|
+| `signing-in.feature` | A signed-in owner is offered their products; a visitor is asked to sign in; a visitor who tries to open their products is sent to sign in |
+| `catalog.feature` | Viewing a product from the catalog; opening a catalog product that does not exist; going back to the catalog keeps my place |
+| `products.feature` | My products are listed; an owner with no products is told so; adding, viewing, renaming and deleting a product; opening a product that does not exist; finding a product's manual |
+
+- **`npm run e2e:ci` runs `bddgen` first**, which compiles the features into `.features-gen/chromium/*.spec.js`
+  (git-ignored). `typecheck:e2e` runs it too. The `setup`, `sweep` and `synthetic` projects are plain Playwright
+  with their own `testDir`, as `playwright-bdd` requires.
+- **Steps live one file per feature area in `e2e/steps/`**, built with `createBdd` over the `test` in
+  `e2e/steps/fixtures.ts`, and wrap the existing helpers (`ci-products.ts`, `product-list.ts`).
+- **The `ctx` fixture carries a scenario's state between steps** (`ScenarioContext`): the product a `Given`
+  made, the id a `Given` chose. Reading a value no step set throws, naming the missing `Given`. **Its teardown
+  deletes a product the scenario still owns through the product list**, so a scenario that fails midway leaves no
+  row for the next one, and a scenario whose subject is the delete clears the context once its `Then` has
+  proved the row gone.
+- **`@noauth` runs a scenario signed out.** The fixture overrides `storageState` for that tag, the pattern
+  `playwright-bdd` documents; the scenario's first step asserts the BFF sees no session.
+- **Going back to the catalog keeps my place** is what pins `withInMemoryScrolling`, and it shortens the viewport
+  rather than seeding rows; the scroll-measurement traps that make it discriminate are in
+  [Inventory.md](../AGENTS/REPOS/Inventory.md).
+- **Reports**: besides the Playwright HTML report and `playwright-results.xml`, the run writes
+  `cucumber-report/messages.ndjson` (Cucumber Messages) and `cucumber-report/index.html` (the business-readable
+  report), paths from `e2e/e2e-settings.json`. CI publishes the NDJSON to the `test_results` database with
+  `publish-bdd-results` from `@crgolden/modules`, reading its path from that file, and only when the E2E step ran.
+  The artifact upload names the `cucumber-report/` directory itself, so a change to the report paths changes that
+  upload path too; its `if-no-files-found: ignore` would not report the drift.
+
+**Behavior checked below the E2E layer rather than in a scenario:**
+
+| Behavior | Where |
+|---|---|
+| The home hero heading renders | `home.component.spec.ts` "renders the hero headline" |
+| One benefit card per configured benefit | `home.component.spec.ts` "renders a card for every benefit" |
+| Save stays disabled until name, brand and model number are filled | `product-form.component.spec.ts` (create mode) |
+| Delete asks for confirmation inline | `product-list.component.spec.ts` "clicking Delete shows inline confirmation" |
+| The manual finder's layout on phone and wide screens, and its message list scrolling inside the panel | `manual-chat-panel.layout.browser.spec.ts` |
+
+**`manual-chat-panel.layout.browser.spec.ts` runs in the `browser` Vitest project**, because its subject is layout
+and jsdom has none. It renders `ManualChatPanelComponent` in Chromium with the app's own `styles.css` (Tailwind
+compiled through the repo's PostCSS config), sets the viewport from `manual-chat-layout-settings.json`, and stubs
+`ChatService` with a reply long enough to overflow the list. `src/test-setup.browser.ts` resolves component
+templates through Vite's `import.meta.glob`, since the jsdom setup's `node:fs` does not exist in a browser.
 
 ### Synthetic walker
 
@@ -291,8 +331,8 @@ open/close toggle, SSE delta accumulation, URL extraction from assistant content
 `manualUrl` patch, all against a stubbed `ChatService`. Asserting those again through a browser would add a
 slower copy of the same evidence.
 
-What a browser adds that jsdom cannot is **layout**. `manual-chat-layout.spec.ts` covers that, and it is the only
-spec here permitted to stub its upstream.
+What a browser adds that jsdom cannot is **layout**, which `manual-chat-panel.layout.browser.spec.ts` covers in the
+`browser` Vitest project.
 
 ---
 
@@ -302,16 +342,19 @@ spec here permitted to stub its upstream.
 
 1. Build solution (`dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci`), under which Angular uses `environment.ci.ts`. `dotnet publish` rebuilds Angular without the override, producing the `production` bundle for the deployed artifact.
 2. Backend unit tests with coverage (`dotnet coverlet … --filter-trait Category=Unit`, OpenCover → `coverage.opencover.xml`)
-3. Frontend unit tests with coverage (`npx vitest run --coverage`)
-4. Azure login (OIDC)
-5. Cache + install Playwright Chromium
-6. Browser E2E tests (`npm run e2e:ci`)
-7. Assert the browser E2E run executed a nonzero test count
+3. Cache + install Playwright Chromium, which the `browser` Vitest project needs as well as the E2E suite
+4. Frontend unit tests with coverage (`npx vitest run --coverage`, both Vitest projects)
+5. Browser E2E tests (`npm run e2e:ci`)
+6. Assert the browser E2E run executed at least `executedTestFloor` tests (`e2e/e2e-settings.json`: the 14
+   scenarios plus the `setup` and `sweep` projects' one test each)
+7. Publish E2E scenario results (`publish-bdd-results`, `vars.TEST_RESULTS_*` and `secrets.TEST_RESULTS_PGPASSWORD`)
 8. Publish app + SonarCloud analysis
 
-**Step 7 is not ceremony.** An aborted Playwright run still writes `tests="0" failures="0"` to
+**Step 6 is not ceremony.** An aborted Playwright run still writes `tests="0" failures="0"` to
 `playwright-results.xml`, which every reporter reads as a pass, so a suite that never started is
-indistinguishable from a suite that passed without it.
+indistinguishable from a suite that passed without it; and a run that stopped partway reports a
+non-zero count, which only a floor catches. Adding or removing a scenario changes the floor in the same
+change.
 
 There is no post-deploy job. The deployed app is exercised by the scheduled **synthetic walker**
 (`.github/workflows/synthetic.yml`), which runs from the same TypeScript suite under its own project.
@@ -375,8 +418,8 @@ $env:SONAR_TOKEN = "<token>"
   "-Dsonar.organization=crgolden" `
   "-Dsonar.sources=Inventory.Server,inventory.client/src" `
   "-Dsonar.tests=Inventory.Tests.Unit" `
-  "-Dsonar.exclusions=inventory.client/aspnetcore-https.js,inventory.client/start-os.js,**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
-  "-Dsonar.coverage.exclusions=inventory.client/e2e/**,inventory.client/src/test-setup.ts" `
+  "-Dsonar.exclusions=**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
+  "-Dsonar.coverage.exclusions=inventory.client/e2e/**,inventory.client/src/test-setup*.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js,gate.ps1" `
   "-Dsonar.test.inclusions=**/*.spec.ts" `
   "-Dsonar.cs.opencover.reportsPaths=coverage.opencover.xml" `
   "-Dsonar.javascript.lcov.reportPaths=inventory.client/coverage/lcov.info"

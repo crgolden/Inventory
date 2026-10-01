@@ -104,13 +104,7 @@ describe('ManualChatComponent', () => {
     component.input.set(newText());
     component.send();
 
-    const last = component.messages().at(-1);
-    if (last === undefined) {
-      throw new Error('send() left the message list empty, so there is no assistant reply to assert on.');
-    }
-
-    expect(last.role).toBe(ChatRoles.assistant);
-    expect(last.content).toBe(deltas.join(''));
+    expect(component.messages().at(-1)).toMatchObject({ role: ChatRoles.assistant, content: deltas.join('') });
   });
 
   it('a failed stream stops the spinner and tells the user, rather than going quiet', () => {

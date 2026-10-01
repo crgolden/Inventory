@@ -120,9 +120,7 @@ describe('CatalogDetailComponent — resolved data carrying owner-private fields
   it('renders none of them, so the public page cannot leak another owner', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain(mockProduct.modelNumber);
-    for (const value of Object.values(ownerPrivateFields)) {
-      expect(text).not.toContain(value);
-    }
+    expect(Object.values(ownerPrivateFields).filter((value) => text.includes(value))).toEqual([]);
   });
 });
 

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, NavigationStart, Params, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
@@ -14,10 +14,10 @@ import {
 } from '@crgolden/modules/primitives';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucidePackage, lucideSearch } from '@ng-icons/lucide';
-import { debounceTime, distinctUntilChanged, Subject } from 'rxjs';
+import { distinctUntilChanged, filter, map, Subject, switchMap, takeUntil, timer } from 'rxjs';
 import { ProductService } from '../product.service';
 import { InventoryItemView } from '../inventory-item.model';
-import { productSearchFrom } from '../product-query';
+import { PRODUCT_SEARCH_PARAM, productSearchFrom } from '../product-query';
 import { AppPaths } from '../../app/app-paths';
 import { viewProductId } from '../../view-product-ids';
 import { confirmDeleteProductId, deleteProductId, editProductId, productNameId, productRowId } from '../../product-row-ids';
@@ -66,12 +66,13 @@ export class ProductListComponent implements OnInit {
   ngOnInit(): void {
     this.titleService.setTitle('Inventory | My Products');
 
+    const navigationStarts$ = this.router.events.pipe(filter(event => event instanceof NavigationStart));
     this.search$.pipe(
-      debounceTime(300),
+      switchMap(term => timer(300).pipe(takeUntil(navigationStarts$), map(() => term))),
       distinctUntilChanged(),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(term => {
-      this.writeListStateToUrl({ q: term || null });
+      this.writeListStateToUrl({ [PRODUCT_SEARCH_PARAM]: term || null });
     });
 
     this.route.data.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(data => {

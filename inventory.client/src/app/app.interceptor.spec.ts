@@ -16,19 +16,15 @@ describe('appInterceptor', () => {
 
   it('should set the X-CSRF header to 1', () => {
     const request = new HttpRequest(HttpMethods.get, `/${newPathSegment()}`, { headers: new HttpHeaders() });
-    let modifiedReq: HttpRequest<unknown> | undefined;
+    const forwarded: HttpRequest<unknown>[] = [];
 
     const next = (req: HttpRequest<unknown>) => {
-      modifiedReq = req;
+      forwarded.push(req);
       return of(new HttpResponse({ status: HttpStatusCode.Ok }));
     };
 
-    interceptor(request, next).subscribe(() => {
-      if (modifiedReq === undefined) {
-        throw new Error('The interceptor never forwarded a request to the next handler.');
-      }
+    interceptor(request, next).subscribe();
 
-      expect(modifiedReq.headers.get(CSRF_HEADER)).toBe(CSRF_HEADER_VALUE);
-    });
+    expect(forwarded.map((req) => req.headers.get(CSRF_HEADER))).toEqual([CSRF_HEADER_VALUE]);
   });
 });

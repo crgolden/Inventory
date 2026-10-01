@@ -68,7 +68,7 @@ and `lucideSearch` for "no match"; the not-found pages use `lucideCircleAlert`.
 The panel is a fixed-position flex layout. Collapsed, it is a vertical pill fixed to the right edge and
 centred (`[writing-mode:vertical-rl]`); expanded, a right-hand drawer below the navbar on wide screens and
 a full-screen overlay below `md`. **The switch is CSS, never script**: `max-md:` variants on the panel
-need no signal, no `matchMedia` listener and no class to keep in sync. `manual-chat-layout.spec.ts` pins
+need no signal, no `matchMedia` listener and no class to keep in sync. `manual-chat-panel.layout.browser.spec.ts` pins
 both sides by geometry: on a phone the open panel starts at the top of the screen (the width alone cannot
 show the overlay, since the 420px drawer already spans a 390px screen), and on a wide screen it is a
 right-anchored drawer below the navbar that leaves the page visible to its left. While collapsed it
