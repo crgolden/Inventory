@@ -285,7 +285,7 @@ jobs:
           PGPASSWORD: ${{ secrets.TEST_RESULTS_PGPASSWORD }}
         run: |
           $messages = (Get-Content e2e/e2e-settings.json -Raw | ConvertFrom-Json).cucumberMessagesFile
-          npx --no publish-bdd-results --app ${{ vars.TEST_RESULTS_APP }} $messages
+          npx --no -- publish-bdd-results --app ${{ vars.TEST_RESULTS_APP }} $messages
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Check template classes against the built CSS
