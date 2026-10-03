@@ -14,7 +14,7 @@ $GateDelta = @('plant:inventory.client/src/zz-bail-plant.spec.ts')
 Register-GateSteps @('node_modules install markers', 'Restore local tools',
     'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec', 'npm run lint:css', 'Begin Sonar analysis', 'Build with dotnet',
     'jb inspectcode', 'Run unit tests with coverage', 'Install Playwright browsers', 'Run UI tests', 'Vitest bail plant',
-    'Fix LCOV paths', 'Run browser E2E tests', 'Browser E2E executed at least its floor',
+    'Fix LCOV paths', 'Run browser E2E tests', 'Browser E2E executed at least its floor', 'Publish command reaches the CLI',
     'npm run lint:utilities', 'End Sonar analysis', 'Fail on open Sonar issues')
 $repo = $PSScriptRoot
 $client = Join-Path $repo 'inventory.client'
@@ -160,6 +160,11 @@ if (-not (Test-StepCarried $e2eStep)) {
     $executed = $tests - $skipped
     if ($floor -le 0 -or $executed -lt $floor) { Stop-Gate $floorStep "executed $executed (tests $tests, skipped $skipped), floor $floor" }
     Write-Row $floorStep 'PASS' "executed $executed (tests $tests, skipped $skipped), floor $floor"
+}
+$publishStep = 'Publish command reaches the CLI (the workflow line run without GITHUB_RUN_ID must fail on the run identity, not on usage)'
+if (-not (Test-StepCarried $publishStep)) {
+    Test-PublishCommandLine $publishStep (Join-Path $repo '.github\workflows\master_crgolden-inventory.yml') 'Inventory' $client `
+        (Get-Content (Join-Path $client 'e2e\e2e-settings.json') -Raw | ConvertFrom-Json).cucumberMessagesFile
 }
 if (-not (Test-StepCarried 'npm run lint:utilities')) {
     $global:LASTEXITCODE = $null
