@@ -30,7 +30,7 @@ $build = 'Build with dotnet (Release, AngularConfiguration=ci, RestoreLockedMode
 $endSonar = 'End Sonar analysis (quality gate waited)'
 $sonarIssues = 'Fail on open Sonar issues'
 $unitStep = 'Run unit tests with coverage (Category=Unit)'
-$uiStep = 'Run UI tests (npx vitest run --coverage)'
+$uiStep = 'Run UI tests (npx --no -- vitest run --coverage)'
 $env:TZ = 'UTC'
 $env:CI = 'true'
 if ($env:TZ -ne 'UTC') { Write-Host 'GATE: FAILED (TZ pin)'; exit 1 }
@@ -111,7 +111,7 @@ Install-PlaywrightBrowsers 'Install Playwright browsers' { npx playwright instal
 
 if (-not (Test-StepCarried $uiStep)) {
     $global:LASTEXITCODE = $null
-    npx vitest run --coverage
+    npx --no -- vitest run --coverage
     $null = Test-Exit $uiStep
 }
 

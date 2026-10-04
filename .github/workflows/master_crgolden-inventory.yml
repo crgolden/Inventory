@@ -134,7 +134,7 @@ jobs:
         working-directory: inventory.client
         env:
           NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN }}
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Restore local tools
         run: dotnet tool restore
@@ -227,7 +227,7 @@ jobs:
 
       - name: Run UI tests
         working-directory: inventory.client
-        run: npx vitest run --coverage
+        run: npx --no -- vitest run --coverage
 
       - name: Fix LCOV paths for SonarQube
         if: github.actor != 'dependabot[bot]'
