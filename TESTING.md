@@ -361,7 +361,7 @@ There is no post-deploy job. The deployed app is exercised by the scheduled **sy
 
 ### Playwright browser cache
 
-The build job caches the Chromium binary at `~\AppData\Local\ms-playwright` on Windows runners, keyed on the
+The build job caches the Chromium binary at `~/.cache/ms-playwright` on the Ubuntu runner, keyed on the
 `@playwright/test` version read out of `inventory.client/package-lock.json`. **That read must fail loudly**: if
 it yields nothing the key silently collapses to a constant, and every run restores a stale browser that no
 longer matches the installed Playwright.
@@ -384,7 +384,7 @@ GitHub Actions artifacts are the only reporting destination. The workflow steps 
 Two workflow decisions that are not obvious from reading the YAML:
 
 - **`actions/checkout` sets `fetch-depth: 0` for SonarCloud, not for the build.** A shallow clone costs Sonar the history it uses to attribute issues to changesets and to compute new-code metrics.
-- **The "Fix LCOV paths for SonarQube" step only rewrites `\` to `/`; it must not prefix `inventory.client/`.** The Scanner for .NET (v8+) indexes `inventory.client` as its own module whose base directory *is* `inventory.client`, so the JS coverage sensor resolves both `sonar.javascript.lcov.reportPaths` (`coverage/lcov.info`) and the LCOV `SF:` paths module-relative (`src/…`), never repo-relative. Adding the prefix double-nests the path and the sensor reports "No LCOV files were found". The separator rewrite is needed because istanbul emits backslashes on Windows runners.
+- **The "Fix LCOV paths for SonarQube" step only rewrites `\` to `/`; it must not prefix `inventory.client/`.** The Scanner for .NET (v8+) indexes `inventory.client` as its own module whose base directory *is* `inventory.client`, so the JS coverage sensor resolves both `sonar.javascript.lcov.reportPaths` (`coverage/lcov.info`) and the LCOV `SF:` paths module-relative (`src/…`), never repo-relative. Adding the prefix double-nests the path and the sensor reports "No LCOV files were found". The separator rewrite is needed wherever istanbul emits backslashes, which it does on Windows (the local gate); on the Ubuntu CI runner it changes nothing.
 
 Do not run Git commands when implementing or verifying Playwright reporting changes.
 

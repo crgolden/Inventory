@@ -103,7 +103,7 @@ if (-not (Test-StepCarried $unitStep)) {
         --format opencover --output "coverage.opencover.xml" `
         --skipautoprops --exclude-by-attribute GeneratedCodeAttribute --exclude-by-file "**/obj/**" `
         --exclude-by-file "**/Program.cs" --does-not-return-attribute DoesNotReturnAttribute --include "[Inventory.Server]*"
-    Test-Trx $unitStep $unitTrx $global:LASTEXITCODE 1
+    Test-Trx $unitStep $unitTrx $global:LASTEXITCODE -floor 1
 }
 
 Set-Location $client
