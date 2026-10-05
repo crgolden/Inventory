@@ -1,4 +1,4 @@
-param([string]$Goal)
+param([string]$Goal, [string[]]$Steps)
 
 $ErrorActionPreference = 'Continue'
 $gateCommon = Join-Path $PSScriptRoot '..\Tools\Gates\GateCommon.ps1'
@@ -16,6 +16,28 @@ Register-GateSteps @('node_modules install markers', 'Restore local tools',
     'jb inspectcode', 'Run unit tests with coverage', 'Install Playwright browsers', 'Run UI tests', 'Vitest bail plant',
     'Fix LCOV paths', 'Run browser E2E tests', 'Browser E2E executed at least its floor', 'Publish command reaches the CLI',
     'npm run lint:utilities', 'End Sonar analysis', 'Fail on open Sonar issues')
+Register-StepInputs @{
+    'node_modules install markers'            = @('*')
+    'Restore local tools'                     = @('dotnet-tools.json')
+    'npm run lint'                            = @('inventory.client/src/*', 'inventory.client/*.ts', 'inventory.client/*.mts', 'inventory.client/*.js', 'inventory.client/*.mjs', 'inventory.client/*.cjs', 'inventory.client/eslint-sonar.rules.json', 'inventory.client/angular.json', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
+    'npm run typecheck:e2e'                   = @('inventory.client/src/*', 'inventory.client/e2e/*', 'inventory.client/playwright.config.ts', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
+    'npm run typecheck:spec'                  = @('inventory.client/src/*', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
+    'npm run lint:css'                        = @('inventory.client/src/*', 'inventory.client/stylelint.config.mjs', 'inventory.client/package.json', 'inventory.client/package-lock.json')
+    'Begin Sonar analysis'                    = @('*')
+    'Build with dotnet'                       = @('*')
+    'jb inspectcode'                          = @('*')
+    'Run unit tests with coverage'            = @('*')
+    'Install Playwright browsers'             = @('*')
+    'Run UI tests'                            = @('*')
+    'Vitest bail plant'                       = @('*')
+    'Fix LCOV paths'                          = @('*')
+    'Run browser E2E tests'                   = @('*')
+    'Browser E2E executed at least its floor' = @('*')
+    'Publish command reaches the CLI'         = @('*')
+    'npm run lint:utilities'                  = @('*')
+    'End Sonar analysis'                      = @('*')
+    'Fail on open Sonar issues'               = @('*')
+}
 $repo = $PSScriptRoot
 $client = Join-Path $repo 'inventory.client'
 $scratch = $gateOutput
@@ -24,7 +46,7 @@ $bailReport = Join-Path $scratch 'inventory-bail-plant.json'
 $plant = Join-Path $client 'src\zz-bail-plant.spec.ts'
 $plantedFailures = 3
 $unitTrx = Join-Path $repo 'Inventory.Tests.Unit\bin\Release\net10.0\TestResults\unit-tests.trx'
-$sonarBranch = "branch-local-$($env:COMPUTERNAME.ToLowerInvariant())"
+$sonarBranch = Get-SonarBranchName
 $beginSonar = "Begin Sonar analysis (branch $sonarBranch)"
 $build = 'Build with dotnet (Release, AngularConfiguration=ci, RestoreLockedMode)'
 $endSonar = 'End Sonar analysis (quality gate waited)'
@@ -36,6 +58,7 @@ $env:CI = 'true'
 if ($env:TZ -ne 'UTC') { Write-Host 'GATE: FAILED (TZ pin)'; exit 1 }
 Set-Location $repo
 Initialize-GateState 'Inventory' $repo
+Assert-RequestedSteps $Steps
 Invoke-CatalogSteps
 
 $installed = (Test-Path (Join-Path $client 'node_modules\.package-lock.json')) -and
