@@ -14,9 +14,9 @@
       },
       "Shared": {
         "type": "Direct",
-        "requested": "[1.5.0, )",
-        "resolved": "1.5.0",
-        "contentHash": "B0+JrWPlBmZf2cEwvAG4yUFAPJCuaKTKbyBJiyQkCUlqzJmjFhv9XltDztKPCyNa8VuSUBgQfJEpwAYej6C0gw==",
+        "requested": "[1.5.1, )",
+        "resolved": "1.5.1",
+        "contentHash": "FQoXImDqgqeSlQXWcW2L85ZtgKdq6ajb/xGMNA2UWhXLudbYSnQhZAUj0MOJcYSNTHn8aRhsIVNMYeGiGpyeIA==",
         "dependencies": {
           "OpenTelemetry.Instrumentation.AspNetCore": "1.19.0"
         }
@@ -120,8 +120,8 @@
       },
       "Duende.BFF": {
         "type": "Transitive",
-        "resolved": "4.3.0",
-        "contentHash": "tLk+YpB3glhyvnD7hSAbifs5KJq9qck1r45Int+QWhH1aD3EphtbMukGcKtG4jA31enDEwx7n0eGj3w9vRCV9g==",
+        "resolved": "4.3.1",
+        "contentHash": "vyPHTOkcCftJw6fS6ZkrZQKR0BQ73CEThLcB3PcLCEn80nqf3NdJWjQHkHM5eDf6UcbvR3Lthv07i1BmBC2l6A==",
         "dependencies": {
           "Duende.AccessTokenManagement.OpenIdConnect": "4.1.1",
           "Microsoft.Extensions.Caching.Hybrid": "10.0.0"
@@ -129,10 +129,10 @@
       },
       "Duende.BFF.Yarp": {
         "type": "Transitive",
-        "resolved": "4.3.0",
-        "contentHash": "l66hcg5voEy/W/n2kPYOyEb6NsXB7SYy//GUtkhHmPYzldk/hlurbi5eqtpTGnL7JQfnMjXEWvPExR3noUU4Og==",
+        "resolved": "4.3.1",
+        "contentHash": "cHy4Tcb9Qix38LN9p21EDcr7aCN8sD/Tkjubqocb0XN/DPjn8dgOvPwoGf1LW0YBhC8Bjd7rCtilyoFVR9Ohww==",
         "dependencies": {
-          "Duende.BFF": "4.3.0",
+          "Duende.BFF": "4.3.1",
           "Yarp.ReverseProxy": "2.3.0"
         }
       },
@@ -707,7 +707,7 @@
           "Azure.Extensions.AspNetCore.DataProtection.Blobs": "[1.5.4, )",
           "Azure.Extensions.AspNetCore.DataProtection.Keys": "[1.6.4, )",
           "Azure.Identity": "[1.21.0, )",
-          "Duende.BFF.Yarp": "[4.3.0, )",
+          "Duende.BFF.Yarp": "[4.3.1, )",
           "Elastic.Serilog.Sinks": "[9.0.0, )",
           "Microsoft.AspNetCore.SpaProxy": "[10.0.12, )",
           "Microsoft.Extensions.Azure": "[1.14.1, )",
@@ -719,7 +719,7 @@
           "Serilog.AspNetCore": "[10.0.0, )",
           "Serilog.Enrichers.Environment": "[3.0.1, )",
           "Serilog.Sinks.Console": "[6.1.1, )",
-          "Shared": "[1.5.0, )"
+          "Shared": "[1.5.1, )"
         }
       }
     }
