@@ -72,7 +72,7 @@ instead of the event turns four of the six red. Background: `AGENTS/REPOS/Invent
 
 `Logging/RequestLogLevelTests.cs` covers the level the request log records. Only one of its seven tests
 asserts the downgrade: an `OperationCanceledException` on a request whose `RequestAborted` token fired logs at
-`Warning`. The other six pin what keeps `Error`. A cancellation the client did not cause, any other exception
+`Warning`. The other six pin the levels that do not change. A cancellation the client did not cause, any other exception
 on an aborted request, a 5xx status, and the 500 boundary all stay at `Error`. A 4xx status and 499 stay at
 `Information`. Dropping the `RequestAborted` check turns the not-client-caused row red, and widening the match to
 any exception on an aborted request turns the other-exception row red.
