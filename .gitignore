@@ -449,3 +449,4 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+/inventory.client/tools/stylelint/node_modules

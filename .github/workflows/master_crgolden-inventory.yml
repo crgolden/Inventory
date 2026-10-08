@@ -155,6 +155,10 @@ jobs:
         working-directory: inventory.client
         run: npm run lint:css
 
+      - name: Audit dependencies (fails on high or critical)
+        working-directory: inventory.client
+        run: npm run audit
+
       - name: Begin Sonar analysis
         if: github.actor != 'dependabot[bot]'
         env:

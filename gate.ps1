@@ -12,7 +12,7 @@ New-Item -ItemType Directory -Force -Path $gateOutput | Out-Null
 $GateDelta = @('plant:inventory.client/src/zz-bail-plant.spec.ts')
 
 Register-GateSteps @('node_modules install markers', 'Restore local tools',
-    'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec', 'npm run lint:css', 'Begin Sonar analysis', 'Build with dotnet',
+    'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec', 'npm run lint:css', 'npm run audit', 'Begin Sonar analysis', 'Build with dotnet',
     'jb inspectcode', 'Run unit tests with coverage', 'Install Playwright browsers', 'Run UI tests', 'Vitest bail plant',
     'Fix LCOV paths', 'Run browser E2E tests', 'Browser E2E executed at least its floor', 'Publish command reaches the CLI',
     'npm run lint:utilities', 'End Sonar analysis', 'Fail on open Sonar issues')
@@ -22,7 +22,8 @@ Register-StepInputs @{
     'npm run lint'                            = @('inventory.client/src/*', 'inventory.client/*.ts', 'inventory.client/*.mts', 'inventory.client/*.js', 'inventory.client/*.mjs', 'inventory.client/*.cjs', 'inventory.client/eslint-sonar.rules.json', 'inventory.client/angular.json', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
     'npm run typecheck:e2e'                   = @('inventory.client/src/*', 'inventory.client/e2e/*', 'inventory.client/playwright.config.ts', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
     'npm run typecheck:spec'                  = @('inventory.client/src/*', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
-    'npm run lint:css'                        = @('inventory.client/src/*', 'inventory.client/stylelint.config.mjs', 'inventory.client/package.json', 'inventory.client/package-lock.json')
+    'npm run lint:css'                        = @('inventory.client/src/*', 'inventory.client/stylelint.config.mjs', 'inventory.client/package.json', 'inventory.client/package-lock.json', 'inventory.client/tools/stylelint/*')
+    'npm run audit'                           = @('inventory.client/package.json', 'inventory.client/package-lock.json')
     'Begin Sonar analysis'                    = @('*')
     'Build with dotnet'                       = @('*')
     'jb inspectcode'                          = @('*')
@@ -38,6 +39,7 @@ Register-StepInputs @{
     'End Sonar analysis'                      = @('*')
     'Fail on open Sonar issues'               = @('*')
 }
+Register-VolatileSteps @('npm run audit')
 $repo = $PSScriptRoot
 $client = Join-Path $repo 'inventory.client'
 $scratch = $gateOutput
@@ -64,7 +66,8 @@ Invoke-CatalogSteps
 $installed = (Test-Path (Join-Path $client 'node_modules\.package-lock.json')) -and
     (Test-Path (Join-Path $client 'node_modules\ajv')) -and (Test-Path (Join-Path $client 'node_modules\.bin\tsc.cmd'))
 if (-not $installed) { Stop-Gate 'node_modules install markers' 'incomplete install; run npm ci deliberately first' }
-Write-Row 'node_modules install markers' 'PASS' '.package-lock.json, ajv, tsc.cmd present'
+Assert-NodeInstallCurrent $client
+Write-Row 'node_modules install markers' 'PASS' 'ajv, tsc.cmd present; every package matches package-lock.json'
 
 $global:LASTEXITCODE = $null
 dotnet tool restore
@@ -90,6 +93,11 @@ if (-not (Test-StepCarried 'npm run lint:css')) {
     $global:LASTEXITCODE = $null
     npm run lint:css
     $null = Test-Exit 'npm run lint:css'
+}
+if (-not (Test-StepCarried 'npm run audit')) {
+    $global:LASTEXITCODE = $null
+    npm run audit
+    $null = Test-Exit 'npm run audit'
 }
 Set-Location $repo
 
