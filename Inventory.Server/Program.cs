@@ -175,15 +175,19 @@ try
 
     var webApplication = builder.Build();
     webApplication.UseForwardedHeaders();
-    webApplication.UseSerilogRequestLogging(options => options.EnrichDiagnosticContext = (diagnosticContext, _) =>
+    webApplication.UseSerilogRequestLogging(options =>
     {
-        if (Activity.Current is null)
+        options.GetLevel = RequestLogLevel.Of;
+        options.EnrichDiagnosticContext = (diagnosticContext, _) =>
         {
-            return;
-        }
+            if (Activity.Current is null)
+            {
+                return;
+            }
 
-        diagnosticContext.Set(nameof(Activity.TraceId), Activity.Current.TraceId.ToString());
-        diagnosticContext.Set(nameof(Activity.SpanId), Activity.Current.SpanId.ToString());
+            diagnosticContext.Set(nameof(Activity.TraceId), Activity.Current.TraceId.ToString());
+            diagnosticContext.Set(nameof(Activity.SpanId), Activity.Current.SpanId.ToString());
+        };
     });
     if (webApplication.Environment.IsDevelopment())
     {

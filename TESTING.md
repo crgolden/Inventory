@@ -70,6 +70,13 @@ assert that the four sibling events from the same logger — `ErrorValidatingLic
 through, and those are the ones that can fail. Widening the predicate to match the logger category
 instead of the event turns four of the six red. Background: `AGENTS/REPOS/Inventory.md`.
 
+`Logging/RequestLogLevelTests.cs` covers the level the request log records. Only one of its seven tests
+asserts the downgrade: an `OperationCanceledException` on a request whose `RequestAborted` token fired logs at
+`Warning`. The other six pin what keeps `Error`. A cancellation the client did not cause, any other exception
+on an aborted request, a 5xx status, and the 500 boundary all stay at `Error`. A 4xx status and 499 stay at
+`Information`. Dropping the `RequestAborted` check turns the not-client-caused row red, and widening the match to
+any exception on an aborted request turns the other-exception row red.
+
 ### Frontend unit tests
 
 ```bash
@@ -132,6 +139,11 @@ their relative imports carry the `.ts` extension and `tsconfig.e2e.json` sets `a
 ordinary configuration keys (`OidcAuthority`, `ProductsApiAddress`, `ManualsApiAddress`, a generated client id and
 secret) and `OpenIdConnectOptions:RequireHttpsMetadata = false`, the one setting that lets it take a plain-HTTP
 provider; production leaves it at its default, `true`.
+
+**`[WebServer] An unhandled exception occurred: Port 50212 is already in use` is not the failure.** Green CI runs print
+it ahead of their passing tests, so it says nothing about the run on its own. A web server that really failed ends the
+run with `Error: Process from config.webServer was not able to start`; read the verdict from that line and the test
+summary, never from the port line.
 
 ### Authentication
 
