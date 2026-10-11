@@ -81,7 +81,7 @@ export class CatalogListComponent implements OnInit {
       distinctUntilChanged(),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(term => {
-      this.writeListStateToUrl({ q: term || null }, true);
+      this.writeListStateToUrl({ q: term.length > 0 ? term : null }, true);
     });
 
     this.route.data.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(data => {

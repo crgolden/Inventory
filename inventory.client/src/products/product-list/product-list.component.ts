@@ -72,7 +72,7 @@ export class ProductListComponent implements OnInit {
       distinctUntilChanged(),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(term => {
-      this.writeListStateToUrl({ [PRODUCT_SEARCH_PARAM]: term || null });
+      this.writeListStateToUrl({ [PRODUCT_SEARCH_PARAM]: term.length > 0 ? term : null });
     });
 
     this.route.data.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(data => {
