@@ -4,207 +4,135 @@
 
 [![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=crgolden_Inventory)](https://sonarcloud.io/summary/new_code?id=crgolden_Inventory)
 
-A full-stack single-page application built with **Angular 22** and **ASP.NET Core 10**, using the [Backend-for-Frontend (BFF)](https://www.duendesoftware.com/products/bff) security pattern to handle OIDC authentication on the server side.
+Keep a private list of the products you own, browse a shared public catalog of those products, and find a
+product's manual through an AI chat. An **Angular 22** single-page app served by an **ASP.NET Core 10**
+Backend-for-Frontend built on [Duende BFF](https://docs.duendesoftware.com/bff/): the BFF holds the OIDC session and
+every token, and proxies the app's calls to a Products API (OData) and a Manuals API (chat).
 
-## Sibling Applications
+How the parts fit together, sign-in, the pages and the invariants: [ARCHITECTURE.md](ARCHITECTURE.md). The visual
+design rules: [DESIGN.md](DESIGN.md). Every test tier and how to run it: [TESTING.md](TESTING.md).
 
-Inventory is the **end-user surface** of a five-app system. The BFF holds the OIDC session; the SPA never sees an access token directly.
-
-| Repo | Role | How Inventory interacts |
-|---|---|---|
-| [Identity](https://github.com/crgolden/Identity) | OIDC Identity Provider | OIDC client — login / logout / silent refresh via Duende BFF |
-| [Manuals](https://github.com/crgolden/Manuals) | Azure OpenAI chat API | BFF proxies `/manuals/api/**` with access token (scope `manuals`) |
-| [Products](https://github.com/crgolden/Products) | OData v4 product catalog API | BFF proxies `/products/api/**` with access token (scope `products`); `/catalog/api/**` proxies anonymously for the public catalog |
-| [Infrastructure](https://github.com/crgolden/Infrastructure) | Health monitoring dashboard | Polls Inventory's `/health` endpoint |
-
-## Architecture
-
-```
-┌─────────────────────┐        ┌──────────────────────────┐
-│  Angular 22 (SPA)   │◄──────►│  ASP.NET Core 10 (BFF)   │
-│  :50212 (dev)       │        │  :7150 (dev)             │
-└─────────────────────┘        └──────────┬───────────────┘
-                                           │
-                    ┌──────────────────────┼──────────────────────┐
-                    │                      │                      │
-             ┌──────▼──────┐    ┌──────────▼──────┐    ┌─────────▼──────┐
-             │  Azure Key  │    │  Grafana Alloy  │    │  Elasticsearch │
-             │    Vault    │    │  + OpenTelemetry│    │  + Serilog     │
-             └─────────────┘    └─────────────────┘    └────────────────┘
-```
-
-**Backend (`Inventory.Server/`)**
-- Minimal API with controller-based routing
-- [Duende BFF](https://docs.duendesoftware.com/bff/) proxies OIDC login/logout and secures API calls
-- All secrets (OIDC client credentials, Elasticsearch credentials) come from **Azure Key Vault** references in App Service Application Settings, resolved into configuration by the platform before the app starts — no Key Vault SDK calls in `Program.cs`
-- Data protection keys stored in **Azure Blob Storage**, encrypted with an **Azure Key Vault** key
-- Distributed tracing and metrics via **OpenTelemetry** exported to **Grafana Alloy** (OTLP)
-- Structured logging via **Serilog** → Elasticsearch (production) / console (development)
-
-**Frontend (`inventory.client/`)**
-- Angular signals for reactive session state, **zoneless** change detection
-- Calls `/bff/user` to resolve the authenticated session and display user claims
-- Proxies API requests to the ASP.NET Core backend in development
-
-**Feature areas**
-
-| Route | Auth | Backed by |
-|---|---|---|
-| `/` | anonymous | static (home / landing) |
-| `/catalog`, `/catalog/:id` | anonymous | [Products API](https://github.com/crgolden/Products) (read-only OData) via BFF (`/catalog/api/**` → Products `/odata/**`) |
-| `/products`, `/products/new`, `/products/:id`, `/products/:id/edit` | authenticated | [Products API](https://github.com/crgolden/Products) via BFF (`/products/api/**` → Products `/odata/**`), with access token attached |
-| `/products/new`, `/products/:id/edit` (embedded `ManualChatPanel`) | authenticated | [Manuals API](https://github.com/crgolden/Manuals) via BFF (`/manuals/api/**` → Manuals `/api/**`), with access token attached |
-
-### Manual-finder chat panel
-
-The create and edit product forms embed `ManualChatPanelComponent` (`inventory.client/src/products/manual-chat/`) — a retractable AI panel that helps the user locate a product manual. Its chat lifecycle, all proxied through the BFF to the [Manuals API](https://github.com/crgolden/Manuals):
-
-1. `POST /manuals/api/chats` creates a chat.
-2. `PATCH` sets the chat title to `"Manual: {name} {brand} {modelNumber}"` (trimmed to 60 characters).
-3. `POST /manuals/api/chats/{id}/messages/stream` streams the assistant reply over SSE — consumed via the Fetch API (not `EventSource`, so the BFF's auth cookie and `X-CSRF` header are sent).
-
-When a reply contains a manual URL, the panel surfaces it as a clickable chip; selecting the chip patches `form.controls.manualUrl`, which is persisted on the product as `Product.ManualUrl`.
-
-## Tech Stack
+## Technologies
 
 | Layer | Technology |
 |---|---|
-| Framework | ASP.NET Core 10 (Minimal API) |
-| Auth | Duende BFF 4 (`Duende.BFF.Yarp`) |
-| Frontend | Angular 22 |
-| Observability | OpenTelemetry → Grafana Alloy (OTLP), Serilog → Elasticsearch |
-| Hosting | Azure App Service |
-| Secrets | Azure Key Vault |
-| Data Protection | Azure Blob Storage + Azure Key Vault |
+| Server | .NET 10 (`global.json`), ASP.NET Core, Duende BFF 4 (`Duende.BFF.Yarp`) |
+| Client | Angular 22, zoneless, signals; Tailwind CSS v4; Node.js 24 (`inventory.client/.nvmrc`) |
+| Shared packages | the `Shared` NuGet package and the `@crgolden/modules` npm package, both from GitHub Packages |
+| Observability (production) | OpenTelemetry over OTLP; Serilog to Elasticsearch |
+| Tests | xUnit v3, Vitest (jsdom and browser mode), Playwright with `playwright-bdd`, SonarCloud, ReSharper `jb inspectcode` |
+| Hosting | Azure App Service; Key Vault references; data-protection keys in Blob Storage |
 
 ## Prerequisites
 
-| Tool | Version |
-|------|---------|
-| .NET SDK | 10.0 |
-| Node.js | 22+ |
-| npm | 11.9.0 |
+- The .NET 10 SDK and Node.js 24.
+- A GitHub personal access token with the `read:packages` scope. `NuGet.Config` and `inventory.client/.npmrc` read
+  the `crgolden` GitHub Packages feed, which asks for a token even for a public package, and `dotnet build` runs
+  `npm install` for the client. Store it outside the repo, for NuGet and for npm:
 
-**Azure resources (production / staging):**
-- Azure Key Vault with the secrets listed below
-- Azure Blob Storage container for data protection keys
-- Grafana Alloy OTLP endpoint
-- Elasticsearch cluster
+  ```powershell
+  dotnet nuget update source GitHub --username <your GitHub user> --password <token> --store-password-in-clear-text --configfile "$env:APPDATA\NuGet\NuGet.Config"
+  ```
 
-## Getting Started
+  and in your user `~/.npmrc`: `//npm.pkg.github.com/:_authToken=<token>`.
+- A trusted ASP.NET Core development certificate (`dotnet dev-certs https --trust`); the client dev server serves
+  HTTPS with it.
+- To run the tests: nothing else. The E2E tier, with `CI` set, starts its own mock OIDC provider, Products and
+  Manuals servers.
+- To sign in to a running copy: an OIDC provider with a confidential client for this app (redirect
+  `<origin>/signin-oidc`, scopes `offline_access openid profile email phone address manuals products`), and the
+  Products and Manuals APIs.
 
-### 1. Configure User Secrets
+## Clone and build
 
-In development, user secrets are used (ID `5480cab8-b41b-4dae-8c41-dbc2c01a15e0`). Set the following:
-
-```jsonc
-{
-  // Azure credential options (DefaultAzureCredential) — enable az login for local dev
-  "DefaultAzureCredentialOptions": {
-    "TenantId": "<tenant-id>",
-    "ExcludeAzureCliCredential": false,
-    "ExcludeVisualStudioCredential": false
-  },
-
-  // Azure Blob Storage URI for data protection keys
-  "BlobUri": "https://<account>.blob.core.windows.net/<container>/keys.xml",
-
-  // Azure Key Vault key URI for data protection key encryption
-  "DataProtectionKeyIdentifier": "https://<vault-name>.vault.azure.net/keys/<key-name>/<version>",
-
-  // Elasticsearch node URI
-  "ElasticsearchNode": "https://<host>:9200",
-
-  // OpenID Connect options
-  "OpenIdConnectOptions": {
-    "Scope": [ "openid", "profile" ],
-    "SaveTokens": true,
-    "GetClaimsFromUserInfoEndpoint": true,
-    "MapInboundClaims": false
-  }
-}
-```
-
-**Secrets required at runtime** (Key Vault-referenced App Service Application Settings in production, User Secrets in development):
-
-| Secret name | Description |
-|-------------|-------------|
-| `ElasticsearchUsername` | Elasticsearch basic auth username |
-| `ElasticsearchPassword` | Elasticsearch basic auth password |
-| `OidcAuthority` | OIDC provider authority URL |
-| `InventoryClientId` | OIDC client ID |
-| `InventoryClientSecret` | OIDC client secret |
-
-### 2. Run
-
-The easiest way to run the full stack locally is to open the solution in **Visual Studio** and run the `https` launch profile — this starts the ASP.NET Core backend and the Angular dev server together via the SPA proxy.
-
-Alternatively, run each manually:
-
-**Backend**
-```bash
-dotnet run --project Inventory.Server
-# Available at https://localhost:7150
-```
-
-**Frontend** (separate terminal)
-```bash
-cd inventory.client
-npm install
-npm start
-# Available at https://localhost:50212
-```
-
-The Angular dev server proxies `/bff` and other API paths to `https://localhost:7150` via `src/proxy.conf.json`.
-
-## Project Structure
-
-```
-Inventory.Server/     # ASP.NET Core 10 BFF — OIDC session, API proxy, data protection
-inventory.client/     # Angular 22 SPA — signals, BFF session, chat and product UI
-Inventory.Tests.Unit/ # xUnit v3 — backend unit tests (Moq)
-inventory.client/e2e/ # Playwright (TypeScript): browser E2E and the synthetic walker
-```
-
-## Commands
-
-> **Shell note:** commands that set environment variables inline use bash syntax. On Windows, use Git Bash, WSL, or set the variables separately before running the `dotnet` command.
-
-```bash
-# Build
+```powershell
+git clone https://github.com/crgolden/Inventory.git
+cd Inventory
+dotnet tool restore
 dotnet build
-
-# Build frontend
-cd inventory.client && npm run build
-# Output → inventory.client/dist/inventory.client/browser/
-
-# Backend unit tests (no Azure required)
-dotnet build Inventory.Tests.Unit --configuration Debug
-.\Inventory.Tests.Unit\bin\Debug\net10.0\Inventory.Tests.Unit.exe -trait "Category=Unit" -showLiveOutput
-
-# Browser E2E tests (Playwright; signs in to the deployed Identity, needs PASSKEY_CREDENTIAL3)
-cd inventory.client && npm run playwright:install && npm run e2e:ci
-
-# Frontend unit tests (Vitest)
-cd inventory.client && npm test
-
-# Publish web app
-dotnet publish Inventory.Server -c Release -r win-x86 --self-contained false -o ./publish
 ```
 
-See [TESTING.md](TESTING.md) for full details on the E2E test infrastructure, CI configuration, and local prerequisites.
+`dotnet build` installs the client's npm dependencies and builds it too.
+
+## Configuration
+
+Settings come from `appsettings*.json`, then User Secrets in Development (id `5480cab8-b41b-4dae-8c41-dbc2c01a15e0`),
+then environment variables. A missing required setting stops the app at startup.
+
+| Setting | Required | Purpose |
+|---|---|---|
+| `OidcAuthority`, `InventoryClientId`, `InventoryClientSecret` | always | the OIDC client |
+| `ProductsApiAddress`, `ManualsApiAddress` | always | where `/products/api/**`, `/catalog/api/**` and `/manuals/api/**` go |
+| `OpenIdConnectOptions` section | always (in `appsettings.json`) | response type and mode, scopes, claim mapping; `ResponseType` must be `code` |
+| `DefaultAzureCredentialOptions`, `BlobUri`, `DataProtectionKeyIdentifier`, `ElasticsearchNode`, `ElasticsearchUsername`, `ElasticsearchPassword`, `AlloyEndpoint` | Production only | managed identity, data protection, logs, traces and metrics |
+
+`appsettings.Development.json` points the OIDC authority and both APIs at local addresses; set the client id and
+secret as User Secrets:
+
+```powershell
+dotnet user-secrets set InventoryClientId "<client id>" --project Inventory.Server
+dotnet user-secrets set InventoryClientSecret "<client secret>" --project Inventory.Server
+```
+
+## Run locally
+
+```powershell
+dotnet run --project Inventory.Server        # the BFF, https://localhost:7150
+cd inventory.client
+npm start                                    # the client, https://localhost:50212
+```
+
+The client dev server proxies `/bff`, `/products/api`, `/catalog/api` and `/manuals/api` to the BFF
+(`inventory.client/src/proxy.conf.json`). Visual Studio's `https` launch profile starts both together.
+
+## Tests
+
+```powershell
+dotnet test --project Inventory.Tests.Unit -- --filter-trait "Category=Unit"
+cd inventory.client
+npx vitest run
+```
+
+Run Vitest from `inventory.client/`: its setup resolves the component templates from the working directory's `src`.
+
+The browser E2E tier and the synthetic walker are in [TESTING.md](TESTING.md).
+
+## Gate
+
+`gate.ps1` is the maintainers' gate. It loads a private toolkit from a folder beside this repo, so in a plain clone
+it stops at once. To gate your own change, run the checks CI runs, in this order (the npm and `npx` steps from
+`inventory.client/`, the `dotnet` steps from the repo root; set `CI=true` and `ASPNETCORE_ENVIRONMENT=CI` before
+`e2e:ci` so the E2E tier uses its mocks):
+
+```powershell
+npm ci
+npm run lint
+npm run typecheck:e2e
+npm run typecheck:spec
+npm run lint:css
+npm run audit
+dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci /p:RestoreLockedMode=true -warnaserror
+dotnet jb inspectcode Inventory.slnx --no-build -e=WARNING --output=inspectcode.sarif --exclude="**/coverage/**;**/dist/**;**/node_modules/**;**/bin/**;**/obj/**"
+dotnet test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait "Category=Unit"
+npm run playwright:install
+npx vitest run --coverage
+dotnet dev-certs https
+npm run e2e:ci
+npm run lint:utilities
+```
+
+Every command must exit 0, and `inspectcode.sarif` must hold no results. CI additionally runs a SonarCloud analysis
+and fails on any open issue.
 
 ## Deployment
 
-The GitHub Actions workflow triggers on pushes to `master` and pull requests.
+`.github/workflows/master_crgolden-inventory.yml` runs the checks above on every push and pull request; on `master`
+it publishes the app and deploys it to Azure App Service over OIDC federated credentials. `synthetic.yml` walks the
+deployed app on a schedule.
 
-**Build job** — runs on every trigger:
-1. Builds the full solution (`dotnet build --configuration Release`) and the Angular frontend
-2. Runs backend unit tests with coverage and frontend unit tests (Vitest)
-3. Logs in to Azure via OIDC and runs backend E2E tests with `ASPNETCORE_ENVIRONMENT=CI`
-4. Runs SonarCloud analysis, publishes the web app, and uploads the artifact
-
-**Deploy job** — runs after a successful build on `master`:
-1. Deploys the web app to **Azure App Service** `crgolden-inventory` (Production slot) via Azure OIDC
-
-Code quality is continuously monitored by [SonarCloud](https://sonarcloud.io/summary/new_code?id=crgolden_Inventory).
+| Repository secret or variable | Used by |
+|---|---|
+| `PACKAGES_READ_TOKEN` (secret) | restoring from GitHub Packages |
+| `SONAR_TOKEN` (secret); `SONAR_PROJECT_KEY`, `SONAR_ORGANIZATION` (variables) | the SonarCloud steps |
+| `TEST_RESULTS_PGPASSWORD` (secret); `TEST_RESULTS_PGHOST`, `TEST_RESULTS_PGDATABASE`, `TEST_RESULTS_PGUSER`, `TEST_RESULTS_PGSSLMODE`, `TEST_RESULTS_APP` (variables) | publishing the E2E scenario results |
+| `AZUREAPPSERVICE_CLIENTID_*`, `AZUREAPPSERVICE_TENANTID_*`, `AZUREAPPSERVICE_SUBSCRIPTIONID_*` | the deploy job |

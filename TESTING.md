@@ -2,9 +2,9 @@
 
 The Inventory test suite is split across three tiers: **backend unit tests** (xUnit v3, `Inventory.Tests.Unit`), **frontend unit tests** (Vitest, `inventory.client/`: jsdom specs plus browser-mode specs in real Chromium), and **browser E2E tests** (Gherkin features run by Playwright through `playwright-bdd`, `inventory.client/e2e`).
 
-**Browser testing here is TypeScript only, and that is a structural decision rather than a preference.** Inventory is the fleet's one .NET BFF: it serves the UI and owns no behavior of its own, so it has nothing for an API-integration tier to drive, and a .NET browser tier would only re-drive the same pages the TypeScript suite already drives. Identity keeps a .NET Playwright suite because Razor Pages leaves it nowhere else to put one; every other front end drives its browser from TypeScript.
+**Browser testing here is TypeScript only.** The .NET BFF serves the UI and owns no behavior of its own, so it has nothing for an API-integration tier to drive, and a .NET browser tier would only re-drive the pages the TypeScript suite already drives.
 
-Unit test coding standards (MockBehavior.Strict, argument verification, SetupSequence, no control-flow in tests, etc.) are in the workspace-level [Unit Test Standards](../AGENTS/TESTING.md#unit-test-standards). Note for Playwright E2E tests: a `for` or `foreach` is acceptable when it is test setup (e.g. sending N chat messages to prime state) rather than an assertion branch.
+Unit tests carry no control flow (no `if`, loop or `try` in a test body). In a Playwright spec a loop is acceptable when it is setup (sending N chat messages to prime state), never an assertion branch.
 
 ## Test tiers
 
@@ -16,10 +16,8 @@ Unit test coding standards (MockBehavior.Strict, argument verification, SetupSeq
 | Browser E2E | Gherkin features (`e2e/features/*.feature`), `playwright-bdd`, Playwright `--project=chromium` | `inventory.client/e2e` | No. With `CI` set, the BFF signs in against a mock OIDC provider and proxies to mock Products and Manuals; without it, to the local services | Served by `npm start`, which `playwright.config.ts` launches | Every push/PR |
 | Synthetic walker | Playwright (`--project=synthetic`) | `inventory.client/e2e/synthetic` | No — targets the deployed app directly | No | Scheduled only, never a merge gate |
 
-**The `Category=Smoke` tier no longer exists.** It was a stopgap until synthetic walkers existed; once they did it
-was duplicate coverage — the same product CRUD lifecycle, against the same deployed app, under the same account —
-that additionally needed a reCAPTCHA exemption to log in and had no sweep for the rows it left behind. The walker
-replaces it.
+There is no separate smoke tier against the deployed app: the synthetic walker covers the product lifecycle there,
+with a sweep for the rows it writes.
 
 ---
 
@@ -46,11 +44,8 @@ cd inventory.client && npm ci        # install Angular dependencies (first time)
 dotnet build --configuration Debug    # builds Angular (dev mode) + C# into bin/Debug/
 ```
 
-No Azure credentials needed. `InventoryWebApplicationFactory` is a minimal static-file Kestrel server — no Azure Key Vault, no BFF, no `DefaultAzureCredential`. All API routes (`/bff/**`, `/products/api/**`, `/manuals/api/**`, `/catalog/api/**`) are Playwright route mocks in local E2E mode.
-
-The Angular build output must exist at `inventory.client/dist/inventory.client/browser/` before running E2E tests. The test factory sets the Kestrel web root to that directory; if it is absent the server still starts but serves no static files.
-
-For running tests (`dotnet test` from the repo root — never the workspace root), see the workspace-level [TESTING.md](../AGENTS/TESTING.md).
+No Azure credentials are needed for any tier: Key Vault, Blob Storage and Elasticsearch are read only under the
+`Production` environment. Run `dotnet test` from the repo root.
 
 ### Backend Unit Tests
 
@@ -68,7 +63,7 @@ notice out of Elasticsearch. Only one of its six tests asserts something is drop
 assert that the four sibling events from the same logger — `ErrorValidatingLicenseKey`,
 `LicenseHasExpired`, `TrialModeWarning`, and a same-named event from any other logger — still get
 through, and those are the ones that can fail. Widening the predicate to match the logger category
-instead of the event turns four of the six red. Background: `AGENTS/REPOS/Inventory.md`.
+instead of the event turns four of the six red.
 
 `Logging/RequestLogLevelTests.cs` covers the level the request log records. Only one of its seven tests
 asserts the downgrade: an `OperationCanceledException` on a request whose `RequestAborted` token fired logs at
@@ -104,8 +99,9 @@ builds the `inventory.client.esproj` reference first, a full Angular development
 the exact artifact those steps verified.
 
 With `CI` set (CI itself, and the local gate), `playwright.config.ts` also starts three mock servers from
-`e2e/mocks/` and points the BFF at them; without it the BFF keeps its `appsettings.Development.json` targets, the local
-Identity, Products and Manuals, and `auth.setup.ts` signs in by passkey, so that run needs `PASSKEY_CREDENTIAL3`.
+`e2e/mocks/` and points the BFF at them; without it the BFF keeps its `appsettings.Development.json` targets (a local
+OIDC provider and the local Products and Manuals APIs), and `auth.setup.ts` signs in by passkey, so that run needs
+`PASSKEY_CREDENTIAL3`.
 Cleanup is described under **The suite sweeps before and after the run** below.
 
 ### Run all tests in sequence
@@ -152,16 +148,13 @@ OIDC code flow against the mock, which echoes the handler's `nonce`, signs the i
 `prompt=none` with `error=login_required` when no identity cookie is present, so the silent-login iframe completes on an
 anonymous page. The session is saved to `e2e/.auth/user.json`, which the `chromium` project reuses.
 
-Without `CI`, the setup signs in to the local Identity by passkey. **A password cannot be substituted there.**
-reCAPTCHA v3 scores the browser environment rather than the person, so an automation-driven password sign-in fails
-whoever is typing, while `Login.cshtml.cs` evaluates the passkey branch *before* the captcha.
+Without `CI`, the setup signs in to the local OIDC provider by passkey, because a provider that scores sign-ins with
+a CAPTCHA rejects an automation-driven password sign-in whoever is typing.
 
 ### Selector ids
 
-The fleet rule, select by `id` and never by class, position, XPath or copy, is in
-[AGENTS/TESTING.md](../AGENTS/TESTING.md#e2e-selector-strategy-select-by-id-never-by-position) and
-[AGENTS/CODE-STYLE.md](../AGENTS/CODE-STYLE.md) rule 10. This is Inventory's own id table, which
-`inventory.client/e2e` selects against.
+Select by `id`, never by class, position, XPath or copy. This is the id table `inventory.client/e2e` selects
+against.
 
 | Element | `id` |
 |---|---|
@@ -176,7 +169,7 @@ The fleet rule, select by `id` and never by class, position, XPath or copy, is i
 | Catalog heading / empty state / table | `catalog-heading`, `catalog-empty-state`, `catalog-table` |
 | Catalog row, name cell, View link | `catalog-row-{index}`, `catalog-name-{index}`, `view-product-{index}`. The row and name ids are built by `src/catalog-row-ids.ts` |
 | Catalog paging summary | `catalog-showing` |
-| Catalog sort headers and pager | `sort-by-name`, `catalog-prev-page`, `catalog-next-page`. The two pager ids are bound from `catalog-list.component.ts` rather than written in the template, because the `@if` anchor and `@else` disabled button share one id and ReSharper's HTML analysis does not evaluate Angular control flow ([Inventory.md](../AGENTS/REPOS/Inventory.md)) |
+| Catalog sort headers and pager | `sort-by-name`, `catalog-prev-page`, `catalog-next-page`. The two pager ids are bound from `catalog-list.component.ts` rather than written in the template, because the `@if` anchor and `@else` disabled button share one id and ReSharper's HTML analysis does not evaluate Angular control flow, so two literal copies read to it as a duplicate id |
 | Detail headings | `product-detail-heading`, `catalog-detail-heading` |
 | Not-found headings | `product-not-found-heading`, `catalog-not-found-heading` |
 | Detail page actions | `view-manual-link`, `edit-product-link` |
@@ -232,7 +225,8 @@ no polling. Driving the create form is reserved for the specs whose subject *is*
 
 ### Gherkin features
 
-Every browser E2E test is a scenario in `e2e/features/`, written as the user sees it ([AGENTS/TESTING.md](../AGENTS/TESTING.md#writing-e2e-scenarios)):
+Every browser E2E test is a scenario in `e2e/features/`, written as the user sees it, in the user's words, with no
+selectors or implementation details in the Gherkin:
 
 | Feature | Scenarios |
 |---|---|
@@ -252,9 +246,11 @@ Every browser E2E test is a scenario in `e2e/features/`, written as the user see
   proved the row gone.
 - **`@noauth` runs a scenario signed out.** The fixture overrides `storageState` for that tag, the pattern
   `playwright-bdd` documents; the scenario's first step asserts the BFF sees no session.
-- **Going back to the catalog keeps my place** is what pins `withInMemoryScrolling`, and it shortens the viewport
-  rather than seeding rows; the scroll-measurement traps that make it discriminate are in
-  [Inventory.md](../AGENTS/REPOS/Inventory.md).
+- **Going back to the catalog keeps my place** is what pins `withInMemoryScrolling`. It shortens the viewport rather
+  than seeding rows, because the list pages at twenty rows whatever the store holds, and it asserts the page
+  overflows first. It clicks in page (`element.click()` inside `evaluate`) and asserts `scrollY` is unchanged around
+  the click, because Playwright's own click scrolls the target into view and the app would then restore wherever the
+  driver left the page.
 - **Reports**: besides the Playwright HTML report and `playwright-results.xml`, the run writes
   `cucumber-report/messages.ndjson` (Cucumber Messages) and `cucumber-report/index.html` (the business-readable
   report), paths from `e2e/e2e-settings.json`. CI publishes the NDJSON to the `test_results` database with
@@ -280,10 +276,10 @@ templates through Vite's `import.meta.glob`, since the jsdom setup's `node:fs` d
 
 ### Synthetic walker
 
-`e2e/synthetic/walker.spec.ts` performs a **seeded random walk of the deployed app**: one real login through Identity
-(`/bff/login?returnUrl=…`), a silent-login check that clears only the Inventory host's cookies, reloads `/catalog`, waits
-for the `prompt=none` request and then for the frame's `/bff/silent-login-callback` response, and asserts `#nav-signout`
-is back (so the Identity session restores the BFF session),
+`e2e/synthetic/walker.spec.ts` performs a **seeded random walk of the deployed app**: one real login through the OIDC
+provider (`/bff/login?returnUrl=…`), a silent-login check that clears only the Inventory host's cookies, reloads
+`/catalog`, waits for the `prompt=none` request and then for the frame's `/bff/silent-login-callback` response, and
+asserts `#nav-signout` is back (so the provider's session restores the BFF session),
 a sweep that deletes any leftover `Synthetic Walker Product` rows from a crashed prior run,
 then a weighted random sequence of actions — catalog and product browsing plus **scoped writes**: product
 create→edit→delete cycles under names `` `Synthetic Walker Product <seed>-<n>` ``, with a second sweep at run end so a
@@ -292,10 +288,6 @@ chat (`#manual-chat-send`) is deliberately excluded — it calls Azure OpenAI. I
 `.github/workflows/synthetic.yml` (twice daily, plus `workflow_dispatch` with a `seed` input) and is **never a merge
 gate**. The `synthetic` project exists only when `WalkerBaseUrl` is set, the config's fleet-standard switch that also
 disables `webServer` and points `baseURL` at the deployed app, so a run without it has no walker to collect.
-
-**This walker is also what replaced the post-deploy smoke tier**, which was deleted fleet-wide. Smoke ran the same
-product CRUD lifecycle against the same deployed app under the same account, but needed a reCAPTCHA exemption to log
-in and had no sweep; the walker covers it without either.
 
 Environment contract:
 
@@ -309,29 +301,26 @@ Environment contract:
 Replay a failed walk with the seed from the job summary / failure message:
 
 ```powershell
-$env:SYNTHETIC_SEED = '<seed>'; $env:WalkerBaseUrl = 'https://crgolden-inventory.azurewebsites.net'; npm run e2e:synthetic
+$env:SYNTHETIC_SEED = '<seed>'; $env:WalkerBaseUrl = '<deployed app URL>'; npm run e2e:synthetic
 ```
 
 Same seed ⇒ same RNG decisions given the same action availability; divergence caused by live-data drift is expected —
 the guarantee is the decision sequence.
 
-- **The seed is a run parameter, not unit-test data.** CODE-STYLE.md rule 11 is scoped to unit tests; do not "fix" the
-  walker by making the seed unrepeatable.
-- **The engine comes from `@crgolden/modules/synthetic-walker`** (the Modules repo). Installing it needs GitHub
-  Packages auth — CI uses the `PACKAGES_READ_TOKEN` secret; locally a `read:packages` PAT in your user `~/.npmrc`.
-  A 401 on the `@crgolden` scope during `npm ci` means the token is missing. This binds the **.NET build too**:
+- **The seed is a run parameter, not unit-test data**; the rule that unit-test data is generated does not apply to it,
+  so do not make the seed unrepeatable.
+- **The engine comes from the `@crgolden/modules` package's `synthetic-walker` entry point**, installed from GitHub
+  Packages ([README.md](README.md#prerequisites)). A 401 on the `@crgolden` scope during `npm ci` means the token is
+  missing. This binds the **.NET build too**:
   `inventory.client.esproj` runs `npm install` from inside `dotnet build`, so the CI build job carries
   `NODE_AUTH_TOKEN` at job level, and a local `dotnet build` of the solution fails on the `@crgolden` scope
   without the PAT (`-p:BuildProjectReferences=false` compiles a test project against existing outputs).
-- **The walker signs in with a passkey, not a password.** Identity evaluates the passkey branch *before* the
-  CAPTCHA, so this is a first-class production auth path rather than an exemption — there is no marker header,
-  no email allowlist, and no test-only code in Identity's authentication handler. No password is stored in CI.
-  A login failure here means the credential in `PASSKEY_CREDENTIAL1` has been revoked, rotated, or drifted from
-  what Identity stores; the walker dashboard shows that as `succeeded="false"` bars rather than as silence.
-  Accounts and the enrollment runbook: `Tools/Identity/AGENTS.md` (private repo).
-- Walker traffic is identifiable by the User-Agent suffix `crgolden-synthetic/1.0`, and **that suffix is a
-  contract** — five Tempo dashboard panels and Identity's `identity.login.passkey_signins` counter both key on
-  it. It is an observability dimension only: no authentication or authorization decision reads it.
+- **The walker signs in with a passkey, not a password**, through the provider's ordinary passkey sign-in rather
+  than an exemption, so no password is stored in CI. A login failure means the credential in `PASSKEY_CREDENTIAL1`
+  has been revoked, rotated, or drifted from what the provider stores. Enroll a passkey for the walker account with
+  your provider and store the virtual authenticator's credential there.
+- Walker traffic is identifiable by the User-Agent suffix `crgolden-synthetic/1.0`. It is an observability
+  dimension only: no authentication or authorization decision reads it.
 - **GitHub disables scheduled workflows after 60 days without repo activity in public repos**; a push, a
   `workflow_dispatch`, or the Actions UI re-enables it. Schedules fire from `master` only.
 
@@ -352,17 +341,20 @@ What a browser adds that jsdom cannot is **layout**, which `manual-chat-panel.la
 
 ### Build job (every push / PR)
 
-1. Build solution (`dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci`), under which Angular uses `environment.ci.ts`. `dotnet publish` rebuilds Angular without the override, producing the `production` bundle for the deployed artifact.
-2. Backend unit tests with coverage (`dotnet coverlet … --filter-trait Category=Unit`, OpenCover → `coverage.opencover.xml`)
-3. Cache + install Playwright Chromium, which the `browser` Vitest project needs as well as the E2E suite
-4. Frontend unit tests with coverage (`npx vitest run --coverage`, both Vitest projects)
-5. Browser E2E tests (`npm run e2e:ci`)
-6. Assert the browser E2E run executed at least `executedTestFloor` tests (`e2e/e2e-settings.json`: the 14
-   scenarios plus the `setup` and `sweep` projects' one test each)
-7. Publish E2E scenario results (`publish-bdd-results`, `vars.TEST_RESULTS_*` and `secrets.TEST_RESULTS_PGPASSWORD`)
-8. Publish app + SonarCloud analysis
+1. From `inventory.client/`: `npm ci`, `npm run lint`, `npm run typecheck:e2e`, `npm run typecheck:spec`,
+   `npm run lint:css`, `npm run audit` (fails on a high or critical advisory)
+2. Build solution (`dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci /p:RestoreLockedMode=true -warnaserror`), under which Angular uses `environment.ci.ts`. `dotnet publish` rebuilds Angular without the override, producing the `production` bundle for the deployed artifact.
+3. ReSharper inspection (`jb inspectcode`)
+4. Backend unit tests with coverage (`dotnet coverlet … --filter-trait Category=Unit`, OpenCover → `coverage.opencover.xml`)
+5. Cache + install Playwright Chromium, which the `browser` Vitest project needs as well as the E2E suite
+6. Frontend unit tests with coverage (`npx vitest run --coverage`, both Vitest projects)
+7. Browser E2E tests (`npm run e2e:ci`)
+8. Assert the browser E2E run executed at least `executedTestFloor` tests (`e2e/e2e-settings.json`)
+9. Publish E2E scenario results (`publish-bdd-results`, `vars.TEST_RESULTS_*` and `secrets.TEST_RESULTS_PGPASSWORD`)
+10. `npm run lint:utilities` against the built CSS
+11. Publish the app, end the SonarCloud analysis, and fail on any open Sonar issue
 
-**Step 6 is not ceremony.** An aborted Playwright run still writes `tests="0" failures="0"` to
+**Step 8 is not ceremony.** An aborted Playwright run still writes `tests="0" failures="0"` to
 `playwright-results.xml`, which every reporter reads as a pass, so a suite that never started is
 indistinguishable from a suite that passed without it; and a run that stopped partway reports a
 non-zero count, which only a floor catches. Adding or removing a scenario changes the floor in the same
@@ -391,7 +383,7 @@ CI uploads these artifacts separately from TRX:
 | Browser E2E | `inventory-browser-e2e-artifacts` |
 | Synthetic walker | `synthetic-playwright-report`, `synthetic-playwright-artifacts` |
 
-GitHub Actions artifacts are the only reporting destination. The workflow steps that used to mirror the same TRX outcomes to Azure DevOps test runs and Azure Monitor custom events are retired and removed.
+GitHub Actions artifacts are the only reporting destination.
 
 Two workflow decisions that are not obvious from reading the YAML:
 
@@ -424,8 +416,8 @@ dotnet coverlet Inventory.Tests.Unit\bin\Release\net10.0 `
 
 # Frontend LCOV comes from `npx vitest run --coverage`. See CI.
 
-$env:SONAR_TOKEN = "<token>"
-& "$env:SystemDrive\sonar-scanner-8.0.1.6346-windows-x64\bin\sonar-scanner.bat" `
+# SonarScanner CLI, with SONAR_TOKEN already in the environment and sonar.host.url=https://sonarcloud.io configured
+sonar-scanner `
   "-Dsonar.projectKey=crgolden_Inventory" `
   "-Dsonar.organization=crgolden" `
   "-Dsonar.sources=Inventory.Server,inventory.client/src" `
