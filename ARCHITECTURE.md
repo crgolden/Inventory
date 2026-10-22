@@ -1,5 +1,7 @@
 # Architecture
 
+## Bird's-eye view
+
 Inventory lets a user keep a private list of the products they own, browse a shared public catalog of those
 products, and find a product's manual through an AI chat. It is an Angular 22 single-page app served by an ASP.NET
 Core 10 Backend-for-Frontend (BFF) built on Duende BFF. The BFF holds every token; the browser holds only a session
@@ -70,7 +72,17 @@ reads its session from `/bff/user`.
 - Selectors are element ids, bound from shared constants the template, specs and walker all import.
 - The design rules in [DESIGN.md](DESIGN.md) govern every UI change.
 
-## Hosting
+## Boundaries
+
+Each dependency is one required setting, read in `Inventory.Server/Program.cs`, so a local stand-in is a different URL:
+
+- **The OIDC provider** (`OidcAuthority`): the BFF is a confidential client running code + PKCE.
+- **The Products API** (`ProductsApiAddress`): `/products/api/**` is forwarded with the user's access token and
+  `/catalog/api/**` anonymously, both by `MapRemoteBffApiEndpoint`.
+- **The Manuals API** (`ManualsApiAddress`): `/manuals/api/**` is forwarded with the access token, including the
+  server-sent-event stream of a chat reply.
+
+## Cross-cutting concerns
 
 Azure App Service. In production the BFF signs in to Azure with `DefaultAzureCredential`, reads its secrets from Key
 Vault-referenced App Service settings, keeps data-protection keys in Blob Storage encrypted with a Key Vault key,

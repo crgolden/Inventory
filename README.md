@@ -99,8 +99,10 @@ The browser E2E tier and the synthetic walker are in [TESTING.md](TESTING.md).
 
 ## Gate
 
-`gate.ps1` is the maintainers' gate. It loads a private toolkit from a folder beside this repo, so in a plain clone
-it stops at once. To gate your own change, run the checks CI runs, in this order (the npm and `npx` steps from
+`gate.ps1` is the maintainers' gate. It dot-sources the gate library script that the `GATE_LIBRARY` environment
+variable names, which defines the step functions `gate.ps1` calls; unset, as in a plain clone, it stops at once with
+`GATE: FAILED` and records nothing. To gate with a library of your own, set `GATE_LIBRARY` to its path; it must
+define every function `gate.ps1` calls, since those functions decide whether each step ran and passed. To gate your own change without one, run the checks CI runs, in this order (the npm and `npx` steps from
 `inventory.client/`, the `dotnet` steps from the repo root; set `CI=true` and `ASPNETCORE_ENVIRONMENT=CI` before
 `e2e:ci` so the E2E tier uses its mocks):
 
