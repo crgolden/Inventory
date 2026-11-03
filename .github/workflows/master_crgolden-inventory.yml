@@ -166,18 +166,21 @@ jobs:
           SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
           SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
         run: |
-          ${{ runner.temp }}/scanner/dotnet-sonarscanner begin `
-            /k:"$env:SONAR_PROJECT_KEY" `
-            /o:"$env:SONAR_ORGANIZATION" `
-            /d:sonar.token="$env:SONAR_TOKEN" `
-            /d:sonar.host.url="https://sonarcloud.io" `
-            /d:sonar.cs.opencover.reportsPaths="coverage.opencover.xml" `
-            /d:sonar.javascript.lcov.reportPaths="coverage/lcov.info" `
-            /d:sonar.exclusions="**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" `
-            /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup*.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js,gate.ps1" `
-            /d:sonar.test.inclusions="**/*.spec.ts" `
-            /d:sonar.qualitygate.wait=true `
-            /d:sonar.scanner.skipJreProvisioning=true
+          $arguments = @(
+            'begin'
+            "/k:$env:SONAR_PROJECT_KEY"
+            "/o:$env:SONAR_ORGANIZATION"
+            "/d:sonar.token=$env:SONAR_TOKEN"
+            '/d:sonar.host.url=https://sonarcloud.io'
+            '/d:sonar.cs.opencover.reportsPaths=coverage.opencover.xml'
+            '/d:sonar.javascript.lcov.reportPaths=coverage/lcov.info'
+            '/d:sonar.exclusions=**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts'
+            '/d:sonar.coverage.exclusions=inventory.client/e2e/**,inventory.client/src/test-setup*.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js,gate.ps1'
+            '/d:sonar.test.inclusions=**/*.spec.ts'
+            '/d:sonar.qualitygate.wait=true'
+            '/d:sonar.scanner.skipJreProvisioning=true'
+          )
+          & "${{ runner.temp }}/scanner/dotnet-sonarscanner" @arguments
 
       - name: Build with dotnet
         env:
@@ -196,16 +199,19 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          dotnet coverlet Inventory.Tests.Unit/bin/Release/net10.0 `
-            --target "dotnet" `
-            --targetargs "test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait Category=Unit --stop-on-fail on --report-xunit-trx --report-xunit-trx-filename unit-tests.trx --results-directory=Inventory.Tests.Unit/bin/Release/net10.0/TestResults" `
-            --format opencover --output "coverage.opencover.xml" `
-            --skipautoprops `
-            --exclude-by-attribute GeneratedCodeAttribute `
-            --exclude-by-file "**/obj/**" `
-            --exclude-by-file "**/Program.cs" `
-            --does-not-return-attribute DoesNotReturnAttribute `
-            --include "[Inventory.Server]*"
+          $arguments = @(
+            'Inventory.Tests.Unit/bin/Release/net10.0'
+            '--target', 'dotnet'
+            '--targetargs', 'test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait Category=Unit --stop-on-fail on --report-xunit-trx --report-xunit-trx-filename unit-tests.trx --results-directory=Inventory.Tests.Unit/bin/Release/net10.0/TestResults'
+            '--format', 'opencover', '--output', 'coverage.opencover.xml'
+            '--skipautoprops'
+            '--exclude-by-attribute', 'GeneratedCodeAttribute'
+            '--exclude-by-file', '**/obj/**'
+            '--exclude-by-file', '**/Program.cs'
+            '--does-not-return-attribute', 'DoesNotReturnAttribute'
+            '--include', '[Inventory.Server]*'
+          )
+          dotnet coverlet @arguments
 
       - name: Get Playwright version
         id: playwright-version
@@ -236,9 +242,8 @@ jobs:
       - name: Fix LCOV paths for SonarQube
         if: github.actor != 'dependabot[bot]'
         run: |
-          (Get-Content "inventory.client/coverage/lcov.info") `
-            -replace '\\', '/' |
-            Set-Content "inventory.client/coverage/lcov.info"
+          $lcov = Get-Content "inventory.client/coverage/lcov.info"
+          $lcov -replace '\\', '/' | Set-Content "inventory.client/coverage/lcov.info"
 
       - name: Upload test results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

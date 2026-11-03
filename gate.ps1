@@ -1,4 +1,4 @@
-param([string]$Goal, [string]$Probe)
+param([string]$Goal, [string]$Probe, [string]$Only)
 
 $ErrorActionPreference = 'Continue'
 $gateCommon = $env:GATE_LIBRARY
@@ -62,9 +62,63 @@ $env:TZ = 'UTC'
 $env:CI = 'true'
 if ($env:TZ -ne 'UTC') { Write-Host 'GATE: FAILED (TZ pin)'; exit 1 }
 Set-Location $repo
-Initialize-GateState 'Inventory' $repo -Probe $Probe
+$probeSteps = @('Run unit tests with coverage', 'Run UI tests', 'Run browser E2E tests')
+if ($Only -and -not $Probe) { Write-Host 'PROBE: FAILED (-Only names the one test a probe runs, so it needs -Probe)'; exit 1 }
+if ($Probe -and ($Probe.Trim() -cnotin $probeSteps -or [string]::IsNullOrWhiteSpace($Only) -or $Only.Contains(','))) {
+    Write-Host "PROBE: FAILED (a probe runs exactly one test: -Probe '<$($probeSteps -join ' | ')>' -Only '<the test's name, or a fully qualified .NET test method>')"
+    exit 1
+}
+$gateState = @{ Probe = $Probe }
+if ((Get-Command Initialize-GateState).Parameters.ContainsKey('Only')) { $gateState['Only'] = $Only }
+Initialize-GateState 'Inventory' $repo @gateState
 Resolve-OwedSteps
 Invoke-CatalogSteps
+
+if ($Probe) {
+    $probeStep = $Probe.Trim()
+    $probeReport = Join-Path $gateOutput 'probe-report'
+    $global:LASTEXITCODE = $null
+    if ($probeStep -ceq 'Run unit tests with coverage') {
+        $probeTrx = Join-Path $probeReport 'probe.trx'
+        if (Test-Path -LiteralPath $probeTrx) { Remove-Item -LiteralPath $probeTrx -Force }
+        dotnet test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-method $Only --report-xunit-trx --report-xunit-trx-filename probe.trx --results-directory=$probeReport
+        $probeExit = $global:LASTEXITCODE
+        if (-not (Test-Path -LiteralPath $probeTrx)) { Stop-Gate $probeStep "no TRX (exit $probeExit)" }
+        $counters = ([xml](Get-Content -LiteralPath $probeTrx -Raw)).TestRun.ResultSummary.Counters
+        $passed = [int]$counters.passed
+        $failed = [int]$counters.failed
+    }
+    else {
+        $probeJson = Join-Path $gateOutput 'probe-report.json'
+        if (Test-Path -LiteralPath $probeJson) { Remove-Item -LiteralPath $probeJson -Force }
+        Set-Location $client
+        if ($probeStep -ceq 'Run UI tests') {
+            npx --no -- vitest run --coverage.enabled=false --reporter=json --outputFile="$probeJson" -t $Only
+            $probeExit = $global:LASTEXITCODE
+            if (-not (Test-Path -LiteralPath $probeJson)) { Stop-Gate $probeStep "no JSON report (exit $probeExit)" }
+            $report = Get-Content -LiteralPath $probeJson -Raw | ConvertFrom-Json
+            $passed = [int]$report.numPassedTests
+            $failed = [int]$report.numFailedTests
+        }
+        else {
+            $env:PLAYWRIGHT_JSON_OUTPUT_NAME = $probeJson
+            npx --no -- bddgen
+            npx --no -- playwright test --project=chromium --no-deps --reporter=json --grep $Only
+            $probeExit = $global:LASTEXITCODE
+            Remove-Item Env:PLAYWRIGHT_JSON_OUTPUT_NAME -ErrorAction SilentlyContinue
+            if (-not (Test-Path -LiteralPath $probeJson)) { Stop-Gate $probeStep "no JSON report (exit $probeExit)" }
+            $report = Get-Content -LiteralPath $probeJson -Raw | ConvertFrom-Json
+            $passed = [int]$report.stats.expected
+            $failed = [int]$report.stats.unexpected
+        }
+        Set-Location $repo
+    }
+    if ($probeExit -ne 0 -or $passed -ne 1 -or $failed -ne 0) {
+        Stop-Gate $probeStep "a probe runs one test, and '$Only' passed $passed, failed $failed (exit $probeExit)"
+    }
+    Write-Row $probeStep 'PASS' "one test, '$Only', passed (the last build; a probe builds nothing)"
+    Complete-Gate
+}
 
 $installed = (Test-Path (Join-Path $client 'node_modules\.package-lock.json')) -and
     (Test-Path (Join-Path $client 'node_modules\ajv')) -and (Test-Path (Join-Path $client 'node_modules\.bin\tsc.cmd'))
