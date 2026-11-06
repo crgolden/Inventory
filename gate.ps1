@@ -1,4 +1,4 @@
-param([string]$Goal, [string]$Probe, [string]$Only)
+param([string]$Goal, [string]$Only)
 
 $ErrorActionPreference = 'Continue'
 $gateCommon = $env:GATE_LIBRARY
@@ -62,28 +62,27 @@ $env:TZ = 'UTC'
 $env:CI = 'true'
 if ($env:TZ -ne 'UTC') { Write-Host 'GATE: FAILED (TZ pin)'; exit 1 }
 Set-Location $repo
-$probeSteps = @('Run unit tests with coverage', 'Run UI tests', 'Run browser E2E tests')
-if ($Only -and -not $Probe) { Write-Host 'PROBE: FAILED (-Only names the one test a probe runs, so it needs -Probe)'; exit 1 }
-if ($Probe -and ($Probe.Trim() -cnotin $probeSteps -or [string]::IsNullOrWhiteSpace($Only) -or $Only.Contains(','))) {
-    Write-Host "PROBE: FAILED (a probe runs exactly one test: -Probe '<$($probeSteps -join ' | ')>' -Only '<the test's name, or a fully qualified .NET test method>')"
-    exit 1
-}
-$gateState = @{ Probe = $Probe }
-if ((Get-Command Initialize-GateState).Parameters.ContainsKey('Only')) { $gateState['Only'] = $Only }
-Initialize-GateState 'Inventory' $repo @gateState
-Resolve-OwedSteps
-Invoke-CatalogSteps
-
-if ($Probe) {
-    $probeStep = $Probe.Trim()
+$probeRoots = @('Inventory.Tests.Unit/', 'inventory.client/src/', 'inventory.client/e2e/')
+if ($Only) {
+    $probeFile, $probeTest = $Only -split '::', 2
+    $probeFile = "$probeFile".Trim().Replace('\', '/')
+    $probeTest = "$probeTest".Trim()
+    $probeRoot = $probeRoots | Where-Object { $probeFile.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+    if (-not $probeTest -or $probeTest.Contains(',') -or -not $probeRoot -or
+            -not (Test-Path -LiteralPath (Join-Path $repo $probeFile) -PathType Leaf)) {
+        Write-Host "PROBE: FAILED (a probe runs exactly one test, named by the file it lives in: -Only '<a test file under $($probeRoots -join ' | ')>::<the test's name>')"
+        exit 1
+    }
     $probeReport = Join-Path $gateOutput 'probe-report'
+    Write-Host "PROBE: running one test, '$probeTest' of $probeFile; no gate record or verdict is written"
     $global:LASTEXITCODE = $null
-    if ($probeStep -ceq 'Run unit tests with coverage') {
+    if ($probeRoot -eq $probeRoots[0]) {
+        $probeClass = [IO.Path]::GetFileNameWithoutExtension($probeFile)
         $probeTrx = Join-Path $probeReport 'probe.trx'
         if (Test-Path -LiteralPath $probeTrx) { Remove-Item -LiteralPath $probeTrx -Force }
-        dotnet test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-method $Only --report-xunit-trx --report-xunit-trx-filename probe.trx --results-directory=$probeReport
+        dotnet test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-query "/*/*/$probeClass/$probeTest" --report-xunit-trx --report-xunit-trx-filename probe.trx --results-directory=$probeReport
         $probeExit = $global:LASTEXITCODE
-        if (-not (Test-Path -LiteralPath $probeTrx)) { Stop-Gate $probeStep "no TRX (exit $probeExit)" }
+        if (-not (Test-Path -LiteralPath $probeTrx)) { Write-Host "PROBE: FAILED (no TRX, exit $probeExit)"; exit 1 }
         $counters = ([xml](Get-Content -LiteralPath $probeTrx -Raw)).TestRun.ResultSummary.Counters
         $passed = [int]$counters.passed
         $failed = [int]$counters.failed
@@ -92,10 +91,11 @@ if ($Probe) {
         $probeJson = Join-Path $gateOutput 'probe-report.json'
         if (Test-Path -LiteralPath $probeJson) { Remove-Item -LiteralPath $probeJson -Force }
         Set-Location $client
-        if ($probeStep -ceq 'Run UI tests') {
-            npx --no -- vitest run --coverage.enabled=false --reporter=json --outputFile="$probeJson" -t $Only
+        $clientFile = $probeFile.Substring('inventory.client/'.Length)
+        if ($probeRoot -eq $probeRoots[1]) {
+            npx --no -- vitest run $clientFile --coverage.enabled=false --reporter=json --outputFile="$probeJson" -t $probeTest
             $probeExit = $global:LASTEXITCODE
-            if (-not (Test-Path -LiteralPath $probeJson)) { Stop-Gate $probeStep "no JSON report (exit $probeExit)" }
+            if (-not (Test-Path -LiteralPath $probeJson)) { Write-Host "PROBE: FAILED (no JSON report, exit $probeExit)"; exit 1 }
             $report = Get-Content -LiteralPath $probeJson -Raw | ConvertFrom-Json
             $passed = [int]$report.numPassedTests
             $failed = [int]$report.numFailedTests
@@ -103,10 +103,10 @@ if ($Probe) {
         else {
             $env:PLAYWRIGHT_JSON_OUTPUT_NAME = $probeJson
             npx --no -- bddgen
-            npx --no -- playwright test --project=chromium --no-deps --reporter=json --grep $Only
+            npx --no -- playwright test --project=chromium --no-deps --reporter=json --grep $probeTest
             $probeExit = $global:LASTEXITCODE
             Remove-Item Env:PLAYWRIGHT_JSON_OUTPUT_NAME -ErrorAction SilentlyContinue
-            if (-not (Test-Path -LiteralPath $probeJson)) { Stop-Gate $probeStep "no JSON report (exit $probeExit)" }
+            if (-not (Test-Path -LiteralPath $probeJson)) { Write-Host "PROBE: FAILED (no JSON report, exit $probeExit)"; exit 1 }
             $report = Get-Content -LiteralPath $probeJson -Raw | ConvertFrom-Json
             $passed = [int]$report.stats.expected
             $failed = [int]$report.stats.unexpected
@@ -114,11 +114,15 @@ if ($Probe) {
         Set-Location $repo
     }
     if ($probeExit -ne 0 -or $passed -ne 1 -or $failed -ne 0) {
-        Stop-Gate $probeStep "a probe runs one test, and '$Only' passed $passed, failed $failed (exit $probeExit)"
+        Write-Host "PROBE: FAILED (a probe runs one test, and '$probeTest' passed $passed, failed $failed, exit $probeExit)"
+        exit 1
     }
-    Write-Row $probeStep 'PASS' "one test, '$Only', passed (the last build; a probe builds nothing)"
-    Complete-Gate
+    Write-Host 'PROBE: PASSED for the one test named, against the last build; no verdict was saved'
+    exit 0
 }
+Initialize-GateState 'Inventory' $repo
+Resolve-OwedSteps
+Invoke-CatalogSteps
 
 $installed = (Test-Path (Join-Path $client 'node_modules\.package-lock.json')) -and
     (Test-Path (Join-Path $client 'node_modules\ajv')) -and (Test-Path (Join-Path $client 'node_modules\.bin\tsc.cmd'))
