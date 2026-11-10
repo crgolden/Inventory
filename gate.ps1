@@ -120,6 +120,7 @@ if ($Only) {
     Write-Host 'PROBE: PASSED for the one test named, against the last build; no verdict was saved'
     exit 0
 }
+exit (Invoke-Gate {
 Initialize-GateState 'Inventory' $repo
 Resolve-OwedSteps
 Invoke-CatalogSteps
@@ -132,33 +133,33 @@ Write-Row 'node_modules install markers' 'PASS' 'ajv, tsc.cmd present; every pac
 
 $global:LASTEXITCODE = $null
 dotnet tool restore
-$null = Test-Exit 'Restore local tools (dotnet tool restore)'
+Assert-StepExit 'Restore local tools (dotnet tool restore)'
 
 Set-Location $client
 if (-not (Test-StepCarried 'npm run lint')) {
     $global:LASTEXITCODE = $null
     npm run lint
-    $null = Test-Exit 'npm run lint'
+    Assert-StepExit 'npm run lint'
 }
 if (-not (Test-StepCarried 'npm run typecheck:e2e')) {
     $global:LASTEXITCODE = $null
     npm run typecheck:e2e
-    $null = Test-Exit 'npm run typecheck:e2e'
+    Assert-StepExit 'npm run typecheck:e2e'
 }
 if (-not (Test-StepCarried 'npm run typecheck:spec')) {
     $global:LASTEXITCODE = $null
     npm run typecheck:spec
-    $null = Test-Exit 'npm run typecheck:spec'
+    Assert-StepExit 'npm run typecheck:spec'
 }
 if (-not (Test-StepCarried 'npm run lint:css')) {
     $global:LASTEXITCODE = $null
     npm run lint:css
-    $null = Test-Exit 'npm run lint:css'
+    Assert-StepExit 'npm run lint:css'
 }
 if (-not (Test-StepCarried 'npm run audit')) {
     $global:LASTEXITCODE = $null
     npm run audit
-    $null = Test-Exit 'npm run audit'
+    Assert-StepExit 'npm run audit'
 }
 Set-Location $repo
 
@@ -173,11 +174,11 @@ else {
     $env:JAVA_HOME = Get-SonarScannerJavaHome $beginSonar
     $global:LASTEXITCODE = $null
     dotnet-sonarscanner begin /k:"crgolden_Inventory" /o:"crgolden" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.opencover.reportsPaths="coverage.opencover.xml" /d:sonar.javascript.lcov.reportPaths="coverage/lcov.info" /d:sonar.exclusions="**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup*.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js,gate.ps1" /d:sonar.test.inclusions="**/*.spec.ts" /d:sonar.qualitygate.wait=true /d:sonar.scanner.skipJreProvisioning=true /d:sonar.branch.name="$sonarBranch"
-    $null = Test-Exit $beginSonar
+    Assert-StepExit $beginSonar
 
     $global:LASTEXITCODE = $null
     dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci /p:RestoreLockedMode=true /nodeReuse:false -warnaserror
-    $null = Test-Exit $build
+    Assert-StepExit $build
 }
 
 if (-not (Test-StepCarried 'jb inspectcode')) {
@@ -204,7 +205,7 @@ Install-PlaywrightBrowsers 'Install Playwright browsers' { npx playwright instal
 if (-not (Test-StepCarried $uiStep)) {
     $global:LASTEXITCODE = $null
     npx --no -- vitest run --coverage
-    $null = Test-Exit $uiStep
+    Assert-StepExit $uiStep
 }
 
 $plantStep = "Vitest bail plant ($plantedFailures failing tests planted, bail: 1 must stop the run before the second)"
@@ -242,7 +243,7 @@ if (-not (Test-StepCarried $e2eStep)) {
     $env:ASPNETCORE_ENVIRONMENT = 'CI'
     $global:LASTEXITCODE = $null
     npm run e2e:ci
-    $null = Test-Exit $e2eStep
+    Assert-StepExit $e2eStep
     $floorStep = 'Browser E2E executed at least its floor'
     if (-not (Test-Path $results)) { Stop-Gate $floorStep 'playwright-results.xml missing' }
     $floor = [int](Get-Content (Join-Path $client 'e2e\e2e-settings.json') -Raw | ConvertFrom-Json).executedTestFloor
@@ -261,16 +262,17 @@ if (-not (Test-StepCarried $publishStep)) {
 if (-not (Test-StepCarried 'npm run lint:utilities')) {
     $global:LASTEXITCODE = $null
     npm run lint:utilities
-    $null = Test-Exit 'npm run lint:utilities'
+    Assert-StepExit 'npm run lint:utilities'
 }
 Set-Location $repo
 
 if (-not $sonarCarried) {
     $global:LASTEXITCODE = $null
     dotnet-sonarscanner end
-    $null = Test-Exit $endSonar
+    Assert-StepExit $endSonar
     Test-SonarIssues $sonarIssues 'crgolden_Inventory' $sonarBranch $sonarStartedAt
 }
 
 Write-Row 'Upload test results / Publish E2E scenario results / dotnet publish / upload artifact / deploy' 'NOT RUN' 'delivery steps, not checks'
 Complete-Gate
+})
