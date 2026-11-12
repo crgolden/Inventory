@@ -18,7 +18,7 @@
     "e2e:synthetic": "playwright test --project=synthetic",
     "typecheck:e2e": "bddgen && tsc -p tsconfig.e2e.json",
     "typecheck:spec": "tsc -p tsconfig.spec.json --noEmit",
-    "playwright:install": "playwright install --with-deps chromium",
+    "playwright:install": "playwright install chromium",
     "prestart": "node aspnetcore-https",
     "start:windows": "ng serve --ssl --ssl-cert \"%APPDATA%\\ASP.NET\\https\\%npm_package_name%.pem\" --ssl-key \"%APPDATA%\\ASP.NET\\https\\%npm_package_name%.key\" --host=127.0.0.1",
     "start:default": "ng serve --ssl --ssl-cert \"$HOME/.aspnet/https/${npm_package_name}.pem\" --ssl-key \"$HOME/.aspnet/https/${npm_package_name}.key\" --host=127.0.0.1",
@@ -76,6 +76,7 @@
     "zone.js": "^0.16.3"
   },
   "overrides": {
+    "minimatch": "^11.0.1",
     "undici": "^7.24.4",
     "vite": "^8.3.4"
   }
