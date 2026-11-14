@@ -50,7 +50,7 @@ $sarif = Join-Path $scratch 'inventory-inspect.sarif'
 $bailReport = Join-Path $scratch 'inventory-bail-plant.json'
 $plant = Join-Path $client 'src\zz-bail-plant.spec.ts'
 $plantedFailures = 3
-$unitTrx = Join-Path $repo 'Inventory.Tests.Unit\bin\Release\net10.0\TestResults\unit-tests.trx'
+$unitTrx = Join-Path $repo 'Inventory.Tests.Unit\bin\Release\net11.0\TestResults\unit-tests.trx'
 $sonarBranch = Get-SonarBranchName
 $beginSonar = "Begin Sonar analysis (branch $sonarBranch)"
 $build = 'Build with dotnet (Release, AngularConfiguration=ci, RestoreLockedMode)'
@@ -190,9 +190,9 @@ if (-not (Test-StepCarried 'jb inspectcode')) {
 if (-not (Test-StepCarried $unitStep)) {
     if (Test-Path $unitTrx) { Remove-Item $unitTrx -Force }
     $global:LASTEXITCODE = $null
-    dotnet coverlet Inventory.Tests.Unit\bin\Release\net10.0 `
+    dotnet coverlet Inventory.Tests.Unit\bin\Release\net11.0 `
         --target "dotnet" `
-        --targetargs "test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait Category=Unit --stop-on-fail on --report-xunit-trx --report-xunit-trx-filename unit-tests.trx --results-directory=Inventory.Tests.Unit/bin/Release/net10.0/TestResults" `
+        --targetargs "test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait Category=Unit --stop-on-fail on --report-xunit-trx --report-xunit-trx-filename unit-tests.trx --results-directory=Inventory.Tests.Unit/bin/Release/net11.0/TestResults" `
         --format opencover --output "coverage.opencover.xml" `
         --skipautoprops --exclude-by-attribute GeneratedCodeAttribute --exclude-by-file "**/obj/**" `
         --exclude-by-file "**/Program.cs" --does-not-return-attribute DoesNotReturnAttribute --include "[Inventory.Server]*"

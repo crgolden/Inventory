@@ -51,7 +51,7 @@ No Azure credentials are needed for any tier: Key Vault, Blob Storage and Elasti
 
 ```powershell
 dotnet build Inventory.Tests.Unit --configuration Debug
-.\Inventory.Tests.Unit\bin\Debug\net10.0\Inventory.Tests.Unit.exe -trait "Category=Unit" -showLiveOutput
+.\Inventory.Tests.Unit\bin\Debug\net11.0\Inventory.Tests.Unit.exe -trait "Category=Unit" -showLiveOutput
 ```
 
 Prefer `Debug` here. `Release` re-runs `ng build --configuration production` on every build because the
@@ -108,7 +108,7 @@ Cleanup is described under **The suite sweeps before and after the run** below.
 
 ```powershell
 dotnet build Inventory.Tests.Unit --configuration Debug
-.\Inventory.Tests.Unit\bin\Debug\net10.0\Inventory.Tests.Unit.exe -showLiveOutput
+.\Inventory.Tests.Unit\bin\Debug\net11.0\Inventory.Tests.Unit.exe -showLiveOutput
 cd inventory.client && npx vitest run --coverage && npm run e2e:ci
 ```
 
@@ -406,7 +406,7 @@ deployed BFF out of process, so nothing instruments it, and `inventory.client/e2
 # .NET unit (OpenCover) — the Inventory.Server BFF surface is tiny; real client logic is Vitest/LCOV
 dotnet build Inventory.Tests.Unit --configuration Release /p:AngularConfiguration=ci
 dotnet tool restore
-dotnet coverlet Inventory.Tests.Unit\bin\Release\net10.0 `
+dotnet coverlet Inventory.Tests.Unit\bin\Release\net11.0 `
   --target "dotnet" `
   --targetargs "test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait Category=Unit" `
   --format opencover --output "coverage.opencover.xml" `

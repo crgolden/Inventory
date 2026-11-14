@@ -16,7 +16,7 @@ design rules: [DESIGN.md](DESIGN.md). Every test tier and how to run it: [TESTIN
 
 | Layer | Technology |
 |---|---|
-| Server | .NET 10 (`global.json`), ASP.NET Core, Duende BFF 4 (`Duende.BFF.Yarp`) |
+| Server | .NET 11 (`global.json`), ASP.NET Core, Duende BFF 4 (`Duende.BFF.Yarp`) |
 | Client | Angular 22, zoneless, signals; Tailwind CSS v4; Node.js 24 (`inventory.client/.nvmrc`) |
 | Shared packages | the `Shared` NuGet package and the `@crgolden/modules` npm package, both from GitHub Packages |
 | Observability (production) | OpenTelemetry over OTLP; Serilog to Elasticsearch |
@@ -25,7 +25,7 @@ design rules: [DESIGN.md](DESIGN.md). Every test tier and how to run it: [TESTIN
 
 ## Prerequisites
 
-- The .NET 10 SDK and Node.js 24.
+- The .NET 11 SDK and Node.js 24.
 - A GitHub personal access token with the `read:packages` scope. `NuGet.Config` and `inventory.client/.npmrc` read
   the `crgolden` GitHub Packages feed, which asks for a token even for a public package, and `dotnet build` runs
   `npm install` for the client. Store it outside the repo, for NuGet and for npm:
