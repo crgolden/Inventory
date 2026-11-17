@@ -120,8 +120,8 @@
       },
       "Duende.BFF": {
         "type": "Transitive",
-        "resolved": "4.3.3",
-        "contentHash": "QqI0esve+Cb1uojgqOLTNZN172shIPwCD320/Eoft1jH497nlket0cjvWafd0Uf7YOs839MOn+QXpEt0T+wxbw==",
+        "resolved": "4.3.4",
+        "contentHash": "hRyIZ6+mIlGv9OGly5TfNJDDFsdM91OY1icaYjTbrGDgAkGrumW/gdEhikAj3s4QHh9eG2f6V9V219QNVMiW5Q==",
         "dependencies": {
           "Duende.AccessTokenManagement.OpenIdConnect": "4.1.1",
           "Duende.Private.Licensing": "2.0.3",
@@ -130,10 +130,10 @@
       },
       "Duende.BFF.Yarp": {
         "type": "Transitive",
-        "resolved": "4.3.3",
-        "contentHash": "LPx5hmW+84zPOFvbcHpFaDhntAYnFd1sAeJvnpmXPjpuk1QD5S4mEEdxLfTAm8iS1KO1Fke7CbIPoJBV4tf40Q==",
+        "resolved": "4.3.4",
+        "contentHash": "jPB9egSoGBtz1zxlDLoY9sO64lRsrPhdNemLqtGmpG6KJTlmCVMIuG7CUzffxwOyBoSnatStyaOGaLKNyq/lMA==",
         "dependencies": {
-          "Duende.BFF": "4.3.3",
+          "Duende.BFF": "4.3.4",
           "Yarp.ReverseProxy": "2.3.0"
         }
       },
@@ -722,7 +722,7 @@
           "Azure.Extensions.AspNetCore.DataProtection.Blobs": "[1.5.5, )",
           "Azure.Extensions.AspNetCore.DataProtection.Keys": "[1.6.5, )",
           "Azure.Identity": "[1.21.0, )",
-          "Duende.BFF.Yarp": "[4.3.3, )",
+          "Duende.BFF.Yarp": "[4.3.4, )",
           "Elastic.Serilog.Sinks": "[9.0.0, )",
           "Microsoft.AspNetCore.SpaProxy": "[11.0.0, )",
           "Microsoft.Extensions.Azure": "[1.14.1, )",
