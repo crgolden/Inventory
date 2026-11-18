@@ -14,35 +14,33 @@ $gateOutput = if (Get-Command Get-GateOutputDirectory -ErrorAction SilentlyConti
 }
 $GateDelta = @('plant:inventory.client/src/zz-bail-plant.spec.ts')
 
-Register-GateSteps @('node_modules install markers', 'Restore local tools',
+Register-GateStep @('node_modules install markers', 'Restore local tools',
     'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec', 'npm run lint:css', 'npm run audit', 'Begin Sonar analysis', 'Build with dotnet',
     'jb inspectcode', 'Run unit tests with coverage', 'Install Playwright browsers', 'Run UI tests', 'Vitest bail plant',
     'Fix LCOV paths', 'Run browser E2E tests', 'Browser E2E executed at least its floor', 'Publish command reaches the CLI',
     'npm run lint:utilities', 'End Sonar analysis', 'Fail on open Sonar issues')
-Register-StepInputs @{
-    'node_modules install markers'            = @('*')
-    'Restore local tools'                     = @('dotnet-tools.json')
-    'npm run lint'                            = @('inventory.client/src/*', 'inventory.client/*.ts', 'inventory.client/*.mts', 'inventory.client/*.js', 'inventory.client/*.mjs', 'inventory.client/*.cjs', 'inventory.client/eslint-sonar.rules.json', 'inventory.client/angular.json', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
-    'npm run typecheck:e2e'                   = @('inventory.client/src/*', 'inventory.client/e2e/*', 'inventory.client/playwright.config.ts', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
-    'npm run typecheck:spec'                  = @('inventory.client/src/*', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
-    'npm run lint:css'                        = @('inventory.client/src/*', 'inventory.client/stylelint.config.mjs', 'inventory.client/package.json', 'inventory.client/package-lock.json', 'inventory.client/tools/stylelint/*')
-    'npm run audit'                           = @('inventory.client/package.json', 'inventory.client/package-lock.json')
-    'Begin Sonar analysis'                    = @('*')
-    'Build with dotnet'                       = @('*')
-    'jb inspectcode'                          = @('*')
-    'Run unit tests with coverage'            = @('*', '!inventory.client/e2e/*', '!inventory.client/src/*.spec.ts')
-    'Install Playwright browsers'             = @('*')
-    'Run UI tests'                            = @('*', '!Inventory.Tests.Unit/*', '!inventory.client/e2e/*')
-    'Vitest bail plant'                       = @('*', '!Inventory.Tests.Unit/*', '!inventory.client/e2e/*')
-    'Fix LCOV paths'                          = @('*', '!Inventory.Tests.Unit/*', '!inventory.client/e2e/*')
-    'Run browser E2E tests'                   = @('*', '!Inventory.Tests.Unit/*', '!inventory.client/src/*.spec.ts')
-    'Browser E2E executed at least its floor' = @('*', '!Inventory.Tests.Unit/*', '!inventory.client/src/*.spec.ts')
-    'Publish command reaches the CLI'         = @('*')
-    'npm run lint:utilities'                  = @('*')
-    'End Sonar analysis'                      = @('*')
-    'Fail on open Sonar issues'               = @('*')
-}
-Register-VolatileSteps @('npm run audit')
+Register-StepInput 'node_modules install markers' @('*')
+Register-StepInput 'Restore local tools' @('dotnet-tools.json')
+Register-StepInput 'npm run lint' @('inventory.client/src/*', 'inventory.client/*.ts', 'inventory.client/*.mts', 'inventory.client/*.js', 'inventory.client/*.mjs', 'inventory.client/*.cjs', 'inventory.client/eslint-sonar.rules.json', 'inventory.client/angular.json', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
+Register-StepInput 'npm run typecheck:e2e' @('inventory.client/src/*', 'inventory.client/e2e/*', 'inventory.client/playwright.config.ts', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
+Register-StepInput 'npm run typecheck:spec' @('inventory.client/src/*', 'inventory.client/tsconfig*.json', 'inventory.client/package.json', 'inventory.client/package-lock.json')
+Register-StepInput 'npm run lint:css' @('inventory.client/src/*', 'inventory.client/stylelint.config.mjs', 'inventory.client/package.json', 'inventory.client/package-lock.json', 'inventory.client/tools/stylelint/*')
+Register-StepInput 'npm run audit' @('inventory.client/package.json', 'inventory.client/package-lock.json')
+Register-StepInput 'Begin Sonar analysis' @('*')
+Register-StepInput 'Build with dotnet' @('*')
+Register-StepInput 'jb inspectcode' @('*')
+Register-StepInput 'Run unit tests with coverage' @('*', '!inventory.client/e2e/*', '!inventory.client/src/*.spec.ts')
+Register-StepInput 'Install Playwright browsers' @('*')
+Register-StepInput 'Run UI tests' @('*', '!Inventory.Tests.Unit/*', '!inventory.client/e2e/*')
+Register-StepInput 'Vitest bail plant' @('*', '!Inventory.Tests.Unit/*', '!inventory.client/e2e/*')
+Register-StepInput 'Fix LCOV paths' @('*', '!Inventory.Tests.Unit/*', '!inventory.client/e2e/*')
+Register-StepInput 'Run browser E2E tests' @('*', '!Inventory.Tests.Unit/*', '!inventory.client/src/*.spec.ts')
+Register-StepInput 'Browser E2E executed at least its floor' @('*', '!Inventory.Tests.Unit/*', '!inventory.client/src/*.spec.ts')
+Register-StepInput 'Publish command reaches the CLI' @('*')
+Register-StepInput 'npm run lint:utilities' @('*')
+Register-StepInput 'End Sonar analysis' @('*')
+Register-StepInput 'Fail on open Sonar issues' @('*')
+Register-VolatileStep @('npm run audit')
 $repo = $PSScriptRoot
 $client = Join-Path $repo 'inventory.client'
 $scratch = $gateOutput
@@ -122,8 +120,8 @@ if ($Only) {
 }
 exit (Invoke-Gate {
 Initialize-GateState 'Inventory' $repo
-Resolve-OwedSteps
-Invoke-CatalogSteps
+Get-OwedStep | Register-OwedStep
+Invoke-GateLibraryStep
 
 $installed = (Test-Path (Join-Path $client 'node_modules\.package-lock.json')) -and
     (Test-Path (Join-Path $client 'node_modules\ajv')) -and (Test-Path (Join-Path $client 'node_modules\.bin\tsc.cmd'))
@@ -183,7 +181,7 @@ else {
 
 if (-not (Test-StepCarried 'jb inspectcode')) {
     if (Test-Path $sarif) { Remove-Item $sarif -Force }
-    dotnet jb inspectcode "$repo\Inventory.slnx" --no-build -e=WARNING --caches-home="$(New-InspectCodeCaches $gateOutput)" --output="$sarif" --exclude="**/coverage/**;**/dist/**;**/node_modules/**;**/bin/**;**/obj/**"
+    dotnet jb inspectcode "$repo\Inventory.slnx" --no-build -e=WARNING --caches-home="$(New-InspectCodeCache $gateOutput)" --output="$sarif" --exclude="**/coverage/**;**/dist/**;**/node_modules/**;**/bin/**;**/obj/**"
     Test-Sarif $sarif
 }
 
@@ -200,7 +198,7 @@ if (-not (Test-StepCarried $unitStep)) {
 }
 
 Set-Location $client
-Install-PlaywrightBrowsers 'Install Playwright browsers' { npx playwright install --dry-run chromium } { npm run playwright:install }
+Install-PlaywrightBrowser 'Install Playwright browsers' { npx playwright install --dry-run chromium } { npm run playwright:install }
 
 if (-not (Test-StepCarried $uiStep)) {
     $global:LASTEXITCODE = $null
@@ -270,7 +268,7 @@ if (-not $sonarCarried) {
     $global:LASTEXITCODE = $null
     dotnet-sonarscanner end
     Assert-StepExit $endSonar
-    Test-SonarIssues $sonarIssues 'crgolden_Inventory' $sonarBranch $sonarStartedAt
+    Assert-NoOpenSonarIssue $sonarIssues 'crgolden_Inventory' $sonarBranch $sonarStartedAt
 }
 
 Write-Row 'Upload test results / Publish E2E scenario results / dotnet publish / upload artifact / deploy' 'NOT RUN' 'delivery steps, not checks'
