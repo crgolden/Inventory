@@ -179,6 +179,7 @@ jobs:
             '/d:sonar.test.inclusions=**/*.spec.ts'
             '/d:sonar.qualitygate.wait=true'
             '/d:sonar.scanner.skipJreProvisioning=true'
+            '/d:sonar.scm.use.blame.algorithm=GIT_NATIVE_BLAME'
           )
           & "${{ runner.temp }}/scanner/dotnet-sonarscanner" @arguments
 

@@ -20,7 +20,7 @@ module.exports = defineConfig(
       ...angular.configs.tsRecommended,
       prettierConfig,
     ],
-    processor: angular.processInlineTemplates,
+    processor: angular.createProcessor(),
     languageOptions: {
       parserOptions: {
         projectService: true,
