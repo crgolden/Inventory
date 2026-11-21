@@ -13,11 +13,13 @@ using Serilog.Extensions.Logging;
 public sealed class DuendeLicenseNoticeTests
 {
     private const string LicenseValidatorSourceContext = DuendeLicenseNotice.LicenseValidatorSourceContext;
-    private const string DroppedEventName = DuendeLicenseNotice.NoLicenseConfiguredEventName;
-    private const string LicenseHasExpiredEventName = DuendeLicenseEventConstants.LicenseHasExpiredEventName;
-    private const string LicenseDetailsEventName = DuendeLicenseEventConstants.LicenseDetailsEventName;
-    private const string TrialModeWarningEventName = DuendeLicenseEventConstants.TrialModeWarningEventName;
-    private const string ErrorValidatingLicenseKeyEventName = DuendeLicenseEventConstants.ErrorValidatingLicenseKeyEventName;
+    private const string ErrorValidatingV2LicenseKeyEventName = DuendeLicenseEventConstants.ErrorValidatingV2LicenseKeyEventName;
+    private const string LicenseExpiredEventName = DuendeLicenseEventConstants.LicenseExpiredEventName;
+    private const string FeatureNotLicensedEventName = DuendeLicenseEventConstants.FeatureNotLicensedEventName;
+    private const string QuantizedExceedsLimitEventName = DuendeLicenseEventConstants.QuantizedExceedsLimitEventName;
+    private const string QuantizedExceedsGraceEventName = DuendeLicenseEventConstants.QuantizedExceedsGraceEventName;
+    private const string LicenseValidUntilEventName = DuendeLicenseEventConstants.LicenseValidUntilEventName;
+    private const string LicenseValidEventName = DuendeLicenseEventConstants.LicenseValidEventName;
 
     private static readonly int DroppedEventIdentifier = Generated.NewEventIdentifier();
 
@@ -25,7 +27,7 @@ public sealed class DuendeLicenseNoticeTests
     public void IsNoLicenseConfiguredNotice_DropsTheUnlicensedNotice()
     {
         // Arrange
-        var eventId = new EventId(DroppedEventIdentifier, DroppedEventName);
+        var eventId = new EventId(DroppedEventIdentifier, DuendeLicenseNotice.NoValidLicenseKeyEventName);
 
         // Act
         var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Error);
@@ -35,11 +37,62 @@ public sealed class DuendeLicenseNoticeTests
     }
 
     [Fact]
+    public void IsNoLicenseConfiguredNotice_DropsTheUnlicensedFeatureWarning()
+    {
+        // Arrange
+        var eventId = new EventId(Generated.NewEventIdentifier(), DuendeLicenseNotice.FeatureUsedNoLicenseEventName);
+
+        // Act
+        var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Warning);
+
+        // Assert
+        Assert.Empty(reachedTheSink);
+    }
+
+    [Fact]
+    public void IsNoLicenseConfiguredNotice_DropsTheUnlicensedEntitlementCountWarning()
+    {
+        // Arrange
+        var eventId = new EventId(Generated.NewEventIdentifier(), DuendeLicenseNotice.QuantizedNoLicenseEventName);
+
+        // Act
+        var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Warning);
+
+        // Assert
+        Assert.Empty(reachedTheSink);
+    }
+
+    [Fact]
+    public void IsNoLicenseConfiguredNotice_KeepsTheMalformedLicenseKeyEventFromTheSameSource()
+    {
+        // Arrange
+        var eventId = new EventId(Generated.NewEventIdentifier(), ErrorValidatingV2LicenseKeyEventName);
+
+        // Act
+        var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Critical);
+
+        // Assert
+        Assert.Single(reachedTheSink);
+    }
+
+    [Fact]
     public void IsNoLicenseConfiguredNotice_KeepsTheExpiredLicenseEventFromTheSameSource()
     {
         // Arrange
-        var licenseHasExpiredEventIdentifier = Generated.NewEventIdentifier();
-        var eventId = new EventId(licenseHasExpiredEventIdentifier, LicenseHasExpiredEventName);
+        var eventId = new EventId(Generated.NewEventIdentifier(), LicenseExpiredEventName);
+
+        // Act
+        var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Error);
+
+        // Assert
+        Assert.Single(reachedTheSink);
+    }
+
+    [Fact]
+    public void IsNoLicenseConfiguredNotice_KeepsAFeatureMissingFromAConfiguredLicense()
+    {
+        // Arrange
+        var eventId = new EventId(Generated.NewEventIdentifier(), FeatureNotLicensedEventName);
 
         // Act
         var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Warning);
@@ -49,11 +102,23 @@ public sealed class DuendeLicenseNoticeTests
     }
 
     [Fact]
-    public void IsNoLicenseConfiguredNotice_KeepsTheTrialModeSessionLimitEvent()
+    public void IsNoLicenseConfiguredNotice_KeepsAnEntitlementBeyondItsLicensedLimit()
     {
         // Arrange
-        var trialModeWarningEventIdentifier = Generated.NewEventIdentifier();
-        var eventId = new EventId(trialModeWarningEventIdentifier, TrialModeWarningEventName);
+        var eventId = new EventId(Generated.NewEventIdentifier(), QuantizedExceedsLimitEventName);
+
+        // Act
+        var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Warning);
+
+        // Assert
+        Assert.Single(reachedTheSink);
+    }
+
+    [Fact]
+    public void IsNoLicenseConfiguredNotice_KeepsAnEntitlementBeyondItsLicensedGrace()
+    {
+        // Arrange
+        var eventId = new EventId(Generated.NewEventIdentifier(), QuantizedExceedsGraceEventName);
 
         // Act
         var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Error);
@@ -63,39 +128,37 @@ public sealed class DuendeLicenseNoticeTests
     }
 
     [Fact]
-    public void IsNoLicenseConfiguredNotice_KeepsTheMalformedLicenseKeyEventFromTheSameSource()
+    public void IsNoLicenseConfiguredNotice_KeepsTheLicenseValidUntilNotice()
     {
         // Arrange
-        var errorValidatingLicenseKeyEventIdentifier = Generated.NewEventIdentifier();
-        var eventId = new EventId(errorValidatingLicenseKeyEventIdentifier, ErrorValidatingLicenseKeyEventName);
+        var eventId = new EventId(Generated.NewEventIdentifier(), LicenseValidUntilEventName);
 
         // Act
-        var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Error);
+        var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Information);
 
         // Assert
         Assert.Single(reachedTheSink);
     }
 
     [Fact]
-    public void IsNoLicenseConfiguredNotice_KeepsTheLicenseDetailsEventFromTheSameSource()
+    public void IsNoLicenseConfiguredNotice_KeepsTheValidLicenseNotice()
     {
         // Arrange
-        var licenseDetailsEventIdentifier = Generated.NewEventIdentifier();
-        var eventId = new EventId(licenseDetailsEventIdentifier, LicenseDetailsEventName);
+        var eventId = new EventId(Generated.NewEventIdentifier(), LicenseValidEventName);
 
         // Act
-        var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Debug);
+        var reachedTheSink = WriteThroughFilter(LicenseValidatorSourceContext, eventId, LogLevel.Information);
 
         // Assert
         Assert.Single(reachedTheSink);
     }
 
     [Fact]
-    public void IsNoLicenseConfiguredNotice_KeepsTheDroppedEventNameWhenItComesFromAnotherSource()
+    public void IsNoLicenseConfiguredNotice_KeepsADroppedEventNameWhenItComesFromAnotherSource()
     {
         // Arrange
         var sourceContext = $"Contoso.Licensing.{Guid.NewGuid():N}";
-        var eventId = new EventId(DroppedEventIdentifier, DroppedEventName);
+        var eventId = new EventId(DroppedEventIdentifier, DuendeLicenseNotice.NoValidLicenseKeyEventName);
 
         // Act
         var reachedTheSink = WriteThroughFilter(sourceContext, eventId, LogLevel.Error);
@@ -105,7 +168,7 @@ public sealed class DuendeLicenseNoticeTests
     }
 
     [Fact]
-    public void IsNoLicenseConfiguredNotice_KeepsAnotherEventCarryingTheDroppedEventIdentifier()
+    public void IsNoLicenseConfiguredNotice_KeepsAnotherEventCarryingADroppedEventIdentifier()
     {
         // Arrange
         var eventId = new EventId(DroppedEventIdentifier, $"Event{Guid.NewGuid():N}");

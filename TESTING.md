@@ -121,7 +121,7 @@ playwright.config.ts
   ├── webServer (CI set only): node e2e/mocks/oidc-server.ts, products-server.ts, manuals-server.ts
   ├── webServer: dotnet run --project ../Inventory.Server   (https://localhost:7150; with CI set,
   │              --no-build --configuration Release, the build the gate's own step made)
-  ├── webServer: npm start                                  (https://localhost:50212)
+  ├── webServer: npm start                                  (https://localhost:44212)
   ├── project "setup"     -> auth.setup.ts, sign-in through the BFF (mock OIDC with CI set, passkey without)
   ├── project "chromium"  -> e2e/features/*.feature, compiled by bddgen into .features-gen/chromium,
   │                          steps in e2e/steps/, reusing e2e/.auth/user.json
@@ -136,7 +136,12 @@ ordinary configuration keys (`OidcAuthority`, `ProductsApiAddress`, `ManualsApiA
 secret) and `OpenIdConnectOptions:RequireHttpsMetadata = false`, the one setting that lets it take a plain-HTTP
 provider; production leaves it at its default, `true`.
 
-**`[WebServer] An unhandled exception occurred: Port 50212 is already in use` is not the failure.** Green CI runs print
+**Every fixed local port sits below 49152.** Windows' dynamic range is 49152-65535, and WSL's network service
+(`winnat`) reserves 100-port blocks at fresh places in it on each boot (`netsh interface ipv4 show excludedportrange
+protocol=tcp`); a dev server whose port lands in one fails `listen EACCES: permission denied`, the BFF's SpaProxy
+logs only `Couldn't start the SPA development server`, and Playwright times out on `config.webServer`.
+
+**`[WebServer] An unhandled exception occurred: Port 44212 is already in use` is not the failure.** Green CI runs print
 it ahead of their passing tests, so it says nothing about the run on its own. A web server that really failed ends the
 run with `Error: Process from config.webServer was not able to start`; read the verdict from that line and the test
 summary, never from the port line.

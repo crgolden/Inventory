@@ -78,7 +78,7 @@ if ($Only) {
         $probeClass = [IO.Path]::GetFileNameWithoutExtension($probeFile)
         $probeTrx = Join-Path $probeReport 'probe.trx'
         if (Test-Path -LiteralPath $probeTrx) { Remove-Item -LiteralPath $probeTrx -Force }
-        dotnet test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-query "/*/*/$probeClass/$probeTest" --report-xunit-trx --report-xunit-trx-filename probe.trx --results-directory=$probeReport
+        dotnet test --project Inventory.Tests.Unit --configuration Release -- --filter-query "/*/*/$probeClass/$probeTest" --report-xunit-trx --report-xunit-trx-filename probe.trx --results-directory=$probeReport
         $probeExit = $global:LASTEXITCODE
         if (-not (Test-Path -LiteralPath $probeTrx)) { Write-Host "PROBE: FAILED (no TRX, exit $probeExit)"; exit 1 }
         $counters = ([xml](Get-Content -LiteralPath $probeTrx -Raw)).TestRun.ResultSummary.Counters

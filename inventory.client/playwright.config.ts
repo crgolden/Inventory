@@ -55,7 +55,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: walkerBaseUrl ?? 'https://localhost:50212',
+    baseURL: walkerBaseUrl ?? 'https://localhost:44212',
     ignoreHTTPSErrors: true,
     trace: 'retain-on-failure',
   },
@@ -73,7 +73,7 @@ export default defineConfig({
     },
     {
       command: 'npm start',
-      url: 'https://localhost:50212',
+      url: 'https://localhost:44212',
       ignoreHTTPSErrors: true,
       reuseExistingServer: true,
       timeout: 60000,

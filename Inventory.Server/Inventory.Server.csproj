@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <SpaRoot>..\inventory.client</SpaRoot>
     <SpaProxyLaunchCommand>npm start</SpaProxyLaunchCommand>
-    <SpaProxyServerUrl>https://localhost:50212</SpaProxyServerUrl>
+    <SpaProxyServerUrl>https://localhost:44212</SpaProxyServerUrl>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <UserSecretsId>5480cab8-b41b-4dae-8c41-dbc2c01a15e0</UserSecretsId>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>

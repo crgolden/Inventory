@@ -79,7 +79,7 @@ dotnet user-secrets set InventoryClientSecret "<client secret>" --project Invent
 ```powershell
 dotnet run --project Inventory.Server        # the BFF, https://localhost:7150
 cd inventory.client
-npm start                                    # the client, https://localhost:50212
+npm start                                    # the client, https://localhost:44212
 ```
 
 The client dev server proxies `/bff`, `/products/api`, `/catalog/api` and `/manuals/api` to the BFF

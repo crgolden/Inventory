@@ -102,7 +102,7 @@
           "defaultConfiguration": "development",
           "options": {
             "proxyConfig": "src/proxy.conf.json",
-            "port": 50212
+            "port": 44212
           }
         },
         "test": {
