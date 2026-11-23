@@ -13,7 +13,7 @@ Unit tests carry no control flow (no `if`, loop or `try` in a test body). In a P
 | Backend unit | `Category=Unit` | `Inventory.Tests.Unit` | No | No | Every push/PR |
 | Frontend unit | Vitest project `unit` (jsdom, `src/**/*.spec.ts`) | `inventory.client` | No | No | Every push/PR |
 | Frontend unit in a real browser | Vitest project `browser` (Chromium through `@vitest/browser-playwright`, `src/**/*.browser.spec.ts`) | `inventory.client` | No | No | Every push/PR |
-| Browser E2E | Gherkin features (`e2e/features/*.feature`), `playwright-bdd`, Playwright `--project=chromium` | `inventory.client/e2e` | No. With `CI` set, the BFF signs in against a mock OIDC provider and proxies to mock Products and Manuals; without it, to the local services | Served by `npm start`, which `playwright.config.ts` launches | Every push/PR |
+| Browser E2E | Gherkin features (`e2e/features/*.feature`), `playwright-bdd`, Playwright `--project=chromium` | `inventory.client/e2e` | No. The BFF signs in against a mock OIDC provider and proxies to mock Products and Manuals, locally as in CI | Served by `npm start`, which `playwright.config.ts` launches | Every push/PR |
 | Synthetic walker | Playwright (`--project=synthetic`) | `inventory.client/e2e/synthetic` | No — targets the deployed app directly | No | Scheduled only, never a merge gate |
 
 There is no separate smoke tier against the deployed app: the synthetic walker covers the product lifecycle there,
@@ -92,16 +92,15 @@ npm run e2e:ui               # same suite, Playwright's UI mode, for debugging o
 `playwright.config.ts` starts the BFF and the Angular server itself. **Set `SKIP_WEBSERVER=1` when they are
 already running locally**, or the run waits on ports that are already held.
 
-**With `CI` set the BFF starts from the Release build, never a fresh `dotnet run` build.** A Debug `dotnet run`
+**The BFF starts from the Release build, never a fresh `dotnet run` build.** A Debug `dotnet run`
 builds the `inventory.client.esproj` reference first, a full Angular development build, inside the web server's
 60-second window; it overruns it and Playwright kills the half-built process before any test runs. `--no-build
 --configuration Release` launches the binary CI's and the gate's own build step produced, so E2E also exercises
-the exact artifact those steps verified.
+the exact artifact those steps verified, so a local run builds Release first
+(`dotnet build --configuration Release /p:AngularConfiguration=ci`).
 
-With `CI` set (CI itself, and the local gate), `playwright.config.ts` also starts three mock servers from
-`e2e/mocks/` and points the BFF at them; without it the BFF keeps its `appsettings.Development.json` targets (a local
-OIDC provider and the local Products and Manuals APIs), and `auth.setup.ts` signs in by passkey, so that run needs
-`PASSKEY_CREDENTIAL3`.
+`playwright.config.ts` always starts three mock servers from `e2e/mocks/` and points the BFF at them, locally as in
+CI, so a run's result depends only on the code under test.
 Cleanup is described under **The suite sweeps before and after the run** below.
 
 ### Run all tests in sequence
@@ -118,20 +117,20 @@ cd inventory.client && npx vitest run --coverage && npm run e2e:ci
 
 ```
 playwright.config.ts
-  ├── webServer (CI set only): node e2e/mocks/oidc-server.ts, products-server.ts, manuals-server.ts
-  ├── webServer: dotnet run --project ../Inventory.Server   (https://localhost:7150; with CI set,
-  │              --no-build --configuration Release, the build the gate's own step made)
+  ├── webServer: node e2e/mocks/oidc-server.ts, products-server.ts, manuals-server.ts
+  ├── webServer: dotnet run --project ../Inventory.Server --no-build --configuration Release
+  │              (https://localhost:7150, the build the gate's own step made)
   ├── webServer: npm start                                  (https://localhost:44212)
-  ├── project "setup"     -> auth.setup.ts, sign-in through the BFF (mock OIDC with CI set, passkey without)
+  ├── project "setup"     -> auth.setup.ts, sign-in through the BFF against the mock OIDC provider
   ├── project "chromium"  -> e2e/features/*.feature, compiled by bddgen into .features-gen/chromium,
   │                          steps in e2e/steps/, reusing e2e/.auth/user.json
   └── project "synthetic" -> the scheduled walker, never a merge gate
 ```
 
-**The BFF is the real SUT and everything it calls is a mock in CI.** The mocks are self-contained `node:http`
+**The BFF is the real SUT and everything it calls is a mock.** The mocks are self-contained `node:http`
 servers that Node 24 runs as TypeScript directly (`node e2e/mocks/<name>.ts`). Node resolves only a full file name, so
-their relative imports carry the `.ts` extension and `tsconfig.e2e.json` sets `allowImportingTsExtensions`. Their ports and the switch live in
-`e2e/mocks/mock-dependencies.ts`, read by the config, the mocks and `auth.setup.ts`. The BFF reaches them through its
+their relative imports carry the `.ts` extension and `tsconfig.e2e.json` sets `allowImportingTsExtensions`. Their ports live in `e2e/e2e-settings.json`
+and their shared helpers in `e2e/mocks/mock-dependencies.ts`, read by the config, the mocks and `auth.setup.ts`. The BFF reaches them through its
 ordinary configuration keys (`OidcAuthority`, `ProductsApiAddress`, `ManualsApiAddress`, a generated client id and
 secret) and `OpenIdConnectOptions:RequireHttpsMetadata = false`, the one setting that lets it take a plain-HTTP
 provider; production leaves it at its default, `true`.
@@ -148,13 +147,10 @@ summary, never from the port line.
 
 ### Authentication
 
-With `CI` set, `auth.setup.ts` sets the mock provider's identity cookie and walks `/bff/login`: the BFF runs its real
+`auth.setup.ts` sets the mock provider's identity cookie and walks `/bff/login`: the BFF runs its real
 OIDC code flow against the mock, which echoes the handler's `nonce`, signs the id token with its own JWKS key and answers
 `prompt=none` with `error=login_required` when no identity cookie is present, so the silent-login iframe completes on an
 anonymous page. The session is saved to `e2e/.auth/user.json`, which the `chromium` project reuses.
-
-Without `CI`, the setup signs in to the local OIDC provider by passkey, because a provider that scores sign-ins with
-a CAPTCHA rejects an automation-driven password sign-in whoever is typing.
 
 ### Selector ids
 
@@ -194,12 +190,8 @@ Two consequences worth stating, because both replaced a selector that had gone w
 This suite runs on push/PR as the workflow's `Run browser E2E tests` step (`npm run e2e:ci`, the `chromium` project only, so
 a push never starts a walk). Its `synthetic` project runs on a schedule instead (see **Synthetic walker** below).
 
-**Without `CI`, `auth.setup.ts` signs in by passkey on slot 3**, through `loginWithPasskey({ slot: 3, … })` from
-`@crgolden/modules/synthetic-walker`. Slot 1 carries admin claims everywhere and is reserved for privileged flows;
-Inventory has no roles, so its suite signs in as a non-admin.
-
 `playwright.config.ts` starts the servers itself unless `SKIP_WEBSERVER=1` is set, which is the switch to use when they
-are already running locally. With `CI` set every server starts fresh (`reuseExistingServer: false`), so a run never
+are already running locally. The mocks and the BFF always start fresh (`reuseExistingServer: false`), so a run never
 adopts a stranger's BFF pointed somewhere else; the mock Products seeds enough catalog rows to overflow the scroll
 test's shortened viewport, and every other row a spec needs it creates itself.
 
@@ -207,7 +199,7 @@ test's shortened viewport, and every other row a spec needs it creates itself.
 two prefixes from `e2e/e2e-settings.json`: the name starts with `productNamePrefix` and the model number with
 `modelNumberPrefix-`. `auth.setup.ts` sweeps both through `sweepE2eProducts` once it has signed in, before any spec
 runs, and the `sweep` project (`e2e/sweep.teardown.ts`, the `setup` project's `teardown`) sweeps again after the
-suite. The pre-run sweep is the one that matters: a run that crashes, is killed or stops at `--max-failures` never
+suite. The pre-run sweep is the one that matters: a run that crashes or is killed never
 reaches its own cleanup, and without a sweep at the start its rows would fail every run after it, most visibly the
 empty-state spec, which asserts the account holds no products. Each journey still deletes its own product through
 the product list, because that deletion is itself under test. The sweep is `e2e/product-sweep.ts`, the same code
@@ -220,7 +212,7 @@ row with 204, 404 when it is gone, and 409 while an inventory item still referen
 filter or answered every delete 404 would let a sweep that removes nothing pass.
 
 **Retries are 0 and a failure keeps its trace.** A retry that passes relabels a failed attempt as flaky and hides
-its cause, and `--max-failures=1` then stops at the next test instead. `trace: 'retain-on-failure'` records every
+its cause. `trace: 'retain-on-failure'` records every
 attempt and keeps the failed one, so the attempt that failed is the one that carries evidence.
 
 **Specs seed through the API, not through the form.** `createProduct()` in `e2e/ci-products.ts` posts to

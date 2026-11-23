@@ -1,7 +1,5 @@
 import { NodeProcessArgv } from './node-constants.ts';
 
-export const AGAINST_MOCKS = process.env['CI'] !== undefined;
-
 function scriptArguments(): string[] {
   return process.argv.slice(NodeProcessArgv.firstScriptArgumentIndex);
 }

@@ -37,8 +37,8 @@ design rules: [DESIGN.md](DESIGN.md). Every test tier and how to run it: [TESTIN
   and in your user `~/.npmrc`: `//npm.pkg.github.com/:_authToken=<token>`.
 - A trusted ASP.NET Core development certificate (`dotnet dev-certs https --trust`); the client dev server serves
   HTTPS with it.
-- To run the tests: nothing else. The E2E tier, with `CI` set, starts its own mock OIDC provider, Products and
-  Manuals servers.
+- To run the tests: nothing else. The E2E tier always starts its own mock OIDC provider, Products and Manuals
+  servers.
 - To sign in to a running copy: an OIDC provider with a confidential client for this app (redirect
   `<origin>/signin-oidc`, scopes `offline_access openid profile email phone address manuals products`), and the
   Products and Manuals APIs.

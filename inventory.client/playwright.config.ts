@@ -4,10 +4,9 @@ import { cucumberReporter, defineBddProject } from 'playwright-bdd';
 import { bffPort } from './e2e/bff-launch';
 import { CucumberReporterTypes } from './e2e/cucumber-constants';
 import e2eSettings from './e2e/e2e-settings.json';
-import { AGAINST_MOCKS, localOrigin } from './e2e/mocks/mock-dependencies';
+import { localOrigin } from './e2e/mocks/mock-dependencies';
 
 const walkerBaseUrl = process.env['WalkerBaseUrl']?.replace(/\/$/, '');
-const againstMocks = AGAINST_MOCKS;
 
 const mockServers = [
   { script: 'e2e/mocks/oidc-server.ts', port: e2eSettings.mockOidcPort, extraArguments: [e2eSettings.mockIdentityCookie] },
@@ -61,15 +60,13 @@ export default defineConfig({
   },
 
   webServer: (walkerBaseUrl || process.env['SKIP_WEBSERVER']) ? [] : [
-    ...(againstMocks ? mockServers : []),
+    ...mockServers,
     {
-      command: againstMocks
-        ? 'dotnet run --project ../Inventory.Server --no-build --configuration Release'
-        : 'dotnet run --project ../Inventory.Server',
+      command: 'dotnet run --project ../Inventory.Server --no-build --configuration Release',
       port: bffPort(),
-      reuseExistingServer: !againstMocks,
+      reuseExistingServer: false,
       timeout: 60000,
-      ...(againstMocks ? { env: bffAgainstMocks } : {}),
+      env: bffAgainstMocks,
     },
     {
       command: 'npm start',

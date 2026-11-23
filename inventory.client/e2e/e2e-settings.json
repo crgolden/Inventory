@@ -10,7 +10,6 @@
   "bddSteps": "e2e/steps/**/*.ts",
   "cucumberMessagesFile": "cucumber-report/messages.ndjson",
   "cucumberHtmlFile": "cucumber-report/index.html",
-  "localPasskeySlot": 3,
   "mockOidcPort": 5301,
   "mockProductsPort": 5302,
   "mockManualsPort": 5303,

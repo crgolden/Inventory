@@ -12,11 +12,10 @@ $gateOutput = if (Get-Command Get-GateOutputDirectory -ErrorAction SilentlyConti
 } else {
     (New-Item -ItemType Directory -Force -Path (Join-Path ([IO.Path]::GetTempPath()) "claude\crgolden-gates\$(Split-Path -Leaf $PSScriptRoot)")).FullName
 }
-$GateDelta = @('plant:inventory.client/src/zz-bail-plant.spec.ts')
 
 Register-GateStep @('node_modules install markers', 'Restore local tools',
     'npm run lint', 'npm run typecheck:e2e', 'npm run typecheck:spec', 'npm run lint:css', 'npm run audit', 'Begin Sonar analysis', 'Build with dotnet',
-    'jb inspectcode', 'Run unit tests with coverage', 'Install Playwright browsers', 'Run UI tests', 'Vitest bail plant',
+    'jb inspectcode', 'Run unit tests with coverage', 'Install Playwright browsers', 'Run UI tests',
     'Fix LCOV paths', 'Run browser E2E tests', 'Browser E2E executed at least its floor', 'Publish command reaches the CLI',
     'npm run lint:utilities', 'End Sonar analysis', 'Fail on open Sonar issues')
 Register-StepInput 'node_modules install markers' @('*')
@@ -32,7 +31,6 @@ Register-StepInput 'jb inspectcode' @('*')
 Register-StepInput 'Run unit tests with coverage' @('*', '!inventory.client/e2e/*', '!inventory.client/src/*.spec.ts')
 Register-StepInput 'Install Playwright browsers' @('*')
 Register-StepInput 'Run UI tests' @('*', '!Inventory.Tests.Unit/*', '!inventory.client/e2e/*')
-Register-StepInput 'Vitest bail plant' @('*', '!Inventory.Tests.Unit/*', '!inventory.client/e2e/*')
 Register-StepInput 'Fix LCOV paths' @('*', '!Inventory.Tests.Unit/*', '!inventory.client/e2e/*')
 Register-StepInput 'Run browser E2E tests' @('*', '!Inventory.Tests.Unit/*', '!inventory.client/src/*.spec.ts')
 Register-StepInput 'Browser E2E executed at least its floor' @('*', '!Inventory.Tests.Unit/*', '!inventory.client/src/*.spec.ts')
@@ -45,9 +43,6 @@ $repo = $PSScriptRoot
 $client = Join-Path $repo 'inventory.client'
 $scratch = $gateOutput
 $sarif = Join-Path $scratch 'inventory-inspect.sarif'
-$bailReport = Join-Path $scratch 'inventory-bail-plant.json'
-$plant = Join-Path $client 'src\zz-bail-plant.spec.ts'
-$plantedFailures = 3
 $unitTrx = Join-Path $repo 'Inventory.Tests.Unit\bin\Release\net11.0\TestResults\unit-tests.trx'
 $sonarBranch = Get-SonarBranchName
 $beginSonar = "Begin Sonar analysis (branch $sonarBranch)"
@@ -123,38 +118,44 @@ Initialize-GateState 'Inventory' $repo
 Get-OwedStep | Register-OwedStep
 Invoke-GateLibraryStep
 
-$installed = (Test-Path (Join-Path $client 'node_modules\.package-lock.json')) -and
-    (Test-Path (Join-Path $client 'node_modules\ajv')) -and (Test-Path (Join-Path $client 'node_modules\.bin\tsc.cmd'))
-if (-not $installed) { Stop-Gate 'node_modules install markers' 'incomplete install; run npm ci deliberately first' }
-Assert-NodeInstallCurrent $client
-Write-Row 'node_modules install markers' 'PASS' 'ajv, tsc.cmd present; every package matches package-lock.json'
+$markers = 'node_modules install markers'
+Invoke-GateStep -Name $markers -Always -Body {
+    $installed = (Test-Path (Join-Path $client 'node_modules\.package-lock.json')) -and
+        (Test-Path (Join-Path $client 'node_modules\ajv')) -and (Test-Path (Join-Path $client 'node_modules\.bin\tsc.cmd'))
+    if (-not $installed) { Stop-Gate $markers 'incomplete install; run npm ci deliberately first' }
+    Assert-NodeInstallCurrent $client
+    Write-Row $markers 'PASS' 'ajv, tsc.cmd present; every package matches package-lock.json'
+}
 
-$global:LASTEXITCODE = $null
-dotnet tool restore
-Assert-StepExit 'Restore local tools (dotnet tool restore)'
+$restore = 'Restore local tools (dotnet tool restore)'
+Invoke-GateStep -Name $restore -Body {
+    $global:LASTEXITCODE = $null
+    dotnet tool restore
+    Assert-StepExit $restore
+}
 
 Set-Location $client
-if (-not (Test-StepCarried 'npm run lint')) {
+Invoke-GateStep -Name 'npm run lint' -Needs @($markers) -Body {
     $global:LASTEXITCODE = $null
     npm run lint
     Assert-StepExit 'npm run lint'
 }
-if (-not (Test-StepCarried 'npm run typecheck:e2e')) {
+Invoke-GateStep -Name 'npm run typecheck:e2e' -Needs @($markers) -Body {
     $global:LASTEXITCODE = $null
     npm run typecheck:e2e
     Assert-StepExit 'npm run typecheck:e2e'
 }
-if (-not (Test-StepCarried 'npm run typecheck:spec')) {
+Invoke-GateStep -Name 'npm run typecheck:spec' -Needs @($markers) -Body {
     $global:LASTEXITCODE = $null
     npm run typecheck:spec
     Assert-StepExit 'npm run typecheck:spec'
 }
-if (-not (Test-StepCarried 'npm run lint:css')) {
+Invoke-GateStep -Name 'npm run lint:css' -Needs @($markers) -Body {
     $global:LASTEXITCODE = $null
     npm run lint:css
     Assert-StepExit 'npm run lint:css'
 }
-if (-not (Test-StepCarried 'npm run audit')) {
+Invoke-GateStep -Name 'npm run audit' -Needs @($markers) -Body {
     $global:LASTEXITCODE = $null
     npm run audit
     Assert-StepExit 'npm run audit'
@@ -169,28 +170,32 @@ if ($sonarCarried) {
 }
 else {
     $sonarStartedAt = [DateTimeOffset]::UtcNow
-    $env:JAVA_HOME = Get-SonarScannerJavaHome $beginSonar
-    $global:LASTEXITCODE = $null
-    dotnet-sonarscanner begin /k:"crgolden_Inventory" /o:"crgolden" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.opencover.reportsPaths="coverage.opencover.xml" /d:sonar.javascript.lcov.reportPaths="coverage/lcov.info" /d:sonar.exclusions="**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup*.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js,gate.ps1" /d:sonar.test.inclusions="**/*.spec.ts" /d:sonar.qualitygate.wait=true /d:sonar.scanner.skipJreProvisioning=true /d:sonar.scm.use.blame.algorithm=GIT_NATIVE_BLAME /d:sonar.branch.name="$sonarBranch"
-    Assert-StepExit $beginSonar
+    Invoke-GateStep -Name $beginSonar -Always -Body {
+        $env:JAVA_HOME = Get-SonarScannerJavaHome $beginSonar
+        $global:LASTEXITCODE = $null
+        dotnet-sonarscanner begin /k:"crgolden_Inventory" /o:"crgolden" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.opencover.reportsPaths="coverage.opencover.xml" /d:sonar.javascript.lcov.reportPaths="coverage/lcov.info" /d:sonar.exclusions="**/bin/**,**/obj/**,**/node_modules/**,**/*.d.ts" /d:sonar.coverage.exclusions="inventory.client/e2e/**,inventory.client/src/test-setup*.ts,**/Program.cs,inventory.client/**/*.config.*,inventory.client/src/environments/**,inventory.client/src/main.ts,inventory.client/aspnetcore-https.js,inventory.client/start-os.js,gate.ps1" /d:sonar.test.inclusions="**/*.spec.ts" /d:sonar.qualitygate.wait=true /d:sonar.scanner.skipJreProvisioning=true /d:sonar.scm.use.blame.algorithm=GIT_NATIVE_BLAME /d:sonar.branch.name="$sonarBranch"
+        Assert-StepExit $beginSonar
+    }
 
-    $global:LASTEXITCODE = $null
-    dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci /p:RestoreLockedMode=true /nodeReuse:false -warnaserror
-    Assert-StepExit $build
+    Invoke-GateStep -Name $build -Needs @($markers) -Always -Body {
+        $global:LASTEXITCODE = $null
+        dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci /p:RestoreLockedMode=true /nodeReuse:false -warnaserror
+        Assert-StepExit $build
+    }
 }
 
-if (-not (Test-StepCarried 'jb inspectcode')) {
+Invoke-GateStep -Name 'jb inspectcode' -Needs @($build, $restore) -Body {
     if (Test-Path $sarif) { Remove-Item $sarif -Force }
     dotnet jb inspectcode "$repo\Inventory.slnx" --no-build -e=WARNING --caches-home="$(New-InspectCodeCache $gateOutput)" --output="$sarif" --exclude="**/coverage/**;**/dist/**;**/node_modules/**;**/bin/**;**/obj/**"
     Test-Sarif $sarif
 }
 
-if (-not (Test-StepCarried $unitStep)) {
+Invoke-GateStep -Name $unitStep -Needs @($build, $restore) -Body {
     if (Test-Path $unitTrx) { Remove-Item $unitTrx -Force }
     $global:LASTEXITCODE = $null
     dotnet coverlet Inventory.Tests.Unit\bin\Release\net11.0 `
         --target "dotnet" `
-        --targetargs "test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait Category=Unit --stop-on-fail on --report-xunit-trx --report-xunit-trx-filename unit-tests.trx --results-directory=Inventory.Tests.Unit/bin/Release/net11.0/TestResults" `
+        --targetargs "test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait Category=Unit --report-xunit-trx --report-xunit-trx-filename unit-tests.trx --results-directory=Inventory.Tests.Unit/bin/Release/net11.0/TestResults" `
         --format opencover --output "coverage.opencover.xml" `
         --skipautoprops --exclude-by-attribute GeneratedCodeAttribute --exclude-by-file "**/obj/**" `
         --exclude-by-file "**/Program.cs" --does-not-return-attribute DoesNotReturnAttribute --include "[Inventory.Server]*"
@@ -198,66 +203,57 @@ if (-not (Test-StepCarried $unitStep)) {
 }
 
 Set-Location $client
-Install-PlaywrightBrowser 'Install Playwright browsers' { npx playwright install --dry-run chromium } { npm run playwright:install }
+$playwright = 'Install Playwright browsers'
+Invoke-GateStep -Name $playwright -Needs @($markers) -Always -Body {
+    Install-PlaywrightBrowser $playwright { npx playwright install --dry-run chromium } { npm run playwright:install }
+}
 
-if (-not (Test-StepCarried $uiStep)) {
+Invoke-GateStep -Name $uiStep -Needs @($markers, $playwright) -Body {
     $global:LASTEXITCODE = $null
     npx --no -- vitest run --coverage
     Assert-StepExit $uiStep
 }
 
-$plantStep = "Vitest bail plant ($plantedFailures failing tests planted, bail: 1 must stop the run before the second)"
-if (-not (Test-StepCarried $plantStep)) {
-    $cases = 1..$plantedFailures | ForEach-Object { "  it('planted failure $_', () => { expect(true).toBe(false); });" }
-    Set-Content -Path $plant -Value (@("describe('bail plant', () => {") + $cases + @('});'))
-    if (Test-Path $bailReport) { Remove-Item $bailReport -Force }
-    try {
-        $global:LASTEXITCODE = $null
-        npx vitest run src/zz-bail-plant.spec.ts --coverage.enabled=false --reporter=json --outputFile="$bailReport"
-        $plantExit = $global:LASTEXITCODE
-    }
-    finally { Remove-Item $plant -Force -ErrorAction SilentlyContinue }
-    if (Test-Path $plant) { Stop-Gate $plantStep 'the plant file could not be removed' }
-    if (-not (Test-Path $bailReport)) { Stop-Gate $plantStep "no JSON report (exit $plantExit): the plant did not run" }
-    $report = Get-Content $bailReport -Raw | ConvertFrom-Json
-    $detail = "exit $plantExit, collected $($report.numTotalTests), failed $($report.numFailedTests)"
-    if ($report.numTotalTests -ne $plantedFailures) { Stop-Gate $plantStep "the plant did not apply: $detail" }
-    if ($plantExit -eq 0 -or $report.numFailedTests -lt 1) { Stop-Gate $plantStep "the planted failures did not fail the run: $detail" }
-    if ($report.numFailedTests -ge $plantedFailures) { Stop-Gate $plantStep "bail did not stop the run: $detail" }
-    Write-Row $plantStep 'PASS' $detail
-}
-
-if (-not (Test-StepCarried 'Fix LCOV paths for SonarQube')) {
+$lcovStep = 'Fix LCOV paths for SonarQube'
+Invoke-GateStep -Name $lcovStep -Needs @($uiStep) -Body {
     $lcov = Join-Path $client 'coverage\lcov.info'
-    if (-not (Test-Path $lcov)) { Stop-Gate 'Fix LCOV paths for SonarQube' 'coverage/lcov.info missing' }
+    if (-not (Test-Path $lcov)) { Stop-Gate $lcovStep 'coverage/lcov.info missing' }
     (Get-Content $lcov) -replace '\\', '/' | Set-Content $lcov
-    Write-Row 'Fix LCOV paths for SonarQube' 'PASS' ''
+    Write-Row $lcovStep 'PASS' ''
 }
 
 $e2eStep = 'Run browser E2E tests (npm run e2e:ci, CI=true, mock dependencies)'
-if (-not (Test-StepCarried $e2eStep)) {
-    $results = Join-Path $client 'playwright-results.xml'
+$floorStep = 'Browser E2E executed at least its floor'
+$publishStep = 'Publish command reaches the CLI (the workflow line run without GITHUB_RUN_ID must fail on the run identity, not on usage)'
+$results = Join-Path $client 'playwright-results.xml'
+$e2eRun = @{ Ran = $false }
+Invoke-GateStep -Name $e2eStep -Needs @($build, $markers, $playwright) -Body {
+    $e2eRun.Ran = $true
     if (Test-Path $results) { Remove-Item $results -Force }
-    $env:ASPNETCORE_ENVIRONMENT = 'CI'
     $global:LASTEXITCODE = $null
     npm run e2e:ci
     Assert-StepExit $e2eStep
-    $floorStep = 'Browser E2E executed at least its floor'
-    if (-not (Test-Path $results)) { Stop-Gate $floorStep 'playwright-results.xml missing' }
-    $floor = [int](Get-Content (Join-Path $client 'e2e\e2e-settings.json') -Raw | ConvertFrom-Json).executedTestFloor
-    $xml = [xml](Get-Content $results -Raw)
-    $tests = [int]$xml.testsuites.tests
-    $skipped = [int]$xml.testsuites.skipped
-    $executed = $tests - $skipped
-    if ($floor -le 0 -or $executed -lt $floor) { Stop-Gate $floorStep "executed $executed (tests $tests, skipped $skipped), floor $floor" }
-    Write-Row $floorStep 'PASS' "executed $executed (tests $tests, skipped $skipped), floor $floor"
 }
-$publishStep = 'Publish command reaches the CLI (the workflow line run without GITHUB_RUN_ID must fail on the run identity, not on usage)'
-if (-not (Test-StepCarried $publishStep)) {
+if ($e2eRun.Ran) {
+    Invoke-GateStep -Name $floorStep -Always -Body {
+        if (-not (Test-Path $results)) { Stop-Gate $floorStep 'playwright-results.xml missing' }
+        $floor = [int](Get-Content (Join-Path $client 'e2e\e2e-settings.json') -Raw | ConvertFrom-Json).executedTestFloor
+        $xml = [xml](Get-Content $results -Raw)
+        $tests = [int]$xml.testsuites.tests
+        $skipped = [int]$xml.testsuites.skipped
+        $executed = $tests - $skipped
+        if ($floor -le 0 -or $executed -lt $floor) { Stop-Gate $floorStep "executed $executed (tests $tests, skipped $skipped), floor $floor" }
+        Write-Row $floorStep 'PASS' "executed $executed (tests $tests, skipped $skipped), floor $floor"
+    }
+}
+elseif (@(Get-FailedStep -Step @($e2eStep)).Count) {
+    Write-PrerequisiteUnreached -Step @($floorStep) -Failed @($e2eStep)
+}
+Invoke-GateStep -Name $publishStep -Needs @($e2eStep) -Body {
     Test-PublishCommandLine $publishStep (Join-Path $repo '.github\workflows\master_crgolden-inventory.yml') 'Inventory' $client `
         (Get-Content (Join-Path $client 'e2e\e2e-settings.json') -Raw | ConvertFrom-Json).cucumberMessagesFile
 }
-if (-not (Test-StepCarried 'npm run lint:utilities')) {
+Invoke-GateStep -Name 'npm run lint:utilities' -Needs @($build) -Body {
     $global:LASTEXITCODE = $null
     npm run lint:utilities
     Assert-StepExit 'npm run lint:utilities'
@@ -265,10 +261,14 @@ if (-not (Test-StepCarried 'npm run lint:utilities')) {
 Set-Location $repo
 
 if (-not $sonarCarried) {
-    $global:LASTEXITCODE = $null
-    dotnet-sonarscanner end
-    Assert-StepExit $endSonar
-    Assert-NoOpenSonarIssue $sonarIssues 'crgolden_Inventory' $sonarBranch $sonarStartedAt
+    Invoke-GateStep -Name $endSonar -Needs @($beginSonar, $build, $unitStep, $uiStep, $lcovStep, $e2eStep) -Always -Body {
+        $global:LASTEXITCODE = $null
+        dotnet-sonarscanner end
+        Assert-StepExit $endSonar
+    }
+    Invoke-GateStep -Name $sonarIssues -Needs @($endSonar) -Always -Body {
+        Assert-NoOpenSonarIssue $sonarIssues 'crgolden_Inventory' $sonarBranch $sonarStartedAt
+    }
 }
 
 Write-Row 'Upload test results / Publish E2E scenario results / dotnet publish / upload artifact / deploy' 'NOT RUN' 'delivery steps, not checks'

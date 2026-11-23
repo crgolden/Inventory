@@ -14,7 +14,7 @@
     "e2e": "bddgen && playwright test",
     "e2e:ui": "bddgen && playwright test --ui",
     "e2e:report": "playwright show-report",
-    "e2e:ci": "bddgen && playwright test --project=chromium --max-failures=1",
+    "e2e:ci": "bddgen && playwright test --project=chromium",
     "e2e:synthetic": "playwright test --project=synthetic",
     "typecheck:e2e": "bddgen && tsc -p tsconfig.e2e.json",
     "typecheck:spec": "tsc -p tsconfig.spec.json --noEmit",
