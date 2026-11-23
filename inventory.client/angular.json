@@ -54,7 +54,7 @@
               ],
               "outputHashing": "all"
             },
-            "ci": {
+            "e2e": {
               "budgets": [
                 {
                   "type": "initial",
@@ -71,7 +71,7 @@
               "fileReplacements": [
                 {
                   "replace": "src/environments/environment.ts",
-                  "with": "src/environments/environment.ci.ts"
+                  "with": "src/environments/environment.e2e.ts"
                 }
               ]
             },

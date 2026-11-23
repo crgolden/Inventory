@@ -46,13 +46,12 @@ $sarif = Join-Path $scratch 'inventory-inspect.sarif'
 $unitTrx = Join-Path $repo 'Inventory.Tests.Unit\bin\Release\net11.0\TestResults\unit-tests.trx'
 $sonarBranch = Get-SonarBranchName
 $beginSonar = "Begin Sonar analysis (branch $sonarBranch)"
-$build = 'Build with dotnet (Release, AngularConfiguration=ci, RestoreLockedMode)'
+$build = 'Build with dotnet (Release, AngularConfiguration=e2e, RestoreLockedMode)'
 $endSonar = 'End Sonar analysis (quality gate waited)'
 $sonarIssues = 'Fail on open Sonar issues'
 $unitStep = 'Run unit tests with coverage (Category=Unit)'
 $uiStep = 'Run UI tests (npx --no -- vitest run --coverage)'
 $env:TZ = 'UTC'
-$env:CI = 'true'
 if ($env:TZ -ne 'UTC') { Write-Host 'GATE: FAILED (TZ pin)'; exit 1 }
 Set-Location $repo
 $probeRoots = @('Inventory.Tests.Unit/', 'inventory.client/src/', 'inventory.client/e2e/')
@@ -179,7 +178,7 @@ else {
 
     Invoke-GateStep -Name $build -Needs @($markers) -Always -Body {
         $global:LASTEXITCODE = $null
-        dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci /p:RestoreLockedMode=true /nodeReuse:false -warnaserror
+        dotnet build --no-incremental --configuration Release /p:AngularConfiguration=e2e /p:RestoreLockedMode=true /nodeReuse:false -warnaserror
         Assert-StepExit $build
     }
 }
@@ -222,7 +221,7 @@ Invoke-GateStep -Name $lcovStep -Needs @($uiStep) -Body {
     Write-Row $lcovStep 'PASS' ''
 }
 
-$e2eStep = 'Run browser E2E tests (npm run e2e:ci, CI=true, mock dependencies)'
+$e2eStep = 'Run browser E2E tests (npm run e2e, mock dependencies)'
 $floorStep = 'Browser E2E executed at least its floor'
 $publishStep = 'Publish command reaches the CLI (the workflow line run without GITHUB_RUN_ID must fail on the run identity, not on usage)'
 $results = Join-Path $client 'playwright-results.xml'
@@ -231,7 +230,7 @@ Invoke-GateStep -Name $e2eStep -Needs @($build, $markers, $playwright) -Body {
     $e2eRun.Ran = $true
     if (Test-Path $results) { Remove-Item $results -Force }
     $global:LASTEXITCODE = $null
-    npm run e2e:ci
+    npm run e2e
     Assert-StepExit $e2eStep
 }
 if ($e2eRun.Ran) {

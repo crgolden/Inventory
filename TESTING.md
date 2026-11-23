@@ -31,9 +31,9 @@ with a sweep for the rows it writes.
 |---|---|---|
 | `Debug` (default) | `ng build --configuration development` — no optimization, fast (~1 min) | Local development and local test runs |
 | `Release` (default) | `ng build --configuration production` — AOT, minification, tree-shaking (~4–5 min) | Local production-bundle testing only |
-| `Release /p:AngularConfiguration=ci` | `ng build --configuration ci` — same optimizations as `production` | CI build step |
+| `Release /p:AngularConfiguration=e2e` | `ng build --configuration e2e` — same optimizations as `production` | CI build step |
 
-The `BuildAngularRelease` target accepts `/p:AngularConfiguration=<name>` to select any Angular configuration defined in `angular.json`. The default for Release is `production`. CI explicitly passes `ci`; adding a staging environment requires only a new `environment.staging.ts`, a matching entry in `angular.json`, and `/p:AngularConfiguration=staging` in the pipeline.
+The `BuildAngularRelease` target accepts `/p:AngularConfiguration=<name>` to select any Angular configuration defined in `angular.json`. The default for Release is `production`. CI explicitly passes `e2e`; adding a staging environment requires only a new `environment.staging.ts`, a matching entry in `angular.json`, and `/p:AngularConfiguration=staging` in the pipeline.
 
 Always use `--configuration Debug` for local test runs. There is no reason to pay the production build cost just to run tests — Playwright only needs the files to exist and load in a browser.
 
@@ -85,7 +85,7 @@ npx vitest run --coverage  # with LCOV coverage report → coverage/lcov.info
 ```bash
 cd inventory.client
 npm run playwright:install   # once per machine
-npm run e2e:ci               # what CI runs: the chromium project only
+npm run e2e               # what CI runs: the chromium project only
 npm run e2e:ui               # same suite, Playwright's UI mode, for debugging one spec
 ```
 
@@ -97,7 +97,7 @@ builds the `inventory.client.esproj` reference first, a full Angular development
 60-second window; it overruns it and Playwright kills the half-built process before any test runs. `--no-build
 --configuration Release` launches the binary CI's and the gate's own build step produced, so E2E also exercises
 the exact artifact those steps verified, so a local run builds Release first
-(`dotnet build --configuration Release /p:AngularConfiguration=ci`).
+(`dotnet build --configuration Release /p:AngularConfiguration=e2e`).
 
 `playwright.config.ts` always starts three mock servers from `e2e/mocks/` and points the BFF at them, locally as in
 CI, so a run's result depends only on the code under test.
@@ -108,7 +108,7 @@ Cleanup is described under **The suite sweeps before and after the run** below.
 ```powershell
 dotnet build Inventory.Tests.Unit --configuration Debug
 .\Inventory.Tests.Unit\bin\Debug\net11.0\Inventory.Tests.Unit.exe -showLiveOutput
-cd inventory.client && npx vitest run --coverage && npm run e2e:ci
+cd inventory.client && npx vitest run --coverage && npm run e2e
 ```
 
 ---
@@ -187,7 +187,7 @@ Two consequences worth stating, because both replaced a selector that had gone w
 
 ### TypeScript Playwright suite (`inventory.client/e2e`)
 
-This suite runs on push/PR as the workflow's `Run browser E2E tests` step (`npm run e2e:ci`, the `chromium` project only, so
+This suite runs on push/PR as the workflow's `Run browser E2E tests` step (`npm run e2e`, the `chromium` project only, so
 a push never starts a walk). Its `synthetic` project runs on a schedule instead (see **Synthetic walker** below).
 
 `playwright.config.ts` starts the servers itself unless `SKIP_WEBSERVER=1` is set, which is the switch to use when they
@@ -231,7 +231,7 @@ selectors or implementation details in the Gherkin:
 | `catalog.feature` | Viewing a product from the catalog; opening a catalog product that does not exist; going back to the catalog keeps my place |
 | `products.feature` | My products are listed; an owner with no products is told so; adding, viewing, renaming and deleting a product; opening a product that does not exist; finding a product's manual |
 
-- **`npm run e2e:ci` runs `bddgen` first**, which compiles the features into `.features-gen/chromium/*.spec.js`
+- **`npm run e2e` runs `bddgen` first**, which compiles the features into `.features-gen/chromium/*.spec.js`
   (git-ignored). `typecheck:e2e` runs it too. The `setup`, `sweep` and `synthetic` projects are plain Playwright
   with their own `testDir`, as `playwright-bdd` requires.
 - **Steps live one file per feature area in `e2e/steps/`**, built with `createBdd` over the `test` in
@@ -340,12 +340,12 @@ What a browser adds that jsdom cannot is **layout**, which `manual-chat-panel.la
 
 1. From `inventory.client/`: `npm ci`, `npm run lint`, `npm run typecheck:e2e`, `npm run typecheck:spec`,
    `npm run lint:css`, `npm run audit` (fails on a high or critical advisory)
-2. Build solution (`dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci /p:RestoreLockedMode=true -warnaserror`), under which Angular uses `environment.ci.ts`. `dotnet publish` rebuilds Angular without the override, producing the `production` bundle for the deployed artifact.
+2. Build solution (`dotnet build --no-incremental --configuration Release /p:AngularConfiguration=e2e /p:RestoreLockedMode=true -warnaserror`), under which Angular uses `environment.e2e.ts`. `dotnet publish` rebuilds Angular without the override, producing the `production` bundle for the deployed artifact.
 3. ReSharper inspection (`jb inspectcode`)
 4. Backend unit tests with coverage (`dotnet coverlet … --filter-trait Category=Unit`, OpenCover → `coverage.opencover.xml`)
 5. Cache + install Playwright Chromium, which the `browser` Vitest project needs as well as the E2E suite
 6. Frontend unit tests with coverage (`npx vitest run --coverage`, both Vitest projects)
-7. Browser E2E tests (`npm run e2e:ci`)
+7. Browser E2E tests (`npm run e2e`)
 8. Assert the browser E2E run executed at least `executedTestFloor` tests (`e2e/e2e-settings.json`)
 9. Publish E2E scenario results (`publish-bdd-results`, `vars.TEST_RESULTS_*` and `secrets.TEST_RESULTS_PGPASSWORD`)
 10. `npm run lint:utilities` against the built CSS
@@ -401,7 +401,7 @@ deployed BFF out of process, so nothing instruments it, and `inventory.client/e2
 
 ```powershell
 # .NET unit (OpenCover) — the Inventory.Server BFF surface is tiny; real client logic is Vitest/LCOV
-dotnet build Inventory.Tests.Unit --configuration Release /p:AngularConfiguration=ci
+dotnet build Inventory.Tests.Unit --configuration Release /p:AngularConfiguration=e2e
 dotnet tool restore
 dotnet coverlet Inventory.Tests.Unit\bin\Release\net11.0 `
   --target "dotnet" `

@@ -186,7 +186,7 @@ jobs:
       - name: Build with dotnet
         env:
           NuGetPackageSourceCredentials_GitHub: Username=${{ github.actor }};Password=${{ secrets.PACKAGES_READ_TOKEN }}
-        run: dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci /p:RestoreLockedMode=true -warnaserror
+        run: dotnet build --no-incremental --configuration Release /p:AngularConfiguration=e2e /p:RestoreLockedMode=true -warnaserror
 
       - name: ReSharper inspection (jb inspectcode)
         run: |
@@ -263,7 +263,7 @@ jobs:
         working-directory: inventory.client
         env:
           ASPNETCORE_ENVIRONMENT: CI
-        run: npm run e2e:ci
+        run: npm run e2e
 
       - name: Assert browser E2E executed at least its floor
         working-directory: inventory.client

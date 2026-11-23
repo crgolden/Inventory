@@ -103,8 +103,7 @@ The browser E2E tier and the synthetic walker are in [TESTING.md](TESTING.md).
 variable names, which defines the step functions `gate.ps1` calls; unset, as in a plain clone, it stops at once with
 `GATE: FAILED` and records nothing. To gate with a library of your own, set `GATE_LIBRARY` to its path; it must
 define every function `gate.ps1` calls, since those functions decide whether each step ran and passed. To gate your own change without one, run the checks CI runs, in this order (the npm and `npx` steps from
-`inventory.client/`, the `dotnet` steps from the repo root; set `CI=true` and `ASPNETCORE_ENVIRONMENT=CI` before
-`e2e:ci` so the E2E tier uses its mocks):
+`inventory.client/`, the `dotnet` steps from the repo root; the E2E tier always runs against its mocks):
 
 ```powershell
 npm ci
@@ -113,13 +112,13 @@ npm run typecheck:e2e
 npm run typecheck:spec
 npm run lint:css
 npm run audit
-dotnet build --no-incremental --configuration Release /p:AngularConfiguration=ci /p:RestoreLockedMode=true -warnaserror
+dotnet build --no-incremental --configuration Release /p:AngularConfiguration=e2e /p:RestoreLockedMode=true -warnaserror
 dotnet jb inspectcode Inventory.slnx --no-build -e=WARNING --output=inspectcode.sarif --exclude="**/coverage/**;**/dist/**;**/node_modules/**;**/bin/**;**/obj/**"
 dotnet test --project Inventory.Tests.Unit --no-build --configuration Release -- --filter-trait "Category=Unit"
 npm run playwright:install
 npx vitest run --coverage
 dotnet dev-certs https
-npm run e2e:ci
+npm run e2e
 npm run lint:utilities
 ```
 
