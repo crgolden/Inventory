@@ -214,7 +214,7 @@ Invoke-GateStep -Name $uiStep -Needs @($markers, $playwright) -Body {
 }
 
 $lcovStep = 'Fix LCOV paths for SonarQube'
-Invoke-GateStep -Name $lcovStep -Needs @($uiStep) -Body {
+Invoke-GateStep -Name $lcovStep -Needs @($markers, $playwright) -Body {
     $lcov = Join-Path $client 'coverage\lcov.info'
     if (-not (Test-Path $lcov)) { Stop-Gate $lcovStep 'coverage/lcov.info missing' }
     (Get-Content $lcov) -replace '\\', '/' | Set-Content $lcov
@@ -260,7 +260,7 @@ Invoke-GateStep -Name 'npm run lint:utilities' -Needs @($build) -Body {
 Set-Location $repo
 
 if (-not $sonarCarried) {
-    Invoke-GateStep -Name $endSonar -Needs @($beginSonar, $build, $unitStep, $uiStep, $lcovStep, $e2eStep) -Always -Body {
+    Invoke-GateStep -Name $endSonar -Needs @($beginSonar, $build, $lcovStep) -Always -Body {
         $global:LASTEXITCODE = $null
         dotnet-sonarscanner end
         Assert-StepExit $endSonar
