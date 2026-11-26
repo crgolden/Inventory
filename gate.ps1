@@ -127,7 +127,7 @@ Invoke-GateStep -Name $markers -Always -Body {
 }
 
 $restore = 'Restore local tools (dotnet tool restore)'
-Invoke-GateStep -Name $restore -Body {
+Invoke-GateStep -Name $restore -Always -Body {
     $global:LASTEXITCODE = $null
     dotnet tool restore
     Assert-StepExit $restore
